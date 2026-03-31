@@ -1,0 +1,234 @@
+let currentSortMode = '';
+let currentCategoryPage = null;
+
+function getCategoryPageParam() {
+    const value = new URLSearchParams(window.location.search).get('category');
+    return (value || '').trim();
+}
+
+function updateSingleCategoryBodyState() {
+    document.body.classList.toggle('single-category-view', !!currentCategoryPage);
+}
+
+function openCategoryPage(encodedCategory) {
+    const category = decodeURIComponent(encodedCategory || '').trim();
+    if (!category) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('category', category);
+    window.location.href = url.toString();
+}
+
+function backToAllCategories() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('category');
+    const query = url.searchParams.toString();
+    window.location.href = query ? `${url.pathname}?${query}` : url.pathname;
+}
+
+function getCategoryProductCardHtml(p) {
+    const isOutOfStock = !!p.isGroupOutOfStock;
+    const avgRating = (p.rating || 0).toFixed(1);
+    const image = Array.isArray(p.image) ? p.image[0] : (p.image || 'https://via.placeholder.com/900x600?text=No+Image');
+    const priceDisplay = `P${formatPeso(p.price)}`;
+
+    return `
+        <div class="product-card" data-id="${p.id}" onclick="openProductModal(${p.id})" style="cursor: pointer; ${isOutOfStock ? 'opacity:0.6;' : ''}">
+            <div class="product-image" style="position:relative;">
+                <img src="${image}" alt="${p.name}" class="product-card-img"/>
+                ${p.variantCount > 0 ? `<span class="product-variant-badge">${p.variantCount} options</span>` : ''}
+                ${isOutOfStock ? '<div style="position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;border-radius:8px;"><span style="color:#fff;font-weight:700;font-size:16px;">Out of Stock</span></div>' : ''}
+            </div>
+            <div class="product-info">
+                <div class="product-name">${p.name}</div>
+                <div class="product-rating">★ ${avgRating} <span style="color:#999;font-size:13px;">(${p.reviewCount || 0} reviews)</span></div>
+                <div class="product-price">${priceDisplay}</div>
+                <div style="margin-top:8px;font-size:13px;color:${isOutOfStock ? '#e22a39' : '#27ae60'};font-weight:600;">Stock: ${p.groupStock}</div>
+                <div style="margin-top:4px;font-size:13px;color:#666;font-weight:600;">Orders: ${Number(p.groupOrderCount || 0)}</div>
+            </div>
+        </div>
+    `;
+}
+
+function renderProducts(productsToRender = filteredProducts) {
+    try {
+        const grid = document.getElementById('productsGrid');
+        if (!grid) return;
+
+        if (!productsToRender || !productsToRender.length) {
+            grid.innerHTML = '';
+            return;
+        }
+
+        const groupedProductsMap = new Map();
+        productsToRender.forEach((p) => {
+            const productId = Number(p.id);
+            const parentId = p.parent_product_id ? Number(p.parent_product_id) : null;
+            const mainProductId = parentId || productId;
+            if (!groupedProductsMap.has(mainProductId)) {
+                groupedProductsMap.set(mainProductId, []);
+            }
+            groupedProductsMap.get(mainProductId).push(p);
+        });
+
+        const groupedCards = Array.from(groupedProductsMap.values()).map((groupItems) => {
+            const mainProduct = groupItems.find(item => !item.parent_product_id) || groupItems[0];
+            const priceValues = groupItems.map(item => Number(item.price || 0));
+            const stockValues = groupItems.map(item => Number(item.stock || 0));
+            const totalStock = stockValues.reduce((sum, value) => sum + value, 0);
+            const inStock = stockValues.some(value => value > 0);
+
+            return {
+                ...mainProduct,
+                variantCount: groupItems.length > 1 ? groupItems.length : 0,
+                groupMinPrice: priceValues.length ? Math.min(...priceValues) : Number(mainProduct.price || 0),
+                groupMaxPrice: priceValues.length ? Math.max(...priceValues) : Number(mainProduct.price || 0),
+                groupStock: totalStock,
+                isGroupOutOfStock: !inStock,
+                groupOrderCount: groupItems.reduce((sum, item) => sum + Number(item.orderCount || 0), 0)
+            };
+        });
+
+        if (currentSortMode === 'price-low') {
+            groupedCards.sort((a, b) => Number(a.groupMinPrice) - Number(b.groupMinPrice));
+        } else if (currentSortMode === 'price-high') {
+            groupedCards.sort((a, b) => Number(b.groupMaxPrice) - Number(a.groupMaxPrice));
+        } else if (currentSortMode === 'rating') {
+            groupedCards.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+        } else {
+            groupedCards.sort((a, b) => {
+                if (a.isGroupOutOfStock && !b.isGroupOutOfStock) return 1;
+                if (!a.isGroupOutOfStock && b.isGroupOutOfStock) return -1;
+                return a.name.localeCompare(b.name);
+            });
+        }
+
+        const groupedByCategory = groupedCards.reduce((acc, p) => {
+            const category = p.categoryName || p.category || 'Uncategorized';
+            if (!acc[category]) acc[category] = [];
+            acc[category].push(p);
+            return acc;
+        }, {});
+
+        if (currentCategoryPage) {
+            const matchCategory = Object.keys(groupedByCategory).find(name => name.toLowerCase() === currentCategoryPage.toLowerCase());
+            if (!matchCategory) {
+                grid.innerHTML = `
+                    <section class="category-block">
+                        <div class="single-category-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #eee;">
+                            <h2 style="margin:0;font-size:22px;color:#222;">Category not found</h2>
+                            <button class="view-all-btn" onclick="backToAllCategories()">Back to All Categories</button>
+                        </div>
+                        <p style="color:#666;">No products were found for this category.</p>
+                    </section>
+                `;
+                return;
+            }
+
+            const oneCategoryProducts = groupedByCategory[matchCategory].slice().sort((a, b) => {
+                if (currentSortMode === 'price-low') return Number(a.price) - Number(b.price);
+                if (currentSortMode === 'price-high') return Number(b.price) - Number(a.price);
+                if (currentSortMode === 'rating') return Number(b.rating || 0) - Number(a.rating || 0);
+                const aStock = Number(a.stock || 0);
+                const bStock = Number(b.stock || 0);
+                if (aStock === 0 && bStock > 0) return 1;
+                if (aStock > 0 && bStock === 0) return -1;
+                return a.name.localeCompare(b.name);
+            });
+
+            grid.innerHTML = `
+                <section class="category-block">
+                    <div class="single-category-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #eee;">
+                        <h2 style="margin:0;font-size:28px;color:#111;">${matchCategory}</h2>
+                        <div class="category-header-actions">
+                            <span style="font-size:14px;color:#777;">${oneCategoryProducts.length} products</span>
+                            <button class="view-all-btn" onclick="backToAllCategories()">Back to All Categories</button>
+                        </div>
+                    </div>
+                    <div class="products-grid">${oneCategoryProducts.map(getCategoryProductCardHtml).join('')}</div>
+                </section>
+            `;
+            return;
+        }
+
+        const categorySections = Object.keys(groupedByCategory).sort().map((category) => {
+            const sorted = groupedByCategory[category].slice().sort((a, b) => {
+                if (currentSortMode === 'price-low') return Number(a.price) - Number(b.price);
+                if (currentSortMode === 'price-high') return Number(b.price) - Number(a.price);
+                if (currentSortMode === 'rating') return Number(b.rating || 0) - Number(a.rating || 0);
+                const aStock = Number(a.stock || 0);
+                const bStock = Number(b.stock || 0);
+                if (aStock === 0 && bStock > 0) return 1;
+                if (aStock > 0 && bStock === 0) return -1;
+                return a.name.localeCompare(b.name);
+            });
+
+            return `
+                <section class="category-block">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <h2 style="margin:0;font-size:22px;color:#222;">${category}</h2>
+                        <div class="category-header-actions">
+                            <span style="font-size:14px;color:#777;">${sorted.length} items</span>
+                            <button class="view-all-btn" onclick="openCategoryPage('${encodeURIComponent(category)}')">View All</button>
+                        </div>
+                    </div>
+                    <div class="products-grid">${sorted.map(getCategoryProductCardHtml).join('')}</div>
+                </section>
+            `;
+        }).join('');
+
+        grid.innerHTML = categorySections;
+    } catch (err) {
+        console.error('renderProducts() error:', err);
+    }
+}
+
+async function loadProducts() {
+    try {
+        const res = await fetch('api/get-products.php');
+        if (!res.ok) throw new Error('Failed to load products');
+        const data = await res.json();
+        products = data.map((p) => {
+            const reviewCount = Number(p.reviewCount) || 0;
+            const normalizedRating = reviewCount > 0 ? (Number(p.rating) || 0) : 0;
+            return {
+                id: p.id,
+                parent_product_id: p.parent_product_id || null,
+                name: p.name,
+                price: p.price,
+                originalPrice: p.original_price || null,
+                image: p.image || ['https://via.placeholder.com/900x600?text=No+Image'],
+                video_url: p.video_url || '',
+                rating: normalizedRating,
+                reviewCount: reviewCount,
+                orderCount: Number(p.orderCount) || 0,
+                category: p.category || 'general',
+                categoryName: p.categoryName || '',
+                stock: p.stock || 0,
+                desc: p.desc || p.product_description || '',
+                reviews: p.reviews || []
+            };
+        });
+
+        if (currentCategoryPage) {
+            const targetCategory = currentCategoryPage.toLowerCase();
+            filteredProducts = products.filter((p) => String(p.categoryName || p.category || '').toLowerCase() === targetCategory);
+            currentCategory = currentCategoryPage;
+        } else {
+            filteredProducts = [...products];
+        }
+
+        renderProducts();
+    } catch (err) {
+        console.error('loadProducts Error:', err);
+    }
+}
+
+function sortProducts(mode) {
+    currentSortMode = mode || '';
+    renderProducts();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    currentCategoryPage = getCategoryPageParam();
+    updateSingleCategoryBodyState();
+});

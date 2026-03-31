@@ -1,0 +1,44 @@
+2026-03-31T06:18:16+02:00
+{
+    "mediaPublicPath": "message_media\/images\/msg_20260331_061816_cf27ab1b.jpg",
+    "mediaType": "image",
+    "mediaMime": "image\/jpeg",
+    "mediaSize": 25692,
+    "mediaOriginalName": "59c25d49-61af-4823-8857-108bbe1d982e.jpg",
+    "finalMessageText": "[CHAT_MEDIA]message_media\/images\/msg_20260331_061816_cf27ab1b.jpg|image[\/CHAT_MEDIA]"
+}
+Insert result: true
+
+2026-03-31T06:21:57+02:00
+{
+    "mediaPublicPath": "message_media\/images\/msg_20260331_062157_e66a1db8.jpg",
+    "mediaType": "image",
+    "mediaMime": "image\/jpeg",
+    "mediaSize": 117979,
+    "mediaOriginalName": "c9ba3fee-ca31-43e3-a87a-ce3270b49952.jpg",
+    "finalMessageText": "[CHAT_MEDIA]message_media\/images\/msg_20260331_062157_e66a1db8.jpg|image[\/CHAT_MEDIA]"
+}
+Insert result: true
+
+2026-03-31T06:22:55+02:00
+{
+    "mediaPublicPath": "message_media\/videos\/msg_20260331_062255_5ae7ae1f.mp4",
+    "mediaType": "video",
+    "mediaMime": "video\/mp4",
+    "mediaSize": 24196472,
+    "mediaOriginalName": "User Dashboard - LUXE and 2 more pages - Personal - Microsoft\u200b Edge 2026-03-30 18-32-43.mp4",
+    "finalMessageText": "[CHAT_MEDIA]message_media\/videos\/msg_20260331_062255_5ae7ae1f.mp4|video[\/CHAT_MEDIA]"
+}
+Insert result: true
+
+2026-03-31T07:07:32+02:00
+{
+    "mediaPublicPath": "message_media\/images\/msg_20260331_070732_b193237e.jpg",
+    "mediaType": "image",
+    "mediaMime": "image\/jpeg",
+    "mediaSize": 55378,
+    "mediaOriginalName": "98926bbc-0640-49a7-9583-f6e46d512033.jpg",
+    "finalMessageText": "[CHAT_MEDIA]message_media\/images\/msg_20260331_070732_b193237e.jpg|image[\/CHAT_MEDIA]"
+}
+Insert result: true
+
