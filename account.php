@@ -198,6 +198,108 @@ $statusDisplay = [
     'delivered' => 'Delivered',
     'cancelled' => 'Cancelled',
 ];
+
+$createRecentTableSql = "CREATE TABLE IF NOT EXISTS user_recent_views (
+    view_id INT(11) NOT NULL AUTO_INCREMENT,
+    user_id INT(11) NOT NULL,
+    product_id INT(11) NOT NULL,
+    viewed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (view_id),
+    UNIQUE KEY uniq_recent_user_product (user_id, product_id),
+    KEY idx_recent_user (user_id),
+    KEY idx_recent_product (product_id),
+    KEY idx_recent_viewed_at (viewed_at),
+    CONSTRAINT fk_recent_views_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_recent_views_product FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+$conn->query($createRecentTableSql);
+
+function normalize_account_recent_image($rawUrl) {
+    $fallback = 'https://via.placeholder.com/600x600?text=No+Image';
+    $url = trim((string)$rawUrl);
+    if ($url === '' || strtolower($url) === 'null') {
+        return $fallback;
+    }
+    if (preg_match('/^(https?:)?\/\//i', $url) || stripos($url, 'data:') === 0 || stripos($url, 'blob:') === 0) {
+        return $url;
+    }
+
+    $url = str_replace('\\\\', '/', $url);
+    $url = str_replace('\\', '/', $url);
+    $url = preg_replace('#^[A-Za-z]:/xampp/htdocs/AndreaMysteryShop/#i', '', $url);
+    $url = preg_replace('#^/xampp/htdocs/AndreaMysteryShop/#i', '', $url);
+    $url = preg_replace('#^\./#', '', $url);
+
+    $workspacePos = stripos($url, 'AndreaMysteryShop/');
+    if ($workspacePos !== false) {
+        $url = substr($url, $workspacePos + strlen('AndreaMysteryShop/'));
+    }
+
+    $url = trim($url);
+    return $url !== '' ? $url : $fallback;
+}
+
+function format_account_recent_price($amount) {
+    $value = (float)$amount;
+    if (floor($value) == $value) {
+        return number_format($value, 0, '.', ',');
+    }
+    return rtrim(rtrim(number_format($value, 2, '.', ','), '0'), '.');
+}
+
+$recentPreviewSql = "SELECT
+        p.product_id,
+        p.product_name,
+        p.price,
+    p.average_rating,
+    (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.product_id) AS review_count,
+    (SELECT IFNULL(SUM(oi.quantity), 0)
+       FROM order_items oi
+       JOIN orders o ON o.order_id = oi.order_id
+      WHERE oi.product_id = p.product_id
+        AND o.status <> 'cancelled') AS order_count,
+        IFNULL((
+            SELECT pi.image_url
+            FROM product_images pi
+            WHERE pi.product_id = p.product_id
+              AND LOWER(pi.image_url) REGEXP '\\.(jpg|jpeg|png|gif|webp)$'
+            ORDER BY pi.is_pinned DESC, pi.image_id ASC
+            LIMIT 1
+        ), '') AS product_image
+    FROM user_recent_views urv
+    JOIN products p ON p.product_id = urv.product_id
+    WHERE urv.user_id = ?
+      AND p.archived = 0
+    ORDER BY urv.viewed_at DESC
+    LIMIT 3";
+
+$recentPreviewStmt = $conn->prepare($recentPreviewSql);
+$recentPreviewStmt->bind_param('i', $userId);
+$recentPreviewStmt->execute();
+$recentPreviewResult = $recentPreviewStmt->get_result();
+$recentPreviewItems = [];
+while ($row = $recentPreviewResult->fetch_assoc()) {
+    $reviewCount = (int)($row['review_count'] ?? 0);
+    $recentPreviewItems[] = [
+        'product_id' => (int)$row['product_id'],
+        'product_name' => $row['product_name'] ?? 'Product',
+        'price' => (float)($row['price'] ?? 0),
+        'rating' => $reviewCount > 0 ? (float)($row['average_rating'] ?? 0) : 0.0,
+        'review_count' => $reviewCount,
+        'order_count' => (int)($row['order_count'] ?? 0),
+        'product_image' => normalize_account_recent_image($row['product_image'] ?? ''),
+    ];
+}
+$recentPreviewStmt->close();
+
+$recentCountStmt = $conn->prepare('SELECT COUNT(*) AS total_recent FROM user_recent_views WHERE user_id = ?');
+$recentCountStmt->bind_param('i', $userId);
+$recentCountStmt->execute();
+$recentCountResult = $recentCountStmt->get_result();
+$recentCountRow = $recentCountResult ? $recentCountResult->fetch_assoc() : null;
+$recentTotalCount = (int)($recentCountRow['total_recent'] ?? 0);
+$recentCountStmt->close();
+$recentPreviewJson = json_encode($recentPreviewItems, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -206,6 +308,7 @@ $statusDisplay = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Account - Andrea Mystery Shop</title>
     <link rel="stylesheet" href="main.css">
+    <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260401-1">
     <style>
         html, body { margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f8f8; padding-bottom: 78px; }
@@ -268,6 +371,28 @@ $statusDisplay = [
         .status-card strong { display: block; font-size: 16px; margin-bottom: 6px; }
         .status-card span { font-size: 12px; color: #777; }
         .card-grid .view-history { grid-column: 1 / -1; }
+        .card-grid .view-recent { grid-column: 1 / -1; }
+        .recent-preview { margin-top: 14px; background: #fff; border: 1px solid #eee; border-radius: 14px; padding: 12px; }
+        .recent-preview-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .recent-preview-title { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: 0.2px; color: #222; }
+        .recent-preview-more { text-decoration: none; color: #4b5563; font-weight: 700; font-size: 13px; }
+        .recent-preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        .recent-preview-grid .product-card { min-height: auto; }
+        .recent-preview-grid .product-image { height: auto; flex: 0 0 auto; }
+        .recent-preview-grid .main-img { width: 100%; aspect-ratio: 1; height: auto; object-fit: cover; }
+        .recent-preview-grid .product-info { padding: 6px; gap: 4px; }
+        .recent-preview-grid .product-name { margin: 0 0 4px; font-size: 10px; line-height: 1.2; min-height: 24px; }
+        .recent-preview-grid .product-rating { font-size: 10px; margin-bottom: 0; }
+        .recent-preview-grid .product-reviews-meta { font-size: 9px; }
+        .recent-preview-grid .product-price { margin: 0; font-size: 14px; line-height: 1; }
+        .recent-preview-grid .product-stock-meta,
+        .recent-preview-grid .product-orders-meta { font-size: 10px; margin-top: 0; }
+        .recent-preview-card { text-decoration: none; color: inherit; background: #fff; border: 1px solid #f0f0f0; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+        .recent-preview-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #f0f0f0; }
+        .recent-preview-body { padding: 6px; flex: 1; display: flex; flex-direction: column; }
+        .recent-preview-name { margin: 0 0 4px; font-size: 10px; line-height: 1.2; min-height: 24px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .recent-preview-price { margin: 0; font-size: 14px; font-weight: 800; color: #e22a39; line-height: 1; }
+        .recent-preview-empty { font-size: 13px; color: #777; padding: 10px 2px 4px; }
         .back-to-shopping-section { text-align: center; padding: 60px 20px; margin-top: 18px; background: #fff; border-radius: 14px; border: 1px solid #eee; }
         .back-to-shopping-section svg { width: 96px; height: 96px; margin: 0 auto 16px; color: #d1d5db; stroke-width: 1.5; }
         .back-to-shopping-section h2 { font-size: 24px; font-weight: bold; margin-bottom: 8px; color: #333; }
@@ -283,6 +408,18 @@ $statusDisplay = [
             .profile-grid { grid-template-columns: 1fr; }
             .hero-actions { gap: 8px; }
             .logout-btn { padding: 8px 10px; font-size: 12px; }
+            .recent-preview-title { font-size: 16px; }
+            .recent-preview-more { font-size: 11px; }
+            .recent-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+            .recent-preview-grid .product-info { padding: 4px; }
+            .recent-preview-grid .product-name { font-size: 9px; min-height: 20px; }
+            .recent-preview-grid .product-rating { font-size: 9px; }
+            .recent-preview-grid .product-price { font-size: 12px; }
+            .recent-preview-grid .product-stock-meta,
+            .recent-preview-grid .product-orders-meta { font-size: 9px; }
+            .recent-preview-price { font-size: 12px; }
+            .recent-preview-name { font-size: 9px; min-height: 20px; }
+            .recent-preview-body { padding: 4px; }
             .back-to-shopping-section { margin-bottom: 60px; }
         }
 
@@ -422,11 +559,26 @@ $statusDisplay = [
                     <strong>To Rate</strong>
                     <span><?php echo $toRateCount; ?> order(s)</span>
                 </div>
-                <div class="status-card view-history" onclick="location.href='purchase_history.php'">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
-                    <strong>View Purchase History</strong>
-                    <span>See all orders and statuses</span>
+                <div class="status-card view-history" onclick="location.href='favorites.php'">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                    <strong>Favorite Products</strong>
+                    <span>See all your saved items</span>
                 </div>
+            </div>
+
+            <div class="recent-preview">
+                <div class="recent-preview-head">
+                    <h3 class="recent-preview-title">Recently Viewed</h3>
+                    <?php if (!empty($recentPreviewItems)): ?>
+                        <a href="recent_views.php" class="recent-preview-more">View More ›</a>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (empty($recentPreviewItems)): ?>
+                    <div class="recent-preview-empty">No recently viewed products yet.</div>
+                <?php else: ?>
+                    <div class="recent-preview-grid" id="recentPreviewGrid"></div>
+                <?php endif; ?>
             </div>
         </section>
 
@@ -459,7 +611,48 @@ $statusDisplay = [
         </div>
     </nav>
 
+    <script src="assets/js/user_dashboard_reusable_ui.js?v=20260401-1"></script>
     <script>
+        const recentPreviewProducts = <?php echo $recentPreviewJson ?: '[]'; ?>;
+
+        function formatPesoAccountRecent(value) {
+            const amount = Number(value || 0);
+            if (Number.isNaN(amount)) return '0';
+            if (Math.floor(amount) === amount) {
+                return amount.toLocaleString('en-US', { maximumFractionDigits: 0 });
+            }
+            return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        }
+
+        function openProductModal(productId) {
+            window.location.href = 'user_dashboard.php?product_id=' + Number(productId || 0);
+        }
+
+        (function renderRecentPreviewCards() {
+            const grid = document.getElementById('recentPreviewGrid');
+            if (!grid || typeof DashboardReusableUI === 'undefined' || !Array.isArray(recentPreviewProducts)) return;
+
+            grid.innerHTML = recentPreviewProducts.map((item) => {
+                const reviewCount = Number(item.review_count || 0);
+                const avgRating = reviewCount > 0 ? Number(item.rating || 0).toFixed(1) : '0.0';
+                const cardProduct = {
+                    id: Number(item.product_id),
+                    name: item.product_name || 'Product',
+                    reviewCount,
+                    groupStock: 1,
+                    groupOrderCount: Number(item.order_count || 0)
+                };
+
+                return DashboardReusableUI.renderProductCard(cardProduct, {
+                    isOutOfStock: false,
+                    avgRating,
+                    variantCount: 0,
+                    priceDisplay: '₱' + formatPesoAccountRecent(item.price),
+                    productImage: item.product_image || 'https://via.placeholder.com/600x600?text=No+Image'
+                });
+            }).join('');
+        })();
+
         function toggleEditMode() {
             const profileSection = document.querySelector('.profile-section');
             const profileGrid = document.querySelector('.profile-grid');

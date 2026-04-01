@@ -27,26 +27,17 @@ function backToAllCategories() {
 
 function getCategoryProductCardHtml(p) {
     const isOutOfStock = !!p.isGroupOutOfStock;
-    const avgRating = (p.rating || 0).toFixed(1);
+    const avgRating = Number(p.reviewCount || 0) > 0 ? Number(p.rating || 0).toFixed(1) : '0.0';
     const image = Array.isArray(p.image) ? p.image[0] : (p.image || 'https://via.placeholder.com/900x600?text=No+Image');
-    const priceDisplay = `P${formatPeso(p.price)}`;
+    const priceDisplay = `₱${formatPeso(p.price)}`;
 
-    return `
-        <div class="product-card" data-id="${p.id}" onclick="openProductModal(${p.id})" style="cursor: pointer; ${isOutOfStock ? 'opacity:0.6;' : ''}">
-            <div class="product-image" style="position:relative;">
-                <img src="${image}" alt="${p.name}" class="product-card-img"/>
-                ${p.variantCount > 0 ? `<span class="product-variant-badge">${p.variantCount} options</span>` : ''}
-                ${isOutOfStock ? '<div style="position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;border-radius:8px;"><span style="color:#fff;font-weight:700;font-size:16px;">Out of Stock</span></div>' : ''}
-            </div>
-            <div class="product-info">
-                <div class="product-name">${p.name}</div>
-                <div class="product-rating">★ ${avgRating} <span style="color:#999;font-size:13px;">(${p.reviewCount || 0} reviews)</span></div>
-                <div class="product-price">${priceDisplay}</div>
-                <div style="margin-top:8px;font-size:13px;color:${isOutOfStock ? '#e22a39' : '#27ae60'};font-weight:600;">Stock: ${p.groupStock}</div>
-                <div style="margin-top:4px;font-size:13px;color:#666;font-weight:600;">Orders: ${Number(p.groupOrderCount || 0)}</div>
-            </div>
-        </div>
-    `;
+    return DashboardReusableUI.renderProductCard(p, {
+        isOutOfStock,
+        avgRating,
+        variantCount: Number(p.variantCount || 0),
+        priceDisplay,
+        productImage: image
+    });
 }
 
 function renderProducts(productsToRender = filteredProducts) {
@@ -184,7 +175,7 @@ function renderProducts(productsToRender = filteredProducts) {
 
 async function loadProducts() {
     try {
-        const res = await fetch('api/get-products.php');
+        const res = await fetch('api/get-products.php', { cache: 'no-store' });
         if (!res.ok) throw new Error('Failed to load products');
         const data = await res.json();
         products = data.map((p) => {
@@ -205,7 +196,8 @@ async function loadProducts() {
                 categoryName: p.categoryName || '',
                 stock: p.stock || 0,
                 desc: p.desc || p.product_description || '',
-                reviews: p.reviews || []
+                reviews: p.reviews || [],
+                isFavorite: !!p.is_favorite
             };
         });
 

@@ -1198,6 +1198,91 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
                 selectConversation(activeConversationId);
             }
         }, 12000);
+
+
+        // Local confirm modal for delete
+function showLocalConfirmModal(title = 'Confirm', text = '', confirmText = 'Delete', cancelText = 'Cancel') {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.inset = '0';
+        overlay.style.background = 'rgba(30,40,60,0.18)';
+        overlay.style.zIndex = '9999';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+
+        const card = document.createElement('div');
+        card.style.background = '#fff';
+        card.style.borderRadius = '12px';
+        card.style.boxShadow = '0 4px 32px rgba(0,0,0,0.13)';
+        card.style.padding = '28px 24px 18px';
+        card.style.maxWidth = '90vw';
+        card.style.width = '340px';
+        card.style.textAlign = 'center';
+        card.innerHTML = `
+            <div style="font-size:18px;font-weight:700;margin-bottom:10px;">${title}</div>
+            <div style="font-size:14px;color:#444;margin-bottom:22px;">${text}</div>
+            <div style="display:flex;gap:12px;justify-content:center;">
+                <button id="localConfirmDeleteBtn" style="background:#e22a39;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 18px;font-size:15px;cursor:pointer;">${confirmText}</button>
+                <button id="localConfirmCancelBtn" style="background:#eee;color:#222;font-weight:700;border:none;border-radius:8px;padding:8px 18px;font-size:15px;cursor:pointer;">${cancelText}</button>
+            </div>
+        `;
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+        document.getElementById('localConfirmDeleteBtn').onclick = () => {
+            document.body.removeChild(overlay);
+            resolve(true);
+        };
+        document.getElementById('localConfirmCancelBtn').onclick = () => {
+            document.body.removeChild(overlay);
+            resolve(false);
+        };
+    });
+}
+
+// Local toast for feedback
+function showLocalToast(text, type = 'success', duration = 1400) {
+    const toast = document.createElement('div');
+    toast.className = `local-toast ${type}`;
+    toast.style.position = 'fixed';
+    toast.style.bottom = '32px';
+    toast.style.left = '50%';
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.background = type === 'error' ? '#e22a39' : '#2f67d8';
+    toast.style.color = '#fff';
+    toast.style.fontWeight = '700';
+    toast.style.fontSize = '15px';
+    toast.style.padding = '12px 28px';
+    toast.style.borderRadius = '8px';
+    toast.style.boxShadow = '0 2px 12px rgba(0,0,0,0.13)';
+    toast.style.zIndex = '9999';
+    toast.textContent = text;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.transition = 'opacity 0.3s';
+        toast.style.opacity = '0';
+        setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 320);
+    }, duration);
+}
+
+// Replace deleteMessage to use local confirm
+async function deleteMessage(messageId) {
+    const confirmed = await showLocalConfirmModal('Delete Message', 'Are you sure you want to delete this message?', 'Delete', 'Cancel');
+    if (!confirmed) return;
+    try {
+        const res = await fetch('api/messages-delete.php', {
+            method: 'POST',
+            body: new URLSearchParams({ message_id: messageId })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Failed to delete message');
+        await selectConversation(activeConversationId);
+        showLocalToast('Message deleted', 'success');
+    } catch (err) {
+        showLocalToast(err.message || 'Failed to delete message', 'error');
+    }
+}
     </script>
 </body>
 </html>

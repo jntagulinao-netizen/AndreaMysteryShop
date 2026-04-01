@@ -42,3 +42,25 @@ Insert result: true
 }
 Insert result: true
 
+2026-03-31T09:10:59+02:00
+{
+    "mediaPublicPath": "message_media\/images\/msg_20260331_091059_957311b7.png",
+    "mediaType": "image",
+    "mediaMime": "image\/png",
+    "mediaSize": 1698698,
+    "mediaOriginalName": "RobloxScreenShot20250915_203427217.png",
+    "finalMessageText": "[CHAT_MEDIA]message_media\/images\/msg_20260331_091059_957311b7.png|image[\/CHAT_MEDIA]"
+}
+Insert result: true
+
+2026-03-31T09:13:46+02:00
+{
+    "mediaPublicPath": "",
+    "mediaType": "",
+    "mediaMime": null,
+    "mediaSize": null,
+    "mediaOriginalName": null,
+    "finalMessageText": "yo"
+}
+Insert result: true
+

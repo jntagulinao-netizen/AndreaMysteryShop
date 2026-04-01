@@ -39,17 +39,29 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label for="district">District</label>
-                <input type="text" id="district" name="district" placeholder="District">
+                <label for="region">Region *</label>
+                <select id="region" name="region" required>
+                  <option value="">Select Region</option>
+                </select>
               </div>
               <div class="form-group">
-                <label for="city">City *</label>
-                <input type="text" id="city" name="city" placeholder="Manila" required>
+                <label for="province">Province *</label>
+                <select id="province" name="province" required disabled>
+                  <option value="">Select Province</option>
+                </select>
               </div>
             </div>
             <div class="form-group">
-              <label for="region">Region/Province *</label>
-              <input type="text" id="region" name="region" placeholder="Metro Manila" required>
+              <label for="city">City / Municipality *</label>
+              <select id="city" name="city" required disabled>
+                <option value="">Select City / Municipality</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="district">Barangay *</label>
+              <select id="district" name="district" required disabled>
+                <option value="">Select Barangay</option>
+              </select>
             </div>
             <div class="form-group recipient-default-group">
               <label class="recipient-default-label">

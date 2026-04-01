@@ -363,6 +363,241 @@ $statusDisplay = [
         .order-actions button.action-primary { background: #e22a39; color: #fff; border-color: #e22a39; }
         .order-actions button.action-primary:hover { background: #c20000; }
         .order-actions button:hover { background: #f9f9f9; }
+
+        /* Review Modal (Shopee-like mobile layout) */
+        .review-modal-content {
+            background: #f5f5f5;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+        .review-form-wrap {
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .review-form-body {
+            padding: 14px 16px 140px;
+        }
+        .review-product-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #fff;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 16px;
+        }
+        .review-product-thumb {
+            width: 52px;
+            height: 52px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: #eee;
+            border: 1px solid #ededed;
+            flex-shrink: 0;
+        }
+        .review-product-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1f1f1f;
+            line-height: 1.35;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .review-product-sub {
+            margin-top: 2px;
+            font-size: 13px;
+            color: #9a9a9a;
+        }
+        .review-rating-block {
+            background: #fff;
+            border-radius: 10px;
+            padding: 18px 14px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+        .review-stars {
+            display: flex;
+            justify-content: center;
+            flex-direction: row-reverse;
+            gap: 8px;
+        }
+        .review-stars input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .review-stars label {
+            font-size: 46px;
+            line-height: 1;
+            color: #c7c7c7;
+            cursor: pointer;
+            transition: color 0.15s ease;
+            user-select: none;
+        }
+        .review-stars label:hover,
+        .review-stars label:hover ~ label,
+        .review-stars input:checked ~ label {
+            color: #f7b500;
+        }
+        .review-rating-hint {
+            margin-top: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #212121;
+        }
+        .review-rating-hint .required {
+            color: #e22a39;
+        }
+        .review-field-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #222;
+            margin-bottom: 10px;
+        }
+        .review-text-wrap {
+            background: #fff;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 18px;
+            position: relative;
+        }
+        .review-textarea {
+            width: 100%;
+            min-height: 140px;
+            border: none;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            font-size: 16px;
+            color: #222;
+            background: transparent;
+            padding: 8px 8px 24px;
+        }
+        .review-textarea::placeholder {
+            color: #acacac;
+        }
+        .review-char-count {
+            position: absolute;
+            right: 16px;
+            bottom: 12px;
+            font-size: 13px;
+            color: #9a9a9a;
+        }
+        .review-upload-wrap {
+            background: #fff;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 18px;
+        }
+        .review-upload-box {
+            border: 1px solid #e6e6e6;
+            background: #f7f7f7;
+            border-radius: 10px;
+            min-height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            cursor: pointer;
+            padding: 12px;
+        }
+        .review-upload-icon {
+            font-size: 34px;
+            line-height: 1;
+            color: #8f8f8f;
+            margin-bottom: 8px;
+        }
+        .review-upload-text {
+            color: #8f8f8f;
+            font-size: 15px;
+        }
+        .review-upload-note {
+            margin-top: 8px;
+            color: #a1a1a1;
+            font-size: 12px;
+            text-align: center;
+        }
+        .review-preview-media {
+            max-width: 100%;
+            max-height: 160px;
+            border-radius: 8px;
+            display: none;
+            margin: 0 auto;
+        }
+        .review-upload-remove {
+            margin-top: 10px;
+            padding: 7px 12px;
+            border: none;
+            border-radius: 8px;
+            background: #e22a39;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .review-anon-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            color: #2a2a2a;
+            margin-bottom: 16px;
+        }
+        .review-anon-row input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            accent-color: #e22a39;
+            cursor: pointer;
+        }
+        .review-privacy-hidden {
+            display: none;
+        }
+        .review-footer {
+            position: sticky;
+            bottom: 0;
+            background: #f5f5f5;
+            border-top: 1px solid #e8e8e8;
+            padding: 10px 16px 12px;
+        }
+        .review-submit-btn {
+            width: 100%;
+            border: none;
+            border-radius: 10px;
+            background: #f7c31d;
+            color: #161616;
+            font-size: 14px;
+            line-height: 1.2;
+            font-weight: 700;
+            padding: 11px 14px;
+            cursor: pointer;
+        }
+        .review-step {
+            margin-top: 8px;
+            text-align: center;
+            font-size: 14px;
+            color: #9a9a9a;
+        }
+
+        @media (min-width: 769px) {
+            #reviewModal .review-modal-content {
+                max-width: 560px;
+                height: auto;
+                max-height: 92vh;
+                margin: auto;
+                border-radius: 12px;
+            }
+            #reviewModal .modal-header {
+                border-radius: 12px 12px 0 0;
+            }
+            .review-submit-btn {
+                font-size: 16px;
+            }
+        }
         
         .mobile-bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 999; background: #fff; border-top: 1px solid #ddd; display: none !important; }
         .mobile-bottom-nav.fixed { display: none !important; }
@@ -683,91 +918,81 @@ $statusDisplay = [
 
     <!-- Review Modal -->
     <div class="modal" id="reviewModal">
-        <div class="modal-content" style="max-width: 500px; width: 90%; height: auto; margin: auto; border-radius: 12px;">
-            <div class="modal-header" style="border-radius: 12px 12px 0 0;">
+        <div class="modal-content review-modal-content">
+            <div class="review-form-wrap">
+            <div class="modal-header">
                 <div class="back-arrow" onclick="closeReviewModal()">‹</div>
                 <div class="header-title">Write a Review</div>
             </div>
             
-            <form id="reviewForm" style="padding: 20px;">
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 12px; color: #333;">Rating</label>
-                    <div style="display: flex; gap: 12px; align-items: center;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="radio" name="rating" value="5" required>
-                            <span>⭐⭐⭐⭐⭐ 5 stars</span>
-                        </label>
+            <form id="reviewForm" class="review-form-body">
+                <div class="review-product-row">
+                    <img id="reviewProductImage" class="review-product-thumb" src="" alt="Product image">
+                    <div>
+                        <div id="reviewProductName" class="review-product-title">Product name</div>
+                        <div id="reviewProductSub" class="review-product-sub"></div>
                     </div>
-                    <div style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="radio" name="rating" value="4" required>
-                            <span>⭐⭐⭐⭐ 4 stars</span>
-                        </label>
-                    </div>
-                    <div style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="radio" name="rating" value="3" required>
-                            <span>⭐⭐⭐ 3 stars</span>
-                        </label>
-                    </div>
-                    <div style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="radio" name="rating" value="2" required>
-                            <span>⭐⭐ 2 stars</span>
-                        </label>
-                    </div>
-                    <div style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="radio" name="rating" value="1" required>
-                            <span>⭐ 1 star</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Your Review</label>
-                    <textarea id="reviewTextarea" placeholder="Share your experience with this product..." style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 14px; resize: vertical; min-height: 100px;" required></textarea>
                 </div>
 
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Review Name Privacy</label>
-                    <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #333; font-size: 14px;">
-                            <input type="radio" name="review_name_privacy" value="revealed" checked>
-                            <span>Show my name</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #333; font-size: 14px;">
-                            <input type="radio" name="review_name_privacy" value="anonymous">
-                            <span>Post as anonymous</span>
-                        </label>
+                <div class="review-rating-block">
+                    <div class="review-stars">
+                        <input type="radio" id="rating5" name="rating" value="5" required>
+                        <label for="rating5" title="5 stars">★</label>
+                        <input type="radio" id="rating4" name="rating" value="4" required>
+                        <label for="rating4" title="4 stars">★</label>
+                        <input type="radio" id="rating3" name="rating" value="3" required>
+                        <label for="rating3" title="3 stars">★</label>
+                        <input type="radio" id="rating2" name="rating" value="2" required>
+                        <label for="rating2" title="2 stars">★</label>
+                        <input type="radio" id="rating1" name="rating" value="1" required>
+                        <label for="rating1" title="1 star">★</label>
                     </div>
+                    <div class="review-rating-hint">Rate your purchase<span class="required">*</span></div>
                 </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Upload Photos or Videos (Optional)</label>
-                    <div style="border: 2px dashed #ddd; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer;" id="uploadArea">
+
+                <div class="review-field-title">Write your review</div>
+                <div class="review-text-wrap">
+                    <textarea id="reviewTextarea" class="review-textarea" maxlength="300" placeholder="What did you like or dislike about this product?" required></textarea>
+                    <div class="review-char-count"><span id="reviewCharCount">0</span>/300</div>
+                </div>
+
+                <div class="review-field-title">Add a photo or video</div>
+                <div class="review-upload-wrap">
+                    <div class="review-upload-box" id="uploadArea">
                         <input type="file" id="reviewMediaInput" accept="image/*,video/*" multiple style="display: none;">
                         <div id="uploadPlaceholder">
-                            <div style="font-size: 24px; margin-bottom: 8px;">📸 📹</div>
-                            <div style="color: #666; font-size: 14px;">Click to upload or drag images/videos</div>
-                            <div style="color: #999; font-size: 12px; margin-top: 4px;">Multiple files allowed, max total 25MB</div>
+                            <div class="review-upload-icon">📷</div>
+                            <div class="review-upload-text">Add photo or video</div>
+                            <div class="review-upload-note">Multiple files allowed, max total 25MB</div>
                         </div>
-                        <div id="uploadPreview" style="display: none; margin-top: 12px;">
-                            <img id="uploadPreviewImg" style="max-width: 100%; max-height: 150px; border-radius: 4px; display: none;">
-                            <video id="uploadPreviewVideo" style="max-width: 100%; max-height: 150px; border-radius: 4px; display: none;" controls></video>
-                            <div id="uploadSummary" style="margin-top: 8px; color: #666; font-size: 12px;"></div>
-                            <button type="button" onclick="clearMediaUpload()" style="margin-top: 8px; padding: 6px 12px; background: #e22a39; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+                        <div id="uploadPreview" style="display: none; margin-top: 8px; width: 100%;">
+                            <img id="uploadPreviewImg" class="review-preview-media" alt="Upload preview">
+                            <video id="uploadPreviewVideo" class="review-preview-media" controls></video>
+                            <div id="uploadSummary" style="margin-top: 8px; color: #666; font-size: 12px; text-align: center;"></div>
+                            <div style="text-align:center;">
+                                <button type="button" class="review-upload-remove" onclick="clearMediaUpload()">Remove</button>
+                            </div>
                         </div>
                     </div>
+                </div>
+
+                <label class="review-anon-row" for="reviewAnonymousToggle">
+                    <input type="checkbox" id="reviewAnonymousToggle">
+                    <span>Post anonymously</span>
+                </label>
+
+                <div class="review-privacy-hidden">
+                    <input type="radio" name="review_name_privacy" id="privacyRevealed" value="revealed" checked>
+                    <input type="radio" name="review_name_privacy" id="privacyAnonymous" value="anonymous">
                 </div>
                 
                 <input type="hidden" id="hiddenProductId" value="">
-                
-                <div style="display: flex; gap: 12px;">
-                    <button type="button" onclick="closeReviewModal()" style="flex: 1; padding: 12px; border: 1px solid #ddd; background: #fff; border-radius: 8px; cursor: pointer; font-weight: 600;">Cancel</button>
-                    <button type="button" onclick="submitReview()" style="flex: 1; padding: 12px; background: #e22a39; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Submit Review</button>
-                </div>
             </form>
+
+            <div class="review-footer">
+                <button type="button" class="review-submit-btn" onclick="submitReview()">Submit</button>
+            </div>
+            </div>
         </div>
     </div>
 
@@ -1568,8 +1793,25 @@ $statusDisplay = [
             // Get product details from the currently open order detail modal
             const productId = document.getElementById('detailItemName')?.dataset?.productId;
             const orderId = document.getElementById('orderNumber').textContent;
+            const detailItemNameEl = document.getElementById('detailItemName');
+            const detailItemImageEl = document.getElementById('detailItemImage');
+            const detailPriceEl = document.getElementById('detailPrice');
             currentReviewProductId = productId || '';
             currentReviewItemId = orderId;
+
+            const reviewNameEl = document.getElementById('reviewProductName');
+            const reviewImageEl = document.getElementById('reviewProductImage');
+            const reviewSubEl = document.getElementById('reviewProductSub');
+            if (reviewNameEl) {
+                reviewNameEl.textContent = detailItemNameEl?.textContent?.trim() || 'Product';
+            }
+            if (reviewImageEl && detailItemImageEl?.src) {
+                reviewImageEl.src = detailItemImageEl.src;
+            }
+            if (reviewSubEl) {
+                reviewSubEl.textContent = detailPriceEl?.textContent?.trim() || '';
+            }
+
             document.getElementById('reviewModal').classList.add('active');
             refreshOverlayState();
         }
@@ -1577,6 +1819,18 @@ $statusDisplay = [
         function closeReviewModal() {
             document.getElementById('reviewModal').classList.remove('active');
             document.getElementById('reviewForm').reset();
+            const charCountEl = document.getElementById('reviewCharCount');
+            if (charCountEl) {
+                charCountEl.textContent = '0';
+            }
+            const anonymousToggleEl = document.getElementById('reviewAnonymousToggle');
+            if (anonymousToggleEl) {
+                anonymousToggleEl.checked = false;
+            }
+            const privacyRevealedEl = document.getElementById('privacyRevealed');
+            if (privacyRevealedEl) {
+                privacyRevealedEl.checked = true;
+            }
             clearMediaUpload();
             refreshOverlayState();
         }
@@ -1637,9 +1891,35 @@ $statusDisplay = [
         document.addEventListener('DOMContentLoaded', function() {
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('reviewMediaInput');
+            const reviewTextarea = document.getElementById('reviewTextarea');
+            const reviewCharCount = document.getElementById('reviewCharCount');
+            const anonymousToggle = document.getElementById('reviewAnonymousToggle');
+            const privacyRevealed = document.getElementById('privacyRevealed');
+            const privacyAnonymous = document.getElementById('privacyAnonymous');
+
+            if (reviewTextarea && reviewCharCount) {
+                reviewTextarea.addEventListener('input', () => {
+                    reviewCharCount.textContent = String(reviewTextarea.value.length);
+                });
+            }
+
+            if (anonymousToggle && privacyRevealed && privacyAnonymous) {
+                anonymousToggle.addEventListener('change', () => {
+                    if (anonymousToggle.checked) {
+                        privacyAnonymous.checked = true;
+                    } else {
+                        privacyRevealed.checked = true;
+                    }
+                });
+            }
             
             if (uploadArea && fileInput) {
-                uploadArea.addEventListener('click', () => fileInput.click());
+                uploadArea.addEventListener('click', (e) => {
+                    if (e.target.closest('.review-upload-remove')) {
+                        return;
+                    }
+                    fileInput.click();
+                });
                 
                 // Handle drag and drop
                 uploadArea.addEventListener('dragover', (e) => {

@@ -76,6 +76,7 @@ if ($categoryId <= 0) {
 $price = round((float)$priceRaw, 2);
 $stock = intval($stockRaw);
 $variants = [];
+$newVariants = [];
 $newMainImage = null;
 $additionalMainImages = [];
 $variantAdditionalImageFiles = [];
@@ -85,9 +86,24 @@ $pinnedMainImageSource = trim((string)($_POST['pinned_main_image_source'] ?? '')
 $pinnedMainImageUrl = trim((string)($_POST['pinned_main_image_url'] ?? ''));
 $pinnedNewImageIndexRaw = trim((string)($_POST['pinned_new_image_index'] ?? ''));
 $pinnedNewImageIndex = is_numeric($pinnedNewImageIndexRaw) ? intval($pinnedNewImageIndexRaw) : -1;
+$switchMainVariantRaw = trim((string)($_POST['switch_main_variant'] ?? ''));
+$switchMainVariantId = 0;
+$switchMainVariantTempId = 0;
 $removeExistingVideo = trim((string)($_POST['remove_existing_video'] ?? '0')) === '1';
 $existingVideoUrl = trim((string)($_POST['existing_video_url'] ?? ''));
 $newProductVideo = null;
+
+if ($switchMainVariantRaw !== '') {
+    if (preg_match('/^id:(\d+)$/', $switchMainVariantRaw, $idMatch)) {
+        $switchMainVariantId = intval($idMatch[1]);
+    } elseif (preg_match('/^temp:(\d+)$/', $switchMainVariantRaw, $tempMatch)) {
+        $switchMainVariantTempId = intval($tempMatch[1]);
+    } else {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid main variant selection']);
+        exit;
+    }
+}
 
 $removedExistingImagesRaw = trim((string)($_POST['removed_existing_images'] ?? ''));
 if ($removedExistingImagesRaw !== '') {
@@ -132,10 +148,58 @@ if ($variantsRaw !== '') {
             
             $variants[] = [
                 'id' => $variantId,
+                'name' => trim((string)($item['name'] ?? '')),
                 'price' => round((float)$variantPrice, 2),
                 'stock' => intval($variantStock)
             ];
         }
+    }
+}
+
+$newVariantsRaw = trim((string)($_POST['new_variants'] ?? ''));
+if ($newVariantsRaw !== '') {
+    $decodedNewVariants = json_decode($newVariantsRaw, true);
+    if (!is_array($decodedNewVariants)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid new variants payload']);
+        exit;
+    }
+
+    foreach ($decodedNewVariants as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+
+        $tempId = intval($item['temp_id'] ?? 0);
+        $variantName = trim((string)($item['name'] ?? ''));
+        $variantPrice = trim((string)($item['price'] ?? ''));
+        $variantStock = trim((string)($item['stock'] ?? ''));
+
+        if ($tempId <= 0) {
+            continue;
+        }
+        if ($variantName === '') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Each new variant must have a name']);
+            exit;
+        }
+        if (!is_numeric($variantPrice) || (float)$variantPrice < 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'New variant price must be a non-negative number']);
+            exit;
+        }
+        if (!is_numeric($variantStock) || intval($variantStock) < 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'New variant stock must be a non-negative integer']);
+            exit;
+        }
+
+        $newVariants[] = [
+            'temp_id' => $tempId,
+            'name' => $variantName,
+            'price' => round((float)$variantPrice, 2),
+            'stock' => intval($variantStock)
+        ];
     }
 }
 
@@ -154,7 +218,8 @@ if ($variantImageUpdatesRaw !== '') {
         }
 
         $variantId = intval($item['id'] ?? 0);
-        if ($variantId <= 0) {
+        $variantTempId = intval($item['temp_id'] ?? 0);
+        if ($variantId <= 0 && $variantTempId <= 0) {
             continue;
         }
 
@@ -177,7 +242,9 @@ if ($variantImageUpdatesRaw !== '') {
         $pinnedNewImageIndexRaw = trim((string)($item['pinned_new_image_index'] ?? ''));
         $pinnedNewImageIndex = is_numeric($pinnedNewImageIndexRaw) ? intval($pinnedNewImageIndexRaw) : -1;
 
-        $variantImageUpdates[$variantId] = [
+        $updateKey = $variantId > 0 ? $variantId : ('temp:' . $variantTempId);
+        $variantImageUpdates[$updateKey] = [
+            'temp_id' => $variantTempId,
             'removed_existing_images' => $removedExisting,
             'pinned_source' => $pinnedSource,
             'pinned_existing_url' => $pinnedExistingUrl,
@@ -324,6 +391,57 @@ foreach ($_FILES as $fileKey => $fileData) {
 }
 
 foreach ($_FILES as $fileKey => $fileData) {
+    if (strpos($fileKey, 'variant_additional_images_new_') !== 0 || !is_array($fileData)) {
+        continue;
+    }
+
+    $tempId = intval(substr($fileKey, strlen('variant_additional_images_new_')));
+    if ($tempId <= 0) {
+        continue;
+    }
+
+    $names = $fileData['name'] ?? [];
+    if (!is_array($names)) {
+        $names = [$names];
+        $tmpNames = [($fileData['tmp_name'] ?? '')];
+        $errors = [($fileData['error'] ?? UPLOAD_ERR_NO_FILE)];
+    } else {
+        $tmpNames = is_array($fileData['tmp_name'] ?? null) ? $fileData['tmp_name'] : [];
+        $errors = is_array($fileData['error'] ?? null) ? $fileData['error'] : [];
+    }
+
+    for ($i = 0; $i < count($names); $i++) {
+        $imgError = (int)($errors[$i] ?? UPLOAD_ERR_NO_FILE);
+        if ($imgError === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        if ($imgError !== UPLOAD_ERR_OK) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid new variant image upload']);
+            exit;
+        }
+
+        $tmpName = $tmpNames[$i] ?? '';
+        $mime = $finfo->file($tmpName);
+        if (!isset($allowedImageMimes[$mime])) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'New variant images must be JPG, PNG, WEBP, or GIF']);
+            exit;
+        }
+
+        if (!isset($variantAdditionalImageFiles['new:' . $tempId])) {
+            $variantAdditionalImageFiles['new:' . $tempId] = [];
+        }
+
+        $variantAdditionalImageFiles['new:' . $tempId][] = [
+            'tmp_name' => $tmpName,
+            'mime' => $mime,
+            'ext' => $allowedImageMimes[$mime]
+        ];
+    }
+}
+
+foreach ($_FILES as $fileKey => $fileData) {
     if (strpos($fileKey, 'variant_additional_images_') !== 0 || !is_array($fileData)) {
         continue;
     }
@@ -397,24 +515,186 @@ $conn->begin_transaction();
 $uploadDirAbsolute = realpath(__DIR__ . '/..') . DIRECTORY_SEPARATOR . 'product_media';
 $createdFiles = [];
 $deletedFilesAfterCommit = [];
+$resolvedMainProductId = $productId;
 
 try {
     if (count($variants) > 0) {
         foreach ($variants as $variant) {
             $variantId = intval($variant['id']);
+            $variantName = trim((string)($variant['name'] ?? ''));
             $variantPrice = $variant['price'];
             $variantStock = intval($variant['stock']);
+            if ($variantName === '') {
+                throw new Exception('Variant name is required');
+            }
             
-            $variantStmt = $conn->prepare('UPDATE products SET price = ?, product_stock = ? WHERE product_id = ?');
+            $variantStmt = $conn->prepare('UPDATE products SET product_name = ?, price = ?, product_stock = ? WHERE product_id = ?');
             if (!$variantStmt) {
                 throw new Exception('Failed to prepare variant update query');
             }
             
-            $variantStmt->bind_param('dii', $variantPrice, $variantStock, $variantId);
+            $variantStmt->bind_param('sdii', $variantName, $variantPrice, $variantStock, $variantId);
             if (!$variantStmt->execute()) {
                 throw new Exception('Failed to update variant product');
             }
             $variantStmt->close();
+        }
+    }
+
+    $newVariantIdMap = [];
+    if (count($newVariants) > 0) {
+        $insertNewVariantStmt = $conn->prepare('INSERT INTO products (product_name, product_description, price, product_stock, category_id, parent_product_id, average_rating, order_count) VALUES (?, ?, ?, ?, ?, ?, 0.00, 0)');
+        if (!$insertNewVariantStmt) {
+            throw new Exception('Failed to prepare new variant insert query');
+        }
+
+        foreach ($newVariants as $newVariant) {
+            $tempId = intval($newVariant['temp_id']);
+            $newVariantName = trim((string)$newVariant['name']);
+            $newVariantPrice = (float)$newVariant['price'];
+            $newVariantStock = intval($newVariant['stock']);
+
+            if ($newVariantName === '') {
+                throw new Exception('New variant name is required');
+            }
+
+            $newVariantDescription = $description;
+            $insertNewVariantStmt->bind_param('ssdiii', $newVariantName, $newVariantDescription, $newVariantPrice, $newVariantStock, $categoryId, $productId);
+            if (!$insertNewVariantStmt->execute()) {
+                throw new Exception('Failed to create new variant');
+            }
+
+            $newVariantProductId = (int)$insertNewVariantStmt->insert_id;
+            $newVariantIdMap[$tempId] = $newVariantProductId;
+        }
+
+        $insertNewVariantStmt->close();
+    }
+
+    if (count($newVariantIdMap) > 0) {
+        foreach ($variantImageUpdates as $key => $updateCfg) {
+            if (!is_array($updateCfg)) {
+                continue;
+            }
+            $tempId = intval($updateCfg['temp_id'] ?? 0);
+            if ($tempId <= 0 || !isset($newVariantIdMap[$tempId])) {
+                continue;
+            }
+
+            $newVariantProductId = $newVariantIdMap[$tempId];
+            $variantImageUpdates[$newVariantProductId] = [
+                'removed_existing_images' => [],
+                'pinned_source' => trim((string)($updateCfg['pinned_source'] ?? '')),
+                'pinned_existing_url' => '',
+                'pinned_new_image_index' => intval($updateCfg['pinned_new_image_index'] ?? -1)
+            ];
+            unset($variantImageUpdates[$key]);
+        }
+
+        foreach ($newVariantIdMap as $tempId => $newVariantProductId) {
+            $tempFileKey = 'new:' . $tempId;
+            $newVariantFiles = $variantAdditionalImageFiles[$tempFileKey] ?? [];
+            if (count($newVariantFiles) < 1) {
+                throw new Exception('Each new variant must have at least one image');
+            }
+            $variantAdditionalImageFiles[$newVariantProductId] = $newVariantFiles;
+            unset($variantAdditionalImageFiles[$tempFileKey]);
+
+            if (!isset($variantImageUpdates[$newVariantProductId])) {
+                $variantImageUpdates[$newVariantProductId] = [
+                    'removed_existing_images' => [],
+                    'pinned_source' => '',
+                    'pinned_existing_url' => '',
+                    'pinned_new_image_index' => -1
+                ];
+            }
+        }
+    }
+
+    if ($switchMainVariantId > 0 || $switchMainVariantTempId > 0) {
+        $familyMainProductId = $productId;
+        $selectedProductStmt = $conn->prepare('SELECT product_id, parent_product_id FROM products WHERE product_id = ? LIMIT 1');
+        if (!$selectedProductStmt) {
+            throw new Exception('Failed to validate selected product for main switch');
+        }
+        $selectedProductStmt->bind_param('i', $productId);
+        if (!$selectedProductStmt->execute()) {
+            throw new Exception('Failed to read selected product for main switch');
+        }
+        $selectedProductRes = $selectedProductStmt->get_result();
+        $selectedProductRow = $selectedProductRes ? $selectedProductRes->fetch_assoc() : null;
+        $selectedProductStmt->close();
+        if (!$selectedProductRow) {
+            throw new Exception('Selected product not found for main switch');
+        }
+        if (intval($selectedProductRow['parent_product_id'] ?? 0) > 0) {
+            $familyMainProductId = intval($selectedProductRow['parent_product_id']);
+        }
+
+        $targetMainProductId = 0;
+        if ($switchMainVariantId > 0) {
+            $targetMainProductId = $switchMainVariantId;
+        } elseif ($switchMainVariantTempId > 0 && isset($newVariantIdMap[$switchMainVariantTempId])) {
+            $targetMainProductId = intval($newVariantIdMap[$switchMainVariantTempId]);
+        }
+
+        if ($targetMainProductId <= 0) {
+            throw new Exception('Selected main variant is invalid or missing');
+        }
+
+        if ($targetMainProductId !== $familyMainProductId) {
+            $targetVariantStmt = $conn->prepare('SELECT product_id, parent_product_id FROM products WHERE product_id = ? LIMIT 1');
+            if (!$targetVariantStmt) {
+                throw new Exception('Failed to validate target variant for main switch');
+            }
+            $targetVariantStmt->bind_param('i', $targetMainProductId);
+            if (!$targetVariantStmt->execute()) {
+                throw new Exception('Failed to read target variant for main switch');
+            }
+            $targetVariantRes = $targetVariantStmt->get_result();
+            $targetVariantRow = $targetVariantRes ? $targetVariantRes->fetch_assoc() : null;
+            $targetVariantStmt->close();
+            if (!$targetVariantRow) {
+                throw new Exception('Target variant not found for main switch');
+            }
+
+            if (intval($targetVariantRow['parent_product_id'] ?? 0) !== $familyMainProductId) {
+                throw new Exception('You can only switch main product with variants in the same family');
+            }
+
+            $moveSiblingVariantsStmt = $conn->prepare('UPDATE products SET parent_product_id = ? WHERE parent_product_id = ? AND product_id <> ?');
+            if (!$moveSiblingVariantsStmt) {
+                throw new Exception('Failed to prepare variant family relink');
+            }
+            $moveSiblingVariantsStmt->bind_param('iii', $targetMainProductId, $familyMainProductId, $targetMainProductId);
+            if (!$moveSiblingVariantsStmt->execute()) {
+                throw new Exception('Failed to relink variant family');
+            }
+            $moveSiblingVariantsStmt->close();
+
+            $moveOldMainStmt = $conn->prepare('UPDATE products SET parent_product_id = ? WHERE product_id = ?');
+            if (!$moveOldMainStmt) {
+                throw new Exception('Failed to prepare old main relink');
+            }
+            $moveOldMainStmt->bind_param('ii', $targetMainProductId, $familyMainProductId);
+            if (!$moveOldMainStmt->execute()) {
+                throw new Exception('Failed to relink old main product');
+            }
+            $moveOldMainStmt->close();
+
+            $setNewMainStmt = $conn->prepare('UPDATE products SET parent_product_id = NULL WHERE product_id = ?');
+            if (!$setNewMainStmt) {
+                throw new Exception('Failed to prepare new main update');
+            }
+            $setNewMainStmt->bind_param('i', $targetMainProductId);
+            if (!$setNewMainStmt->execute()) {
+                throw new Exception('Failed to set new main product');
+            }
+            $setNewMainStmt->close();
+
+            $resolvedMainProductId = $targetMainProductId;
+        } else {
+            $resolvedMainProductId = $familyMainProductId;
         }
     }
 
@@ -844,6 +1124,7 @@ try {
         'success' => true,
         'message' => 'Product updated successfully',
         'product_id' => $productId,
+        'main_product_id' => $resolvedMainProductId,
         'main_images' => $finalImages,
         'video_url' => $finalVideoUrl
     ]);

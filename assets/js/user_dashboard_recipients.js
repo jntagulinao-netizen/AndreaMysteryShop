@@ -118,11 +118,15 @@ async function loadRecipients() {
         } else {
             list.style.display = 'none';
             form.style.display = 'block';
+            setRecipientFormFields();
+            setRecipientSaveMode(false);
         }
     } catch (err) {
         console.error('loadRecipients', err);
         document.getElementById('recipientsList').style.display = 'none';
         document.getElementById('newRecipientForm').style.display = 'block';
+        setRecipientFormFields();
+        setRecipientSaveMode(false);
     }
 }
 
@@ -156,7 +160,7 @@ async function saveNewRecipient() {
     const formData = getRecipientFormValues();
 
     // Validate required fields
-    if (!formData.recipient_name || !formData.phone_no || !formData.street_name || !formData.city || !formData.region) {
+    if (!formData.recipient_name || !formData.phone_no || !formData.street_name || !formData.region || !formData.province || !formData.city || !formData.district) {
         await showLocalSweetAlert('warning', 'Missing Required Fields', 'Please fill in all required fields (marked with *).', 1700);
         return;
     }
@@ -250,7 +254,7 @@ async function saveEditedRecipient() {
     const formData = getRecipientFormValues();
 
     // Validate required fields
-    if (!formData.recipient_name || !formData.phone_no || !formData.street_name || !formData.city || !formData.region) {
+    if (!formData.recipient_name || !formData.phone_no || !formData.street_name || !formData.region || !formData.province || !formData.city || !formData.district) {
         await showLocalSweetAlert('warning', 'Missing Required Fields', 'Please fill in all required fields (marked with *).', 1700);
         return;
     }

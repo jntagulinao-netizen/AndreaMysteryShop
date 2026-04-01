@@ -13,6 +13,26 @@
         let lightboxCurrentIndex = 0;
         let lightboxTouchStartX = 0;
         let lightboxTouchStartY = 0;
+        const productModalParams = new URLSearchParams(window.location.search);
+        let pendingOpenProductId = parseInt(productModalParams.get('product_id') || '', 10);
+        if (!Number.isFinite(pendingOpenProductId) || pendingOpenProductId <= 0) {
+            pendingOpenProductId = null;
+        }
+
+        function openPendingProductFromUrl() {
+            if (!pendingOpenProductId) return;
+            const targetProduct = products.find((p) => Number(p.id) === Number(pendingOpenProductId));
+            if (!targetProduct) return;
+
+            const productId = pendingOpenProductId;
+            pendingOpenProductId = null;
+            openProductModal(productId);
+
+            // Keep URL clean after modal auto-opens.
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('product_id');
+            window.history.replaceState({}, '', cleanUrl.toString());
+        }
 
         async function loadCategories() {
             try {
@@ -128,7 +148,7 @@
 
         async function loadProducts() {
             try {
-                const res = await fetch('api/get-products.php');
+                const res = await fetch('api/get-products.php', { cache: 'no-store' });
                 if (!res.ok) throw new Error('Failed to load products');
                 const data = await res.json();
                 console.log('API Returned:', data.length, 'products', data);
@@ -149,6 +169,7 @@
                         category: p.category || 'general',
                         categoryName: p.categoryName || '',
                         stock: p.stock || 0,
+                        isFavorite: !!p.is_favorite,
                         desc: p.desc || p.product_description || '',
                         reviews: p.reviews || []
                     };
@@ -157,6 +178,7 @@
                 console.log('Products Array:', products);
                 console.log('Filtered Products:', filteredProducts);
                 renderProducts();
+                openPendingProductFromUrl();
                 console.log('renderProducts() called');
             } catch (err) {
                 console.error('loadProducts Error:', err);
@@ -169,6 +191,7 @@
                 ];
                 filteredProducts = [...products];
                 renderProducts();
+                openPendingProductFromUrl();
                 console.log('Fallback products rendered');
             }
         }
@@ -495,6 +518,86 @@
         let currentProductId = null;
         let currentProductIndex = null;
 
+        function updateFavoriteButtonState(isFavorite) {
+            const btn = document.getElementById('favoriteBtn');
+            if (!btn) return;
+            const icon = btn.querySelector('.favorite-btn-icon');
+            const text = btn.querySelector('.favorite-btn-text');
+            btn.classList.toggle('active', !!isFavorite);
+            btn.setAttribute('aria-label', isFavorite ? 'Remove from favorites' : 'Add to favorites');
+            btn.setAttribute('title', isFavorite ? 'Remove from favorites' : 'Add to favorites');
+            if (icon) icon.textContent = isFavorite ? '♥' : '♡';
+            if (text) text.textContent = isFavorite ? 'Favorited' : 'Favorite';
+        }
+
+        function setFavoriteStateInLists(productId, isFavorite) {
+            const nextState = !!isFavorite;
+            const numericId = Number(productId || 0);
+            if (!numericId) return;
+
+            products.forEach((item) => {
+                if (Number(item.id) === numericId) {
+                    item.isFavorite = nextState;
+                }
+            });
+
+            filteredProducts.forEach((item) => {
+                if (Number(item.id) === numericId) {
+                    item.isFavorite = nextState;
+                }
+            });
+        }
+
+        async function fetchFavoriteStatus(productId) {
+            const numericId = Number(productId || 0);
+            if (!numericId) return null;
+
+            try {
+                const response = await fetch(`api/toggle-favorite.php?product_id=${numericId}`, { cache: 'no-store' });
+                const data = await response.json();
+                if (!response.ok || !data.success) return null;
+                return !!data.is_favorite;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        async function toggleFavoriteFromDetail(button) {
+            try {
+                const productId = Number(currentProductId || 0);
+                if (!productId) return;
+
+                if (button) {
+                    button.disabled = true;
+                }
+
+                const response = await fetch('api/toggle-favorite.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ product_id: productId })
+                });
+
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to update favorite');
+                }
+
+                setFavoriteStateInLists(productId, !!data.is_favorite);
+
+                updateFavoriteButtonState(!!data.is_favorite);
+                await showLocalSweetAlert('success', data.is_favorite ? 'Added to Favorites' : 'Removed from Favorites', '', 900);
+            } catch (err) {
+                const message = (err && err.message) ? err.message : 'Unable to update favorite.';
+                await showLocalSweetAlert('error', 'Favorites', message, 1200);
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                }
+            }
+        }
+
         function refreshOverlayState() {
             const checkoutOpen = document.getElementById('checkoutModal')?.classList.contains('show');
             const productOpen = document.getElementById('productModal')?.classList.contains('show');
@@ -636,6 +739,14 @@
                 }
                 id = parseInt(id);
                 currentProductId = id;
+
+                // Track per-user recent views whenever a product detail is opened.
+                fetch('api/track-recent-view.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_id: id })
+                }).catch(() => {});
+
                 currentProductIndex = products.findIndex(p => parseInt(p.id) === id);
                 let product = products[currentProductIndex];
                 
@@ -696,6 +807,14 @@
                 switchMediaTab('photos');
                 
                 document.getElementById('productTitle').textContent = product.name;
+                updateFavoriteButtonState(!!product.isFavorite);
+                fetchFavoriteStatus(id).then((isFavorite) => {
+                    if (isFavorite === null) return;
+                    setFavoriteStateInLists(id, isFavorite);
+                    if (Number(currentProductId) === Number(id)) {
+                        updateFavoriteButtonState(isFavorite);
+                    }
+                });
                 document.getElementById('currentPrice').textContent = `₱${formatPeso(product.price)}`;
                 const orig = document.getElementById('originalPrice');
                 const disc = document.getElementById('discount');
@@ -855,6 +974,7 @@
             
             // Update product title
             document.getElementById('productTitle').textContent = variantProduct.name;
+            updateFavoriteButtonState(!!variantProduct.isFavorite);
             
             // Update price
             document.getElementById('currentPrice').textContent = `₱${formatPeso(variantProduct.price)}`;
@@ -1517,28 +1637,35 @@
             
             // If no existing recipient selected, create new one
             if (!recipientId) {
-                const recipientName = document.getElementById('recipientName').value;
-                const phoneNo = document.getElementById('phoneNo').value;
-                const streetName = document.getElementById('streetName').value;
-                const unitFloor = document.getElementById('unitFloor').value;
-                const district = document.getElementById('district').value;
-                const city = document.getElementById('city').value;
-                const region = document.getElementById('region').value;
+                const recipientFormData = typeof getRecipientFormValues === 'function'
+                    ? getRecipientFormValues()
+                    : {
+                        recipient_name: document.getElementById('recipientName').value.trim(),
+                        phone_no: document.getElementById('phoneNo').value.trim(),
+                        street_name: document.getElementById('streetName').value.trim(),
+                        unit_floor: document.getElementById('unitFloor').value.trim(),
+                        district: document.getElementById('district').value.trim(),
+                        city: document.getElementById('city').value.trim(),
+                        region: document.getElementById('region').value.trim(),
+                        province: '',
+                        is_default: false
+                    };
                 
-                if (!recipientName || !phoneNo || !streetName || !city || !region) {
+                if (!recipientFormData.recipient_name || !recipientFormData.phone_no || !recipientFormData.street_name || !recipientFormData.region || !recipientFormData.province || !recipientFormData.city || !recipientFormData.district) {
                     showToast('Please fill in all required recipient fields', 'error');
                     return;
                 }
                 
                 try {
                     const body = new URLSearchParams();
-                    body.append('recipient_name', recipientName);
-                    body.append('phone_no', phoneNo);
-                    body.append('street_name', streetName);
-                    body.append('unit_floor', unitFloor);
-                    body.append('district', district);
-                    body.append('city', city);
-                    body.append('region', region);
+                    body.append('recipient_name', recipientFormData.recipient_name);
+                    body.append('phone_no', recipientFormData.phone_no);
+                    body.append('street_name', recipientFormData.street_name);
+                    body.append('unit_floor', recipientFormData.unit_floor);
+                    body.append('district', recipientFormData.district);
+                    body.append('city', recipientFormData.city);
+                    body.append('region', recipientFormData.region);
+                    body.append('is_default', recipientFormData.is_default ? 'true' : 'false');
                     
                     const res = await fetch('api/add-recipient.php', { method: 'POST', body });
                     if (!res.ok) throw new Error('Failed to add recipient');

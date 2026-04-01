@@ -398,7 +398,27 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       font-size: 13px;
       font-weight: 700;
       color: #333;
+      margin-bottom: 0;
+    }
+    .variants-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
       margin-bottom: 10px;
+    }
+    .add-variant-btn {
+      border: 1px solid #b7d5ff;
+      background: #eef5ff;
+      color: #1f56bf;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+    .add-variant-btn:hover {
+      background: #dfeeff;
     }
     .variants-section-help {
       font-size: 12px;
@@ -417,6 +437,38 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       margin-bottom: 8px;
     }
     .variant-edit-row:last-child { margin-bottom: 0; }
+    .variant-row-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .variant-main-btn {
+      border: 1px solid #b7d5ff;
+      background: #eef5ff;
+      color: #1f56bf;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .variant-main-btn.active {
+      border-color: #1e6a36;
+      background: #eaf8ef;
+      color: #1e6a36;
+    }
+    .variant-remove-row-btn {
+      border: 1px solid #efc5ca;
+      background: #fff4f5;
+      color: #bb2532;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
     .variant-edit-row input {
       width: 100%;
       border: 1px solid #ddd;
@@ -895,7 +947,10 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
                 </div>
 
                 <div id="variantsEditSection" class="variants-section" style="display:none;">
-                  <div class="variants-section-title">Edit Variants</div>
+                  <div class="variants-section-header">
+                    <div class="variants-section-title">Edit Variants</div>
+                    <button type="button" id="addVariantBtn" class="add-variant-btn">Add New Variant</button>
+                  </div>
                   <div class="variants-section-help">Upload an image only for variants you want to change.</div>
                   <div id="variantsEditRows"></div>
                 </div>
@@ -944,6 +999,8 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
     let currentVideoUrl = '';
     let removeExistingVideo = false;
     let pendingVideoPreviewUrl = '';
+    let newVariantTempCounter = 1;
+    let pendingMainVariantSelection = '';
 
     function revokeVariantImageUrls() {
       currentEditingVariants.forEach((variant) => {
@@ -1419,9 +1476,109 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       });
     }
 
+    function buildVariantRowMarkup(variant) {
+      const variantId = Number(variant.id || 0);
+      const tempId = Number(variant.tempId || 0);
+      const displayPrice = Number(variant.price || 0).toFixed(2);
+      const displayStock = Math.floor(Number(variant.stock || 0));
+      const selectionKey = variantId > 0 ? `id:${variantId}` : `temp:${tempId}`;
+      const isMainSelection = pendingMainVariantSelection === selectionKey;
+      const mainActionLabel = isMainSelection ? 'Main Product Selected' : 'Set as Main Product';
+
+      return `
+        <div class="variant-edit-row">
+          <input type="hidden" class="variant-id" value="${variantId}">
+          <input type="hidden" class="variant-temp-id" value="${tempId}">
+          <input type="text" class="variant-name" placeholder="Variant Name" value="${escapeHtml(variant.name || '')}">
+          <input type="number" class="variant-price" placeholder="Price" min="0" step="0.01" value="${displayPrice}">
+          <input type="number" class="variant-stock" placeholder="Stock" min="0" step="1" value="${displayStock}">
+          <div class="variant-images-cell" data-variant-temp-id="${tempId}">
+            <div class="variant-image-input-wrap">
+              <input type="file" class="variant-image" accept="image/*" multiple title="Add variant images">
+              <small class="variant-image-note">Keep 1 to 8 images, choose one pinned, and remove unwanted ones.</small>
+            </div>
+            <div class="variant-image-count">0 / 8 images</div>
+            <div class="variant-images-grid"></div>
+            <div class="variant-row-actions">
+              <button type="button" class="variant-main-btn ${isMainSelection ? 'active' : ''}" data-main-selection="${escapeHtml(selectionKey)}">${mainActionLabel}</button>
+              ${variant.isNew ? '<button type="button" class="variant-remove-row-btn">Remove Variant</button>' : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function addNewVariantRow() {
+      const baseName = extractBaseProductName((document.getElementById('editProductName')?.value || '').trim()) || 'Variant';
+      const tempId = newVariantTempCounter++;
+
+      currentEditingVariants.push({
+        id: 0,
+        tempId,
+        isNew: true,
+        name: `${baseName} - Variant ${tempId}`,
+        price: 0,
+        stock: 0,
+        images: [],
+        newImages: [],
+        pinnedKey: ''
+      });
+
+      renderVariantsEditSectionFromState();
+    }
+
+    function renderVariantsEditSectionFromState() {
+      const rows = document.getElementById('variantsEditRows');
+      if (!rows) return;
+
+      rows.innerHTML = currentEditingVariants.map((variant) => buildVariantRowMarkup(variant)).join('');
+
+      rows.querySelectorAll('.variant-edit-row').forEach((row) => {
+        const tempId = Number(row.querySelector('.variant-temp-id')?.value || 0);
+        renderVariantImageManager(tempId, row);
+
+        const fileInput = row.querySelector('.variant-image');
+        if (fileInput) {
+          fileInput.addEventListener('change', () => handleVariantImageInputChange(tempId, row, fileInput));
+        }
+
+        const removeBtn = row.querySelector('.variant-remove-row-btn');
+        if (removeBtn) {
+          removeBtn.addEventListener('click', () => {
+            const index = currentEditingVariants.findIndex((variant) => Number(variant.tempId) === tempId);
+            if (index === -1) return;
+            const removedVariant = currentEditingVariants.splice(index, 1)[0];
+            const removedSelectionKey = Number(removedVariant.id || 0) > 0
+              ? `id:${Number(removedVariant.id)}`
+              : `temp:${Number(removedVariant.tempId || 0)}`;
+            if (pendingMainVariantSelection === removedSelectionKey) {
+              pendingMainVariantSelection = '';
+            }
+            (removedVariant.newImages || []).forEach((item) => {
+              if (item && item.previewUrl) {
+                URL.revokeObjectURL(item.previewUrl);
+              }
+            });
+            renderVariantsEditSectionFromState();
+          });
+        }
+
+        const mainBtn = row.querySelector('.variant-main-btn');
+        if (mainBtn) {
+          mainBtn.addEventListener('click', () => {
+            const selection = String(mainBtn.getAttribute('data-main-selection') || '').trim();
+            if (!selection) return;
+            pendingMainVariantSelection = pendingMainVariantSelection === selection ? '' : selection;
+            renderVariantsEditSectionFromState();
+          });
+        }
+      });
+    }
+
     function renderVariantsEditSection(variants) {
       const section = document.getElementById('variantsEditSection');
       const rows = document.getElementById('variantsEditRows');
+      const addBtn = document.getElementById('addVariantBtn');
       if (!section || !rows) return;
 
       revokeVariantImageUrls();
@@ -1430,15 +1587,12 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
         ? variants.filter((v) => Number(v.parent_product_id || 0) > 0)
         : [];
 
-      if (childVariants.length === 0) {
-        section.style.display = 'none';
-        currentEditingVariants = [];
-        return;
-      }
-
       section.style.display = 'block';
+      pendingMainVariantSelection = '';
       currentEditingVariants = childVariants.map((v) => ({
         id: Number(v.id),
+        tempId: Number(v.id),
+        isNew: false,
         name: v.name || '',
         price: Number(v.price || 0),
         stock: Number(v.stock || 0),
@@ -1447,32 +1601,11 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
         pinnedKey: normalizeVariantImages(v.image).length > 0 ? 'e:0' : ''
       }));
 
-      rows.innerHTML = currentEditingVariants.map((variant) => `
-        <div class="variant-edit-row">
-          <input type="hidden" class="variant-id" value="${variant.id}">
-          <input type="text" class="variant-name" placeholder="Variant Name" value="${variant.name}" readonly>
-          <input type="number" class="variant-price" placeholder="Price" min="0" step="0.01" value="${variant.price.toFixed(2)}">
-          <input type="number" class="variant-stock" placeholder="Stock" min="0" step="1" value="${variant.stock}">
-          <div class="variant-images-cell" data-variant-id="${variant.id}">
-            <div class="variant-image-input-wrap">
-              <input type="file" class="variant-image" accept="image/*" multiple title="Add variant images">
-              <small class="variant-image-note">Keep 1 to 8 images, choose one pinned, and remove unwanted ones.</small>
-            </div>
-            <div class="variant-image-count">0 / 8 images</div>
-            <div class="variant-images-grid"></div>
-          </div>
-        </div>
-      `).join('');
+      if (addBtn) {
+        addBtn.onclick = addNewVariantRow;
+      }
 
-      rows.querySelectorAll('.variant-edit-row').forEach((row) => {
-        const variantId = Number(row.querySelector('.variant-id')?.value || 0);
-        renderVariantImageManager(variantId, row);
-
-        const fileInput = row.querySelector('.variant-image');
-        if (!fileInput) return;
-
-        fileInput.addEventListener('change', () => handleVariantImageInputChange(variantId, row, fileInput));
-      });
+      renderVariantsEditSectionFromState();
     }
 
     function normalizeVariantImages(imageValue) {
@@ -1489,8 +1622,8 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
         .map((url) => ({ url, deleted: false }));
     }
 
-    function findEditingVariant(variantId) {
-      return currentEditingVariants.find((variant) => Number(variant.id) === Number(variantId)) || null;
+    function findEditingVariantByTempId(tempId) {
+      return currentEditingVariants.find((variant) => Number(variant.tempId) === Number(tempId)) || null;
     }
 
     function getVariantActiveImageCount(variant) {
@@ -1533,8 +1666,8 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       variant.pinnedKey = '';
     }
 
-    function renderVariantImageManager(variantId, row) {
-      const variant = findEditingVariant(variantId);
+    function renderVariantImageManager(tempId, row) {
+      const variant = findEditingVariantByTempId(tempId);
       if (!variant || !row) return;
 
       const grid = row.querySelector('.variant-images-grid');
@@ -1555,7 +1688,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
             <img src="${escapeHtml(item.url)}" alt="Variant image ${index + 1}">
             <div class="variant-image-actions">
               <label class="variant-image-pin">
-                <input type="radio" name="variantPinned_${variantId}" value="${key}" ${checked} ${item.deleted ? 'disabled' : ''}>
+                <input type="radio" name="variantPinned_${tempId}" value="${key}" ${checked} ${item.deleted ? 'disabled' : ''}>
                 <span>Pin</span>
               </label>
               <button type="button" class="variant-image-remove-btn" data-existing-index="${index}">${buttonLabel}</button>
@@ -1573,7 +1706,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
             <img src="${escapeHtml(item.previewUrl)}" alt="New variant image ${index + 1}">
             <div class="variant-image-actions">
               <label class="variant-image-pin">
-                <input type="radio" name="variantPinned_${variantId}" value="${key}" ${checked}>
+                <input type="radio" name="variantPinned_${tempId}" value="${key}" ${checked}>
                 <span>Pin</span>
               </label>
               <button type="button" class="variant-image-remove-btn" data-new-index="${index}">Remove</button>
@@ -1585,11 +1718,11 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       grid.innerHTML = cards.join('');
       countEl.textContent = `${getVariantActiveImageCount(variant)} / 8 images`;
 
-      grid.querySelectorAll(`input[name="variantPinned_${variantId}"]`).forEach((radio) => {
+      grid.querySelectorAll(`input[name="variantPinned_${tempId}"]`).forEach((radio) => {
         radio.addEventListener('change', () => {
           if (!radio.checked) return;
           variant.pinnedKey = radio.value;
-          renderVariantImageManager(variantId, row);
+          renderVariantImageManager(tempId, row);
         });
       });
 
@@ -1599,7 +1732,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
           if (!Number.isInteger(index) || !variant.images[index]) return;
           variant.images[index].deleted = !variant.images[index].deleted;
           applyVariantPinnedFallback(variant);
-          renderVariantImageManager(variantId, row);
+          renderVariantImageManager(tempId, row);
         });
       });
 
@@ -1612,13 +1745,13 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
             URL.revokeObjectURL(removed.previewUrl);
           }
           applyVariantPinnedFallback(variant);
-          renderVariantImageManager(variantId, row);
+          renderVariantImageManager(tempId, row);
         });
       });
     }
 
-    async function handleVariantImageInputChange(variantId, row, input) {
-      const variant = findEditingVariant(variantId);
+    async function handleVariantImageInputChange(tempId, row, input) {
+      const variant = findEditingVariantByTempId(tempId);
       if (!variant || !input) return;
 
       const selectedFiles = Array.from(input.files || []);
@@ -1628,7 +1761,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       const remainingSlots = 8 - getVariantActiveImageCount(variant);
       if (remainingSlots <= 0) {
         await localAlert('warning', 'Image Limit Reached', 'Each variant can keep up to 8 images only.');
-        renderVariantImageManager(variantId, row);
+        renderVariantImageManager(tempId, row);
         return;
       }
 
@@ -1645,7 +1778,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       }
 
       applyVariantPinnedFallback(variant);
-      renderVariantImageManager(variantId, row);
+      renderVariantImageManager(tempId, row);
     }
 
     function getPrimaryImage(imageValue) {
@@ -1966,13 +2099,20 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
         }
 
         const variantsToUpdate = [];
+        const newVariantsToCreate = [];
         const variantImageUpdates = [];
         if (Array.isArray(currentEditingVariants) && currentEditingVariants.length > 0) {
           const variantRows = document.querySelectorAll('.variant-edit-row');
           variantRows.forEach((row) => {
             const variantId = Number(row.querySelector('.variant-id')?.value || 0);
+            const variantTempId = Number(row.querySelector('.variant-temp-id')?.value || 0);
+            const variantName = (row.querySelector('.variant-name')?.value || '').trim();
             const variantPrice = row.querySelector('.variant-price')?.value || '0';
             const variantStock = row.querySelector('.variant-stock')?.value || '0';
+
+            if (!variantName) {
+              throw new Error('Each variant must have a name.');
+            }
 
             if (!variantPrice || Number(variantPrice) < 0) {
               throw new Error('All variant prices must be non-negative numbers.');
@@ -1982,13 +2122,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
               throw new Error('All variant stocks must be non-negative numbers.');
             }
 
-            variantsToUpdate.push({
-              id: variantId,
-              price: Number(variantPrice).toFixed(2),
-              stock: Math.floor(Number(variantStock))
-            });
-
-            const variantState = findEditingVariant(variantId);
+            const variantState = findEditingVariantByTempId(variantTempId);
             if (!variantState) {
               throw new Error('Variant image state is missing. Please reopen the product modal and try again.');
             }
@@ -1999,6 +2133,18 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
             }
             if (activeVariantImageCount > 8) {
               throw new Error('Each variant can keep up to 8 images only.');
+            }
+
+            const variantPayload = {
+              name: variantName,
+              price: Number(variantPrice).toFixed(2),
+              stock: Math.floor(Number(variantStock))
+            };
+
+            if (variantId > 0) {
+              variantsToUpdate.push({ id: variantId, ...variantPayload });
+            } else {
+              newVariantsToCreate.push({ temp_id: variantTempId, ...variantPayload });
             }
 
             applyVariantPinnedFallback(variantState);
@@ -2024,13 +2170,18 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
               }
             }
 
-            variantImageUpdates.push({
-              id: variantId,
+            const variantImagePayload = {
               removed_existing_images: removedExisting,
               pinned_source: pinnedSource,
               pinned_existing_url: pinnedExistingUrl,
               pinned_new_image_index: pinnedNewImageIndex
-            });
+            };
+
+            if (variantId > 0) {
+              variantImageUpdates.push({ id: variantId, ...variantImagePayload });
+            } else {
+              variantImageUpdates.push({ temp_id: variantTempId, ...variantImagePayload });
+            }
           });
         }
 
@@ -2044,7 +2195,11 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
         if (variantsToUpdate.length > 0) {
           body.append('variants', JSON.stringify(variantsToUpdate));
         }
+        if (newVariantsToCreate.length > 0) {
+          body.append('new_variants', JSON.stringify(newVariantsToCreate));
+        }
         body.append('variant_image_updates', JSON.stringify(variantImageUpdates));
+        body.append('switch_main_variant', pendingMainVariantSelection);
         body.append('remove_existing_video', removeExistingVideo ? '1' : '0');
         body.append('existing_video_url', currentVideoUrl || '');
         if (newVideoFile) {
@@ -2079,11 +2234,15 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
 
         currentEditingVariants.forEach((variant) => {
           const variantId = Number(variant.id || 0);
-          if (variantId <= 0) return;
+          const variantTempId = Number(variant.tempId || 0);
           const newImages = Array.isArray(variant.newImages) ? variant.newImages : [];
           newImages.forEach((item) => {
             if (item && item.file) {
-              body.append(`variant_additional_images_${variantId}[]`, item.file);
+              if (variantId > 0) {
+                body.append(`variant_additional_images_${variantId}[]`, item.file);
+              } else if (variantTempId > 0) {
+                body.append(`variant_additional_images_new_${variantTempId}[]`, item.file);
+              }
             }
           });
         });
@@ -2216,6 +2375,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       revokePendingVideoPreview();
       revokeVariantImageUrls();
       currentEditingVariants = [];
+      pendingMainVariantSelection = '';
     }
 
     async function loadProducts() {
