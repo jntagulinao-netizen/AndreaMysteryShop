@@ -18,12 +18,47 @@ try {
         $anonymousColumnExists = true;
     }
 
+    $adminReplyColumnExists = false;
+    $adminReplyCheck = $conn->query("SHOW COLUMNS FROM reviews LIKE 'admin_reply'");
+    if ($adminReplyCheck && $adminReplyCheck->num_rows > 0) {
+        $adminReplyColumnExists = true;
+    }
+
+    $adminReplyAtColumnExists = false;
+    $adminReplyAtCheck = $conn->query("SHOW COLUMNS FROM reviews LIKE 'admin_reply_at'");
+    if ($adminReplyAtCheck && $adminReplyAtCheck->num_rows > 0) {
+        $adminReplyAtColumnExists = true;
+    }
+
+    $adminReplyByColumnExists = false;
+    $adminReplyByCheck = $conn->query("SHOW COLUMNS FROM reviews LIKE 'admin_reply_by'");
+    if ($adminReplyByCheck && $adminReplyByCheck->num_rows > 0) {
+        $adminReplyByColumnExists = true;
+    } else {
+        $conn->query("ALTER TABLE reviews ADD COLUMN admin_reply_by INT NULL AFTER admin_reply_at");
+        $adminReplyByCheck = $conn->query("SHOW COLUMNS FROM reviews LIKE 'admin_reply_by'");
+        if ($adminReplyByCheck && $adminReplyByCheck->num_rows > 0) {
+            $adminReplyByColumnExists = true;
+        }
+    }
+
     $query = 'SELECT r.review_id, r.rating, r.review_text, r.review_image, r.review_image_type, r.created_at, u.full_name';
     if ($anonymousColumnExists) {
         $query .= ', r.is_anonymous';
     }
+    if ($adminReplyColumnExists) {
+        $query .= ', r.admin_reply';
+    }
+    if ($adminReplyAtColumnExists) {
+        $query .= ', r.admin_reply_at';
+    }
+    if ($adminReplyByColumnExists) {
+        $query .= ', r.admin_reply_by';
+        $query .= ', COALESCE(NULLIF(TRIM(admin_user.full_name), ""), "Admin") AS admin_reply_by_name';
+    }
     $query .= ' FROM reviews r
               LEFT JOIN users u ON r.user_id = u.user_id
+              LEFT JOIN users admin_user ON admin_user.user_id = r.admin_reply_by
               WHERE r.product_id = ?
               ORDER BY r.created_at DESC
               LIMIT 50';
@@ -100,6 +135,10 @@ try {
             'rating' => intval($row['rating']),
             'review_text' => trim($row['review_text']),
             'created_at' => $row['created_at'],
+            'admin_reply' => isset($row['admin_reply']) ? trim((string)$row['admin_reply']) : '',
+            'admin_reply_at' => $row['admin_reply_at'] ?? null,
+            'admin_reply_by' => isset($row['admin_reply_by']) ? intval($row['admin_reply_by']) : null,
+            'admin_reply_by_name' => isset($row['admin_reply_by_name']) ? trim((string)$row['admin_reply_by_name']) : null,
             'has_media' => $hasMedia,
             'media_type' => $hasMedia ? ($mediaFiles[0]['media_type'] ?? null) : null,
             'media_files' => $mediaFiles

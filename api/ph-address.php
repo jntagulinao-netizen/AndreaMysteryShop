@@ -19,6 +19,23 @@ function respondError(string $message, int $status = 400): void {
 }
 
 function getOfflineAddressData(): array {
+    static $cached = null;
+    if (is_array($cached)) {
+        return $cached;
+    }
+
+    $offlineFile = __DIR__ . '/ph-address-offline.json';
+    if (is_file($offlineFile) && is_readable($offlineFile)) {
+        $raw = @file_get_contents($offlineFile);
+        if ($raw !== false) {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $cached = $decoded;
+                return $cached;
+            }
+        }
+    }
+
     return [
         'regions' => [
             ['code' => '130000000', 'name' => 'NCR'],
@@ -134,11 +151,7 @@ function getOfflineResponse(string $endpoint, string $regionCode, string $provin
         return $offline['citiesByRegion'][$regionCode] ?? [];
     }
     if ($endpoint === 'barangays') {
-        return $offline['barangaysByCity'][$cityCode] ?? [
-            ['code' => $cityCode . '001', 'name' => 'Barangay 1'],
-            ['code' => $cityCode . '002', 'name' => 'Barangay 2'],
-            ['code' => $cityCode . '003', 'name' => 'Barangay 3']
-        ];
+        return $offline['barangaysByCity'][$cityCode] ?? [];
     }
     return [];
 }

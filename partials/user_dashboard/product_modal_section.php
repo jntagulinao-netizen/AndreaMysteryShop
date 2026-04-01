@@ -1,14 +1,6 @@
 <div class="product-modal" id="productModal">
     <div class="product-detail">
         <span class="close-product" onclick="closeProductModal()">&times;</span>
-        <div class="media-tabs">
-            <button class="media-tab active" id="photosTab" onclick="switchMediaTab('photos')">Photos</button>
-            <button class="media-tab" id="videosTab" onclick="switchMediaTab('videos')" style="display:none;">Video</button>
-        </div>
-        <div class="product-nav">
-            <div class="nav-btn" onclick="navigateProduct(-1)" title="Previous item"><</div>
-            <div class="nav-btn" onclick="navigateProduct(1)" title="Next item">></div>
-        </div>
         <div id="mediaSection" class="detail-section"></div>
         <div class="product-gallery" id="productGallery"></div>
         <div class="product-main-info">

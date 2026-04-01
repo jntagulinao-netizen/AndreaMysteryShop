@@ -203,6 +203,7 @@ function format_peso_display($amount) {
     .icon-products { background: linear-gradient(135deg, #f59e0b, #f97316); }
     .icon-drafts { background: linear-gradient(135deg, #10b981, #0ea5a5); }
     .icon-archived { background: linear-gradient(135deg, #64748b, #475569); }
+    .icon-reviews { background: linear-gradient(135deg, #06b6d4, #0e7490); }
     .icon-add { background: linear-gradient(135deg, #ef4444, #e11d48); }
     .function-label {
       font-size: 12px;
@@ -292,6 +293,7 @@ function format_peso_display($amount) {
           <a href="admin_my_products.php">My Products</a>
           <a href="admin_product_drafts.php">Product Drafts</a>
           <a href="admin_my_products.php?view=archived">Archived Products</a>
+          <a href="admin_manage_reviews.php">Manage Reviews</a>
         
           <a href="logout.php">Logout</a>
         </div>
@@ -337,6 +339,12 @@ function format_peso_display($amount) {
             <svg viewBox="0 0 24 24"><path d="M3 7h18"></path><path d="M5 7l1 12h12l1-12"></path><path d="M9 11v5"></path><path d="M15 11v5"></path><path d="M10 7V5h4v2"></path></svg>
           </span>
           <span class="function-label">Archived Products</span>
+        </a>
+        <a class="function-tile" href="admin_manage_reviews.php" title="Manage Reviews">
+          <span class="function-icon icon-reviews">
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8 9h8"></path><path d="M8 13h6"></path></svg>
+          </span>
+          <span class="function-label">Manage Reviews</span>
         </a>
         <a class="function-tile" href="admin_add_product.php" title="Add Product">
           <span class="function-icon icon-add">

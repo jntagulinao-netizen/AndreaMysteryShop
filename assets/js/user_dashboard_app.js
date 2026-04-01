@@ -10,9 +10,12 @@
         let currentProductImages = [];
         let currentProductVideoUrl = '';
         let currentProductMediaOptions = [];
+        let currentGalleryMediaIndex = 0;
         let lightboxCurrentIndex = 0;
         let lightboxTouchStartX = 0;
         let lightboxTouchStartY = 0;
+        let galleryTouchStartX = 0;
+        let galleryTouchStartY = 0;
         const productModalParams = new URLSearchParams(window.location.search);
         let pendingOpenProductId = parseInt(productModalParams.get('product_id') || '', 10);
         if (!Number.isFinite(pendingOpenProductId) || pendingOpenProductId <= 0) {
@@ -357,6 +360,7 @@
             }
 
             const firstOption = currentProductMediaOptions[0];
+            currentGalleryMediaIndex = 0;
             const firstPreviewHtml = firstOption && firstOption.type === 'video'
                 ? `<video class="main-img" id="mainProductVideo" src="${firstOption.src}" controls playsinline style="cursor: auto; object-fit: contain;"></video>`
                 : `<img class="main-img" id="mainProductImg" src="${firstOption ? firstOption.src : ''}" alt="${productName}" onclick="openImageLightbox(${firstOption ? firstOption.imageIndex : 0}, event)" />`;
@@ -364,6 +368,7 @@
             gallery.innerHTML = `
                 <div class="main-gallery">
                     ${firstPreviewHtml}
+                    <div class="media-count-indicator" id="mediaCountIndicator">1/${currentProductMediaOptions.length}</div>
                 </div>
                 <div class="gallery-thumbs">
                     ${currentProductMediaOptions.map((media, i) => {
@@ -374,6 +379,8 @@
                     }).join('')}
                 </div>
             `;
+
+            initializeProductGalleryGestures();
         }
 
         function renderProductVideo(videoUrl) {
@@ -912,6 +919,9 @@
                             rating: parseInt(r.rating) || 0,
                             date: r.created_at || '2 days ago',
                             text: r.review_text || '[No text provided]',
+                            admin_reply: (r.admin_reply || '').trim(),
+                            admin_reply_at: r.admin_reply_at || null,
+                            admin_reply_by_name: (r.admin_reply_by_name || '').trim(),
                             has_media: r.has_media || false,
                             media_type: r.media_type || null,
                             media_files: Array.isArray(r.media_files) ? r.media_files : []
@@ -1070,20 +1080,58 @@
         function switchImage(index) {
             const thumbs = document.querySelectorAll('.thumb-img');
             const gallery = document.getElementById('productGallery');
-            const option = currentProductMediaOptions[index];
+            const total = currentProductMediaOptions.length;
+            if (!total) return;
+            const safeIndex = ((Number(index) % total) + total) % total;
+            const option = currentProductMediaOptions[safeIndex];
             if (!gallery || !option) return;
 
-            thumbs.forEach((t, i) => t.classList.toggle('active', i === index));
+            currentGalleryMediaIndex = safeIndex;
+            thumbs.forEach((t, i) => t.classList.toggle('active', i === safeIndex));
 
             const mainGallery = gallery.querySelector('.main-gallery');
             if (!mainGallery) return;
 
             if (option.type === 'video') {
-                mainGallery.innerHTML = `<video class="main-img" id="mainProductVideo" src="${option.src}" controls playsinline style="cursor: auto; object-fit: contain;"></video>`;
+                mainGallery.innerHTML = `<video class="main-img" id="mainProductVideo" src="${option.src}" controls playsinline style="cursor: auto; object-fit: contain;"></video><div class="media-count-indicator" id="mediaCountIndicator">${safeIndex + 1}/${total}</div>`;
                 return;
             }
 
-            mainGallery.innerHTML = `<img class="main-img" id="mainProductImg" src="${option.src}" alt="Product image" onclick="openImageLightbox(${option.imageIndex}, event)" />`;
+            mainGallery.innerHTML = `<img class="main-img" id="mainProductImg" src="${option.src}" alt="Product image" onclick="openImageLightbox(${option.imageIndex}, event)" /><div class="media-count-indicator" id="mediaCountIndicator">${safeIndex + 1}/${total}</div>`;
+        }
+
+        function initializeProductGalleryGestures() {
+            const gallery = document.getElementById('productGallery');
+            if (!gallery || gallery.dataset.swipeBound === '1') return;
+
+            gallery.addEventListener('touchstart', (event) => {
+                const mainGallery = event.target.closest('.main-gallery');
+                if (!mainGallery) return;
+
+                const touch = event.changedTouches?.[0];
+                if (!touch) return;
+                galleryTouchStartX = touch.clientX;
+                galleryTouchStartY = touch.clientY;
+            }, { passive: true });
+
+            gallery.addEventListener('touchend', (event) => {
+                const mainGallery = event.target.closest('.main-gallery');
+                if (!mainGallery) return;
+
+                const touch = event.changedTouches?.[0];
+                if (!touch) return;
+
+                const deltaX = touch.clientX - galleryTouchStartX;
+                const deltaY = touch.clientY - galleryTouchStartY;
+                const absX = Math.abs(deltaX);
+                const absY = Math.abs(deltaY);
+
+                if (absX > 40 && absX > absY) {
+                    switchImage(currentGalleryMediaIndex + (deltaX < 0 ? 1 : -1));
+                }
+            }, { passive: true });
+
+            gallery.dataset.swipeBound = '1';
         }
 
         function switchMediaTab(tab) {
@@ -1166,6 +1214,13 @@
             document.getElementById('avgRating').innerHTML = `★ ${avg}`; 
             document.getElementById('reviewsCount').textContent = `${reviews.length} reviews`; 
             reviewMediaMap = {};
+
+            const escapeHtml = (value) => String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
             
             container.innerHTML = reviews.map(r => {
                 let mediaHtml = '';
@@ -1205,9 +1260,33 @@
                         'review-media-single'
                     );
                 }
+
+                let adminReplyHtml = '';
+                if (r.admin_reply) {
+                    const adminName = r.admin_reply_by_name || 'Admin';
+                    const replyDateText = r.admin_reply_at ? `<div class="admin-reply-date">${r.admin_reply_at}</div>` : '';
+                    const replyId = `adminReply-${r.review_id}`;
+                    adminReplyHtml = `
+                        <button type="button" class="admin-reply-toggle" onclick="toggleAdminReply('${replyId}', this)">Show admin reply</button>
+                        <div class="admin-reply-box" id="${replyId}" style="display: none;">
+                            <div class="admin-reply-header">Replied by ${escapeHtml(adminName)}</div>
+                            <div class="admin-reply-text">${escapeHtml(r.admin_reply)}</div>
+                            ${replyDateText}
+                        </div>
+                    `;
+                }
                 
-                return `<div class="review-item"><div class="review-avatar">${r.user[0].toUpperCase()}</div><div class="review-content"><div class="review-header"><span class="reviewer-name">${r.user}</span><span class="review-stars">★${'★'.repeat(r.rating-1)}${'☆'.repeat(5-r.rating)}</span><span class="review-date">${r.date}</span></div><p class="review-text">${r.text}</p>${mediaHtml}</div></div>`;
+                return `<div class="review-item"><div class="review-avatar">${r.user[0].toUpperCase()}</div><div class="review-content"><div class="review-header"><span class="reviewer-name">${r.user}</span><span class="review-stars">★${'★'.repeat(r.rating-1)}${'☆'.repeat(5-r.rating)}</span><span class="review-date">${r.date}</span></div><p class="review-text">${r.text}</p>${mediaHtml}${adminReplyHtml}</div></div>`;
             }).join('') || '<p class="empty-reviews-text">No reviews yet. Be the first!</p>';
+        }
+
+        function toggleAdminReply(replyId, btn) {
+            const box = document.getElementById(replyId);
+            if (!box || !btn) return;
+
+            const hidden = box.style.display === 'none' || box.style.display === '';
+            box.style.display = hidden ? 'block' : 'none';
+            btn.textContent = hidden ? 'Hide admin reply' : 'Show admin reply';
         }
 
         function getRecommendationTokens(text) {
