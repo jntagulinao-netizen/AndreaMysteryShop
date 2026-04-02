@@ -26,7 +26,7 @@ if ($role !== 'user') {
     <link rel="stylesheet" href="assets/css/user_dashboard_cart.css?v=20260331-2">
     <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260401-2">
   <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260401-4">
-    <link rel="stylesheet" href="assets/css/category_products_custom_display.css?v=20260331-2">
+    <link rel="stylesheet" href="assets/css/category_products_custom_display.css?v=20260402-5">
 </head>
 <body>
     <?php include __DIR__ . '/partials/user_dashboard/topbar_search.php'; ?>
@@ -69,7 +69,7 @@ if ($role !== 'user') {
     <script src="assets/js/user_dashboard_search.js"></script>
     <script src="assets/js/user_dashboard_app.js?v=20260402-1"></script>
     <script src="assets/js/user_dashboard_app_init.js"></script>
-    <script src="assets/js/category_products_custom_display.js?v=20260402-1"></script>
+    <script src="assets/js/category_products_custom_display.js?v=20260402-3"></script>
 
 
 </body>

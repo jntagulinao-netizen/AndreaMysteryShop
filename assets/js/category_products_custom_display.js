@@ -109,8 +109,13 @@ function renderProducts(productsToRender = filteredProducts) {
             if (!matchCategory) {
                 grid.innerHTML = `
                     <section class="category-block">
-                        <div class="single-category-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #eee;">
-                            <h2 style="margin:0;font-size:22px;color:#222;">Category not found</h2>
+                        <div class="single-category-header">
+                            <div class="single-category-header-left">
+                                <div class="single-category-title-wrap">
+                                    <h1>Category not found</h1>
+                                    <p>No matching category</p>
+                                </div>
+                            </div>
                             <button class="view-all-btn" onclick="backToAllCategories()">Back to All Categories</button>
                         </div>
                         <p style="color:#666;">No products were found for this category.</p>
@@ -133,8 +138,13 @@ function renderProducts(productsToRender = filteredProducts) {
             if (oneCategoryProducts.length === 0) {
                 grid.innerHTML = `
                     <section class="category-block">
-                        <div class="single-category-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #eee;">
-                            <h2 style="margin:0;font-size:28px;color:#111;">${matchCategory}</h2>
+                        <div class="single-category-header">
+                            <div class="single-category-header-left">
+                                <div class="single-category-title-wrap">
+                                    <h1>${matchCategory}</h1>
+                                    <p>0 products</p>
+                                </div>
+                            </div>
                             <button class="view-all-btn" onclick="backToAllCategories()">Back to All Categories</button>
                         </div>
                         <div style="text-align:center;padding:40px 20px;color:#999;font-size:16px;">
@@ -145,12 +155,14 @@ function renderProducts(productsToRender = filteredProducts) {
             } else {
                 grid.innerHTML = `
                     <section class="category-block">
-                        <div class="single-category-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #eee;">
-                            <h2 style="margin:0;font-size:28px;color:#111;">${matchCategory}</h2>
-                            <div class="category-header-actions">
-                                <span style="font-size:14px;color:#777;">${oneCategoryProducts.length} products</span>
-                                <button class="view-all-btn" onclick="backToAllCategories()">Back to All Categories</button>
+                        <div class="single-category-header">
+                            <div class="single-category-header-left">
+                                <div class="single-category-title-wrap">
+                                    <h1>${matchCategory}</h1>
+                                    <p>${oneCategoryProducts.length} products</p>
+                                </div>
                             </div>
+                            <button class="view-all-btn" onclick="backToAllCategories()">Back to All Categories</button>
                         </div>
                         <div class="products-grid">${oneCategoryProducts.map(getCategoryProductCardHtml).join('')}</div>
                     </section>

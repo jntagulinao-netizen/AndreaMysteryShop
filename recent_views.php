@@ -136,10 +136,12 @@ $recentItemsJson = json_encode($recentItems, JSON_UNESCAPED_SLASHES | JSON_UNESC
     <style>
         html, body { margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f4f4; color: #1f2937; }
-        main { margin-top: 90px; margin: 90px auto 40px; width: 100%; max-width: none; padding: 0 24px; }
+        main { margin: 0 auto 40px; width: 100%; max-width: none; padding: 84px 24px 0; }
         .page-header {
-            position: sticky;
+            position: fixed;
             top: 8px;
+            left: 24px;
+            right: 24px;
             z-index: 20;
             background: #fff;
             border: 1px solid #ececec;
@@ -203,7 +205,11 @@ $recentItemsJson = json_encode($recentItems, JSON_UNESCAPED_SLASHES | JSON_UNESC
         }
 
         @media (max-width: 768px) {
-            main { padding: 0 12px; }
+            main { padding: 78px 12px 0; }
+            .page-header {
+                left: 12px;
+                right: 12px;
+            }
             .page-title { font-size: 16px; }
             .products-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 12px; }
             .products-grid .product-name { font-size: 11px; min-height: 28px; }
