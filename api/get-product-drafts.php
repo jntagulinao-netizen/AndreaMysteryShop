@@ -73,7 +73,11 @@ function fetchDraftMedia(mysqli $conn, int $draftId): array {
         } elseif ($role === 'video' && $path !== '') {
             $video = $path;
         } elseif ($role === 'variant_image' && $path !== '' && $clientVariantId > 0) {
-            $variantImages[(string)$clientVariantId] = $path;
+            $key = (string)$clientVariantId;
+            if (!isset($variantImages[$key]) || !is_array($variantImages[$key])) {
+                $variantImages[$key] = [];
+            }
+            $variantImages[$key][] = $path;
         }
     }
 
@@ -105,6 +109,17 @@ try {
         }
 
         $draftMedia = fetchDraftMedia($conn, (int)$row['draft_id']);
+        $variants = fetchDraftVariants($conn, (int)$row['draft_id']);
+
+        $variantsWithImages = array_map(static function (array $variant) use ($draftMedia): array {
+            $variantId = (int)($variant['id'] ?? 0);
+            $variantKey = (string)$variantId;
+            $variant['images'] = [];
+            if ($variantId > 0 && isset($draftMedia['variant_images'][$variantKey]) && is_array($draftMedia['variant_images'][$variantKey])) {
+                $variant['images'] = $draftMedia['variant_images'][$variantKey];
+            }
+            return $variant;
+        }, $variants);
 
         $draft = [
             'draft_id' => (int)$row['draft_id'],
@@ -121,7 +136,7 @@ try {
             'created_at' => $row['created_at'] ?? null,
             'updated_at' => $row['updated_at'] ?? null,
             'media' => $draftMedia,
-            'variants' => fetchDraftVariants($conn, (int)$row['draft_id'])
+            'variants' => $variantsWithImages
         ];
 
         echo json_encode(['success' => true, 'draft' => $draft]);

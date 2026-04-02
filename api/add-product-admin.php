@@ -29,6 +29,7 @@ $stockRaw = trim($_POST['product_stock'] ?? '');
 $categoryMode = trim($_POST['category_mode'] ?? 'existing');
 $categoryIdRaw = trim($_POST['category_id'] ?? '0');
 $newCategoryName = trim($_POST['new_category_name'] ?? '');
+$pinnedImageKeyRaw = trim($_POST['pinned_image_key'] ?? '');
 $pinnedImageIndexRaw = trim($_POST['pinned_image_index'] ?? '0');
 $draftIdRaw = trim($_POST['draft_id'] ?? '0');
 $variantsRaw = trim($_POST['variants'] ?? '');
@@ -81,6 +82,9 @@ if ($variantsRaw !== '') {
         }
 
         $variantId = (int)($item['id'] ?? 0);
+        if ($variantId <= 0) {
+            $variantId = (int)($item['temp_id'] ?? 0);
+        }
         $variantName = trim((string)($item['name'] ?? ''));
         $variantPriceRaw = trim((string)($item['price'] ?? ''));
         $variantStockRaw = trim((string)($item['stock'] ?? ''));
@@ -96,9 +100,7 @@ if ($variantsRaw !== '') {
         }
 
         if ($variantId <= 0) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Each variant must have a valid ID']);
-            exit;
+            $variantId = count($variants) + 1;
         }
 
         if (!is_numeric($variantPriceRaw) || (float)$variantPriceRaw < 0) {
@@ -147,6 +149,9 @@ if (count($imageFiles) > 8) {
 }
 
 $pinnedImageIndex = is_numeric($pinnedImageIndexRaw) ? (int)$pinnedImageIndexRaw : 0;
+if ($pinnedImageKeyRaw !== '' && preg_match('/^[en]:(\d+)$/', $pinnedImageKeyRaw, $matches)) {
+    $pinnedImageIndex = (int)$matches[1];
+}
 if (!empty($imageFiles)) {
     if ($pinnedImageIndex < 0 || $pinnedImageIndex >= count($imageFiles)) {
         $pinnedImageIndex = 0;
@@ -202,41 +207,50 @@ foreach ($imageFiles as $file) {
 }
 
 $variantImageFiles = [];
-if (count($variants) > 0) {
-    foreach ($variants as $variant) {
-        $variantId = (int)$variant['id'];
-        $variantImageKey = 'variant_image_' . $variantId;
+foreach ($_FILES as $field => $file) {
+    $fieldName = (string)$field;
+    $variantId = 0;
 
-        if (!isset($_FILES[$variantImageKey])) {
-            continue;
-        }
-
-        $variantImageFile = [
-            'name' => $_FILES[$variantImageKey]['name'] ?? '',
-            'tmp_name' => $_FILES[$variantImageKey]['tmp_name'] ?? '',
-            'error' => (int)($_FILES[$variantImageKey]['error'] ?? UPLOAD_ERR_NO_FILE),
-            'size' => (int)($_FILES[$variantImageKey]['size'] ?? 0)
-        ];
-
-        if ($variantImageFile['error'] === UPLOAD_ERR_NO_FILE) {
-            continue;
-        }
-
-        if ($variantImageFile['error'] !== UPLOAD_ERR_OK) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Each variant must have one valid image']);
-            exit;
-        }
-
-        $variantMime = $finfo->file($variantImageFile['tmp_name']);
-        if (!isset($allowedImageMimes[$variantMime])) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Variant image must be JPG, PNG, WEBP, or GIF']);
-            exit;
-        }
-
-        $variantImageFiles[$variantId] = $variantImageFile;
+    if (preg_match('/^variant_(\d+)_image_(\d+)$/', $fieldName, $matches)) {
+        $variantId = (int)$matches[1];
+    } elseif (strpos($fieldName, 'variant_image_') === 0) {
+        $variantId = (int)substr($fieldName, strlen('variant_image_'));
+    } else {
+        continue;
     }
+
+    if ($variantId <= 0) {
+        continue;
+    }
+
+    $variantImageFile = [
+        'name' => $file['name'] ?? '',
+        'tmp_name' => $file['tmp_name'] ?? '',
+        'error' => (int)($file['error'] ?? UPLOAD_ERR_NO_FILE),
+        'size' => (int)($file['size'] ?? 0)
+    ];
+
+    if ($variantImageFile['error'] === UPLOAD_ERR_NO_FILE) {
+        continue;
+    }
+
+    if ($variantImageFile['error'] !== UPLOAD_ERR_OK) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Each variant must have one valid image']);
+        exit;
+    }
+
+    $variantMime = $finfo->file($variantImageFile['tmp_name']);
+    if (!isset($allowedImageMimes[$variantMime])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Variant image must be JPG, PNG, WEBP, or GIF']);
+        exit;
+    }
+
+    if (!isset($variantImageFiles[$variantId])) {
+        $variantImageFiles[$variantId] = [];
+    }
+    $variantImageFiles[$variantId][] = $variantImageFile;
 }
 
 if ($videoFile) {
@@ -321,7 +335,7 @@ try {
     if (count($variants) > 0) {
         foreach ($variants as $variant) {
             $variantId = (int)$variant['id'];
-            $hasUploadedVariantImage = isset($variantImageFiles[$variantId]);
+            $hasUploadedVariantImage = !empty($variantImageFiles[$variantId]);
             $hasDraftVariantImage = isset($draftMedia['variant_images'][$variantId]);
             if (!$hasUploadedVariantImage && !$hasDraftVariantImage) {
                 throw new Exception('Each variant must have one image');
@@ -498,7 +512,7 @@ try {
             }
         } else if ($variantId > 0) {
             // Variant: save only its single variant image
-            $variantImageFile = $variantImageFiles[$variantId] ?? null;
+            $variantImageFile = (!empty($variantImageFiles[$variantId]) && is_array($variantImageFiles[$variantId])) ? $variantImageFiles[$variantId][0] : null;
             if ($variantImageFile) {
                 $variantMime = $finfo->file($variantImageFile['tmp_name']);
                 $variantExt = $allowedImageMimes[$variantMime] ?? 'jpg';

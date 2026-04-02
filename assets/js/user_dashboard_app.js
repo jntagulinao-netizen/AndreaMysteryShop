@@ -676,6 +676,16 @@
                     console.error('productsGrid element not found!');
                     return;
                 }
+
+                // Check if no products to render
+                if (!productsToRender || !productsToRender.length) {
+                    grid.innerHTML = `
+                        <div style="text-align:center;padding:60px 20px;color:#999;font-size:16px;grid-column:1/-1;">
+                            <p>No products available.</p>
+                        </div>
+                    `;
+                    return;
+                }
                 
                 // Build one card per product family (main product + its variants)
                 const groupedProductsMap = new Map();

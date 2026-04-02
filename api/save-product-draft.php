@@ -31,6 +31,7 @@ $productStockRaw = trim((string)($_POST['product_stock'] ?? ''));
 $useNewCategory = (int)(($_POST['use_new_category'] ?? '0') === '1');
 $categoryId = isset($_POST['category_id']) && $_POST['category_id'] !== '' ? (int)$_POST['category_id'] : null;
 $newCategoryName = trim((string)($_POST['new_category_name'] ?? ''));
+$pinnedImageKeyRaw = trim((string)($_POST['pinned_image_key'] ?? ''));
 $pinnedImageIndex = isset($_POST['pinned_image_index']) ? (int)$_POST['pinned_image_index'] : 0;
 $imageCount = isset($_POST['image_count']) ? (int)$_POST['image_count'] : 0;
 $hasVideo = (int)(($_POST['has_video'] ?? '0') === '1');
@@ -81,23 +82,46 @@ function getUploadedMainImages(): array {
 function getUploadedVariantImages(): array {
     $variantImages = [];
     foreach ($_FILES as $field => $file) {
-        if (strpos((string)$field, 'variant_image_') !== 0) {
+        $fieldName = (string)$field;
+        $clientVariantId = 0;
+        $sortOrder = 0;
+
+        if (preg_match('/^variant_(\d+)_image_(\d+)$/', $fieldName, $matches)) {
+            $clientVariantId = (int)$matches[1];
+            $sortOrder = (int)$matches[2];
+        } elseif (strpos($fieldName, 'variant_image_') === 0) {
+            $clientVariantId = (int)substr($fieldName, strlen('variant_image_'));
+        } else {
             continue;
         }
-        $clientVariantId = (int)substr((string)$field, strlen('variant_image_'));
+
         if ($clientVariantId <= 0) {
             continue;
         }
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
             continue;
         }
-        $variantImages[$clientVariantId] = [
+
+        if (!isset($variantImages[$clientVariantId])) {
+            $variantImages[$clientVariantId] = [];
+        }
+
+        $variantImages[$clientVariantId][] = [
             'name' => $file['name'] ?? '',
             'tmp_name' => $file['tmp_name'] ?? '',
             'error' => (int)($file['error'] ?? UPLOAD_ERR_NO_FILE),
-            'size' => (int)($file['size'] ?? 0)
+            'size' => (int)($file['size'] ?? 0),
+            'sort_order' => $sortOrder
         ];
     }
+
+    foreach ($variantImages as $variantId => $files) {
+        usort($files, static function (array $a, array $b): int {
+            return ((int)($a['sort_order'] ?? 0)) <=> ((int)($b['sort_order'] ?? 0));
+        });
+        $variantImages[$variantId] = $files;
+    }
+
     return $variantImages;
 }
 
@@ -214,6 +238,9 @@ if ($imageCount < 0) {
 if ($pinnedImageIndex < 0) {
     $pinnedImageIndex = 0;
 }
+if ($pinnedImageKeyRaw !== '' && preg_match('/^[en]:(\d+)$/', $pinnedImageKeyRaw, $matches)) {
+    $pinnedImageIndex = (int)$matches[1];
+}
 
 $variantsDecoded = json_decode($variantsRaw, true);
 if (!is_array($variantsDecoded)) {
@@ -259,15 +286,25 @@ foreach ($variantsDecoded as $item) {
     }
 
     $variants[] = [
-        'client_variant_id' => (int)($item['id'] ?? 0),
+        'client_variant_id' => 0,
         'variant_order' => $variantOrder++,
         'variant_name' => $variantName,
         'variant_price' => $variantPrice,
-        'variant_stock' => $variantStock
+        'variant_stock' => $variantStock,
+        'pinned_image_key' => trim((string)($item['pinned_image_key'] ?? $item['pinnedImageKey'] ?? ''))
     ];
 
-    if ((int)($item['id'] ?? 0) > 0) {
-        $variantClientIds[] = (int)$item['id'];
+    $clientVariantId = (int)($item['id'] ?? 0);
+    if ($clientVariantId <= 0) {
+        $clientVariantId = (int)($item['temp_id'] ?? 0);
+    }
+    if ($clientVariantId <= 0) {
+        $clientVariantId = 100000 + $variantOrder;
+    }
+
+    $variants[count($variants) - 1]['client_variant_id'] = $clientVariantId;
+    if ($clientVariantId > 0) {
+        $variantClientIds[] = $clientVariantId;
     }
 }
 
@@ -373,9 +410,6 @@ try {
 
         foreach ($variants as $variant) {
             $clientVariantIdVal = (int)($variant['client_variant_id'] ?? 0);
-            if ($clientVariantIdVal <= 0) {
-                throw new Exception('Variant ID is required for draft variants');
-            }
             $variantOrderVal = (int)$variant['variant_order'];
             $variantNameVal = $variant['variant_name'];
             $variantPriceVal = $variant['variant_price'];
@@ -464,12 +498,17 @@ try {
 
     // Save new variant images if uploaded.
     if (!empty($variantImageFiles)) {
-        $insertVariantMediaStmt = $conn->prepare('INSERT INTO product_draft_media (draft_id, media_role, client_variant_id, file_path, sort_order, is_pinned) VALUES (?, ?, ?, ?, 0, 1)');
+        $variantPinnedByClientId = [];
+        foreach ($variants as $variant) {
+            $variantPinnedByClientId[(int)$variant['client_variant_id']] = (string)($variant['pinned_image_key'] ?? '');
+        }
+
+        $insertVariantMediaStmt = $conn->prepare('INSERT INTO product_draft_media (draft_id, media_role, client_variant_id, file_path, sort_order, is_pinned) VALUES (?, ?, ?, ?, ?, ?)');
         if (!$insertVariantMediaStmt) {
             throw new Exception('Failed to prepare draft variant image insert');
         }
 
-        foreach ($variantImageFiles as $clientVariantId => $variantFile) {
+        foreach ($variantImageFiles as $clientVariantId => $variantFilesForClient) {
             if (!in_array((int)$clientVariantId, $variantClientIds, true)) {
                 continue;
             }
@@ -483,14 +522,26 @@ try {
             }
             deleteDraftMediaRows($conn, $draftId, 'variant_image', (int)$clientVariantId);
 
-            $savedVariant = saveDraftUpload($variantFile, $finfo, $allowedImageMimes, 'draft_' . $draftId . '_variant_' . (int)$clientVariantId, $draftMediaAbsoluteDir);
-            $newlyCreatedFiles[] = $savedVariant['absolute'];
-            $role = 'variant_image';
-            $clientVariantIdVal = (int)$clientVariantId;
-            $variantRel = $savedVariant['relative'];
-            $insertVariantMediaStmt->bind_param('isis', $draftId, $role, $clientVariantIdVal, $variantRel);
-            if (!$insertVariantMediaStmt->execute()) {
-                throw new Exception('Failed to save draft variant image record');
+            $variantPinnedKey = (string)($variantPinnedByClientId[(int)$clientVariantId] ?? '');
+            $pinnedVariantImageIdx = 0;
+            if (preg_match('/^[en]:(\d+)$/', $variantPinnedKey, $pinnedMatches)) {
+                $pinnedVariantImageIdx = (int)$pinnedMatches[1];
+            }
+
+            $mediaSortOrder = 0;
+            foreach ($variantFilesForClient as $uploadedVariantFile) {
+                $savedVariant = saveDraftUpload($uploadedVariantFile, $finfo, $allowedImageMimes, 'draft_' . $draftId . '_variant_' . (int)$clientVariantId . '_' . $mediaSortOrder, $draftMediaAbsoluteDir);
+                $newlyCreatedFiles[] = $savedVariant['absolute'];
+                $role = 'variant_image';
+                $clientVariantIdVal = (int)$clientVariantId;
+                $variantRel = $savedVariant['relative'];
+                $sortOrder = $mediaSortOrder;
+                $isPinned = $mediaSortOrder === $pinnedVariantImageIdx ? 1 : 0;
+                $insertVariantMediaStmt->bind_param('isisii', $draftId, $role, $clientVariantIdVal, $variantRel, $sortOrder, $isPinned);
+                if (!$insertVariantMediaStmt->execute()) {
+                    throw new Exception('Failed to save draft variant image record');
+                }
+                $mediaSortOrder++;
             }
         }
 

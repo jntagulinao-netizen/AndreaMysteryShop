@@ -807,6 +807,69 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
         grid-template-columns: 1fr;
       }
     }
+
+    /* Pagination Styles */
+    .pagination-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-top: 30px;
+      flex-wrap: wrap;
+    }
+
+    .pagination-btn {
+      padding: 8px 12px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #333;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .pagination-btn:hover:not(:disabled) {
+      background: #f0f0f0;
+      border-color: #999;
+    }
+
+    .pagination-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .page-numbers {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .page-btn {
+      padding: 6px 10px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #333;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      min-width: 30px;
+      text-align: center;
+    }
+
+    .page-btn:hover {
+      background: #f0f0f0;
+      border-color: #999;
+    }
+
+    .page-btn.active {
+      background: #4CAF50;
+      color: white;
+      border-color: #4CAF50;
+    }
   </style>
 </head>
 <body>
@@ -855,6 +918,12 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
 
     <div class="products-grid" id="productsGrid"></div>
     <div id="emptyState" class="empty-state" style="display:none;">No products found for this filter.</div>
+    
+    <div id="paginationContainer" class="pagination-container" style="display:none; margin-top: 30px; text-align: center;">
+      <button class="pagination-btn" id="prevBtn" onclick="goToPage(currentPage - 1)">← Previous</button>
+      <div id="pageNumbers" class="page-numbers"></div>
+      <button class="pagination-btn" id="nextBtn" onclick="goToPage(currentPage + 1)">Next →</button>
+    </div>
   </div>
 
   <div class="product-modal" id="productModal">
@@ -1002,6 +1071,9 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
     let pendingVideoPreviewUrl = '';
     let newVariantTempCounter = 1;
     let pendingMainVariantSelection = '';
+    let currentPage = 1;
+    let itemsPerPage = 12;
+    let totalPages = 1;
 
     function revokeVariantImageUrls() {
       currentEditingVariants.forEach((variant) => {
@@ -1021,6 +1093,13 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       }
     }
 
+    function getVideoFileName(videoUrl) {
+      const raw = String(videoUrl || '').trim();
+      if (!raw) return '';
+      const clean = raw.split('?')[0].split('#')[0];
+      return clean.split(/[\\/]/).pop() || '';
+    }
+
     function renderVideoManager() {
       const input = document.getElementById('editProductVideo');
       const status = document.getElementById('productVideoStatus');
@@ -1036,20 +1115,28 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
         revokePendingVideoPreview();
         pendingVideoPreviewUrl = URL.createObjectURL(selectedFile);
         player.src = pendingVideoPreviewUrl;
+        player.load();
         wrap.style.display = 'block';
-        status.textContent = 'New video selected. It will replace the current video when saved.';
+        status.textContent = `New video selected: ${selectedFile.name}. It will replace the current video when saved.`;
         toggleBtn.style.display = 'inline-block';
         toggleBtn.textContent = 'Clear Selected Video';
         return;
       }
 
       revokePendingVideoPreview();
+      player.pause();
       player.src = '';
+      player.removeAttribute('src');
+      player.load();
 
       if (currentVideoUrl && !removeExistingVideo) {
         player.src = currentVideoUrl;
+        player.load();
         wrap.style.display = 'block';
-        status.textContent = 'Current product video is set.';
+        const fileName = getVideoFileName(currentVideoUrl);
+        status.textContent = fileName
+          ? `Current product video: ${fileName}`
+          : 'Current product video is set.';
         toggleBtn.style.display = 'inline-block';
         toggleBtn.textContent = 'Remove Existing Video';
         return;
@@ -1319,6 +1406,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
 
     function filterByCategory(categoryName) {
       currentCategory = categoryName;
+      currentPage = 1; // Reset pagination
       document.querySelectorAll('.filter-btn').forEach((btn) => btn.classList.remove('active'));
       const activeBtn = document.querySelector(`[data-category="${categoryName}"]`);
       if (activeBtn) {
@@ -1329,6 +1417,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
     }
 
     function applySearch() {
+      currentPage = 1; // Reset pagination
       const query = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
       currentSearchQuery = query;
 
@@ -1375,6 +1464,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
     function sortProducts(sortBy) {
       const sortValue = sortBy || '';
       currentSortMode = sortValue;
+      currentPage = 1; // Reset pagination
       renderProducts(applySort([...filteredProducts], sortValue));
     }
 
@@ -1418,7 +1508,17 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
             return 0;
           });
 
-      grid.innerHTML = stockSorted.map((p) => {
+      // Calculate pagination
+      totalPages = Math.ceil(stockSorted.length / itemsPerPage) || 1;
+      if (currentPage > totalPages) {
+        currentPage = Math.max(1, totalPages);
+      }
+      
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedCards = stockSorted.slice(startIndex, endIndex);
+
+      grid.innerHTML = paginatedCards.map((p) => {
         const isOutOfStock = p.isGroupOutOfStock;
         const avgRating = (Number(p.rating) || 0).toFixed(1);
         const image = Array.isArray(p.image) && p.image.length ? p.image[0] : 'https://via.placeholder.com/900x600?text=No+Image';
@@ -1446,6 +1546,74 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       }).join('');
 
       updateEmptyState();
+      updatePaginationUI();
+    }
+
+    function goToPage(pageNum) {
+      if (pageNum >= 1 && pageNum <= totalPages) {
+        currentPage = pageNum;
+        renderProducts();
+        // Scroll to the top of the products grid
+        document.getElementById('productsGrid').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    function updatePaginationUI() {
+      const container = document.getElementById('paginationContainer');
+      const pageNumbersDiv = document.getElementById('pageNumbers');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+
+      if (totalPages <= 1) {
+        container.style.display = 'none';
+        return;
+      }
+
+      container.style.display = 'flex';
+      container.style.justifyContent = 'center';
+      container.style.alignItems = 'center';
+      container.style.gap = '10px';
+      container.style.flexWrap = 'wrap';
+
+      // Disable/enable prev and next buttons
+      prevBtn.disabled = currentPage === 1;
+      nextBtn.disabled = currentPage === totalPages;
+      prevBtn.style.opacity = currentPage === 1 ? '0.5' : '1';
+      nextBtn.style.opacity = currentPage === totalPages ? '0.5' : '1';
+
+      // Generate page numbers
+      const maxPagesToShow = 5;
+      let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+      let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+      if (endPage - startPage + 1 < maxPagesToShow) {
+        startPage = Math.max(1, endPage - maxPagesToShow + 1);
+      }
+
+      let pageHtml = '';
+      
+      // First page and ellipsis
+      if (startPage > 1) {
+        pageHtml += `<button class="page-btn" onclick="goToPage(1)">1</button>`;
+        if (startPage > 2) {
+          pageHtml += `<span style="margin: 0 5px;">...</span>`;
+        }
+      }
+
+      // Page numbers
+      for (let i = startPage; i <= endPage; i++) {
+        const isActive = i === currentPage;
+        pageHtml += `<button class="page-btn ${isActive ? 'active' : ''}" onclick="goToPage(${i})" style="${isActive ? 'background: #4CAF50; color: white;' : ''}">${i}</button>`;
+      }
+
+      // Last page and ellipsis
+      if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+          pageHtml += `<span style="margin: 0 5px;">...</span>`;
+        }
+        pageHtml += `<button class="page-btn" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+      }
+
+      pageNumbersDiv.innerHTML = pageHtml;
     }
 
     function extractBaseProductName(fullName) {

@@ -46,7 +46,11 @@ function renderProducts(productsToRender = filteredProducts) {
         if (!grid) return;
 
         if (!productsToRender || !productsToRender.length) {
-            grid.innerHTML = '';
+            grid.innerHTML = `
+                <div style="text-align:center;padding:60px 20px;color:#999;font-size:16px;">
+                    <p>No products available.</p>
+                </div>
+            `;
             return;
         }
 
@@ -126,18 +130,32 @@ function renderProducts(productsToRender = filteredProducts) {
                 return a.name.localeCompare(b.name);
             });
 
-            grid.innerHTML = `
-                <section class="category-block">
-                    <div class="single-category-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #eee;">
-                        <h2 style="margin:0;font-size:28px;color:#111;">${matchCategory}</h2>
-                        <div class="category-header-actions">
-                            <span style="font-size:14px;color:#777;">${oneCategoryProducts.length} products</span>
+            if (oneCategoryProducts.length === 0) {
+                grid.innerHTML = `
+                    <section class="category-block">
+                        <div class="single-category-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #eee;">
+                            <h2 style="margin:0;font-size:28px;color:#111;">${matchCategory}</h2>
                             <button class="view-all-btn" onclick="backToAllCategories()">Back to All Categories</button>
                         </div>
-                    </div>
-                    <div class="products-grid">${oneCategoryProducts.map(getCategoryProductCardHtml).join('')}</div>
-                </section>
-            `;
+                        <div style="text-align:center;padding:40px 20px;color:#999;font-size:16px;">
+                            <p>No products available in this category.</p>
+                        </div>
+                    </section>
+                `;
+            } else {
+                grid.innerHTML = `
+                    <section class="category-block">
+                        <div class="single-category-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #eee;">
+                            <h2 style="margin:0;font-size:28px;color:#111;">${matchCategory}</h2>
+                            <div class="category-header-actions">
+                                <span style="font-size:14px;color:#777;">${oneCategoryProducts.length} products</span>
+                                <button class="view-all-btn" onclick="backToAllCategories()">Back to All Categories</button>
+                            </div>
+                        </div>
+                        <div class="products-grid">${oneCategoryProducts.map(getCategoryProductCardHtml).join('')}</div>
+                    </section>
+                `;
+            }
             return;
         }
 
@@ -152,6 +170,22 @@ function renderProducts(productsToRender = filteredProducts) {
                 if (aStock > 0 && bStock === 0) return -1;
                 return a.name.localeCompare(b.name);
             });
+
+            if (sorted.length === 0) {
+                return `
+                    <section class="category-block">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                            <h2 style="margin:0;font-size:22px;color:#222;">${category}</h2>
+                            <div class="category-header-actions">
+                                <span style="font-size:14px;color:#999;">No products</span>
+                            </div>
+                        </div>
+                        <div style="padding:20px;text-align:center;color:#999;font-size:15px;">
+                            <p>No products available in this category.</p>
+                        </div>
+                    </section>
+                `;
+            }
 
             return `
                 <section class="category-block">

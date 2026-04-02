@@ -129,6 +129,15 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
 
     .hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
 
+    .video-preview {
+      width: 100%;
+      margin-top: 10px;
+      max-height: 240px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #000;
+    }
+
     input[type="file"] {
       width: 100%;
       padding: 10px;
@@ -149,52 +158,66 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       cursor: pointer;
     }
 
-    .media-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
-    .media-tile {
-      border: 1px dashed #c7d2de;
+    .main-images-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .main-image-card {
+      border: 1px solid #e2e2e2;
       border-radius: 10px;
-      background: #f9fbfd;
-      min-height: 94px;
+      padding: 8px;
+      background: #fff;
+      position: relative;
+    }
+    .main-image-card.removed {
+      opacity: 0.48;
+      border-style: dashed;
+    }
+    .main-image-card img {
+      width: 100%;
+      height: 92px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid #ededed;
+      background: #f6f6f6;
+      display: block;
+      margin-bottom: 8px;
+    }
+    .main-image-actions {
+      display: grid;
+      gap: 6px;
+    }
+    .main-image-pin {
       display: flex;
       align-items: center;
-      justify-content: center;
-      color: #667384;
-      font-size: 12px;
-      text-align: center;
-      padding: 8px;
-      overflow: hidden;
-    }
-    .media-tile.pinned {
-      border-style: solid;
-      border-color: #2f5dd7;
-      box-shadow: 0 0 0 2px rgba(47, 93, 215, 0.2) inset;
-    }
-    .media-tile img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
-    .pin-chip {
-      position: absolute;
-      top: 6px;
-      left: 6px;
-      background: rgba(47, 93, 215, 0.92);
-      color: #fff;
+      gap: 6px;
       font-size: 11px;
-      font-weight: 700;
-      border-radius: 999px;
-      padding: 3px 7px;
+      color: #444;
+      font-weight: 600;
     }
-    .pin-btn {
-      position: absolute;
-      right: 6px;
-      bottom: 6px;
-      border: 1px solid #c4cfde;
-      background: rgba(255,255,255,0.95);
-      color: #234794;
+    .main-image-remove-btn {
+      border: 1px solid #efc5ca;
+      background: #fff4f5;
+      color: #bb2532;
       border-radius: 8px;
-      padding: 4px 7px;
       font-size: 11px;
       font-weight: 700;
+      padding: 6px;
       cursor: pointer;
     }
-    .pin-btn:hover { border-color: #2f5dd7; }
+    .main-image-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: #2d68d8;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 999px;
+    }
 
     .input, .textarea, .select {
       width: 100%;
@@ -247,7 +270,71 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       display: grid;
       grid-template-columns: 1fr 120px 120px 1fr auto;
       gap: 10px;
+      align-items: flex-start;
+    }
+    .variant-images-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 8px;
+    }
+    .variant-image-card {
+      border: 1px solid #e2e2e2;
+      border-radius: 8px;
+      padding: 6px;
+      background: #fff;
+      position: relative;
+    }
+    .variant-image-card.removed {
+      opacity: 0.5;
+      border-style: dashed;
+    }
+    .variant-image-card img {
+      width: 100%;
+      height: 74px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #ededed;
+      background: #f6f6f6;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .variant-image-actions {
+      display: grid;
+      gap: 5px;
+    }
+    .variant-image-pin {
+      display: flex;
       align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      color: #444;
+      font-weight: 600;
+    }
+    .variant-image-remove-btn {
+      border: 1px solid #efc5ca;
+      background: #fff4f5;
+      color: #bb2532;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 5px;
+      cursor: pointer;
+    }
+    .variant-image-badge {
+      position: absolute;
+      top: 9px;
+      left: 9px;
+      background: #2d68d8;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 999px;
+    }
+    .variant-image-count {
+      font-size: 11px;
+      color: #666;
+      font-weight: 600;
     }
     .variant-remove-btn {
       border: 1px solid #d7dee8;
@@ -376,7 +463,7 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       .topbar-title { font-size: 20px; }
       .hero h1 { font-size: 18px; }
       .hero p { font-size: 13px; }
-      .media-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .main-images-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .field-label { font-size: 16px; }
       .dual-row { grid-template-columns: 1fr; }
       .variant-row { grid-template-columns: 1fr; }
@@ -404,10 +491,10 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
           <div class="field-label" id="imagesLabel">Product Images (0/8) <span class="required-mark">*</span></div>
           <input id="imagesInput" type="file" name="images[]" accept="image/*" multiple>
           <div class="hint">Optional, max 8 images. First image will be the cover image.</div>
-          <div class="hint">Click Pin on a preview to choose the pinned image.</div>
+          <div class="hint">Click Pin image on a preview to choose the pinned image.</div>
           <div id="imagesError" class="error-text hidden"></div>
-          <div id="imagePreviewGrid" class="media-grid">
-            <div class="media-tile">No images selected</div>
+          <div id="mainImagesGrid" class="main-images-grid">
+            <div style="text-align:center;color:#999;font-size:13px;padding:20px;grid-column:1/-1;">No images selected</div>
           </div>
         </div>
 
@@ -416,6 +503,7 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
           <input id="videoInput" type="file" name="video" accept="video/*">
           <div class="hint">Optional, max 1 video (MP4/WEBM/MOV).</div>
           <div id="videoName" class="hint"></div>
+          <video id="videoPreview" class="video-preview hidden" controls playsinline></video>
         </div>
 
         <div class="row">
@@ -453,8 +541,7 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
           <div class="field-label">Product Variants (Optional)</div>
           <div class="hint">Add multiple variant names and prices to publish several products at once.</div>
           <div class="hint">Variant product name format: Base Product Name - Variant Name</div>
-          <div class="hint">Each variant must have one image only.</div>
-          <div class="hint">All variants will use the category selected in the main product section.</div>
+          <div class="hint">Each variant can have 1 to 8 images. Pin one image as primary.</div>
           <div id="variantRows" class="variant-list"></div>
           <button type="button" class="new-cat-btn variant-add-btn" onclick="addVariantRow()">+ Add Variant</button>
         </div>
@@ -489,15 +576,24 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
   <script>
     let currentDraftId = <?php echo (int)$draftId; ?>;
     let useNewCategory = false;
-    let pinnedImageIndex = 0;
+    let pinnedImageKey = '';
     let selectedImageFiles = [];
     let existingDraftImagePaths = [];
+    let existingDraftImageStates = {};
     let existingDraftVideoPath = '';
     let existingVariantImageMap = {};
-    let nextVariantId = 1;
+    let variantTempIdCounter = 1;
+    let variantsList = [];
 
     function byId(id) {
       return document.getElementById(id);
+    }
+
+    function escapeHtml(value) {
+      if (!value) return '';
+      const div = document.createElement('div');
+      div.textContent = String(value);
+      return div.innerHTML;
     }
 
     function openLocalSweetAlert(options = {}) {
@@ -512,9 +608,10 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
 
       const type = options.type || 'success';
       const isError = type === 'error';
+      const isWarning = type === 'warning';
       const hasCancel = !!options.showCancel;
       icon.className = `swal-icon ${isError ? 'error' : 'success'}`;
-      icon.textContent = isError ? '!' : '✓';
+      icon.textContent = isError ? '!' : isWarning ? '⚠' : '✓';
       titleEl.textContent = options.title || 'Notice';
       textEl.textContent = options.text || '';
 
@@ -621,6 +718,7 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
 
     function handleImagesSelection() {
       const input = byId('imagesInput');
+      if (!input) return;
       const err = byId('imagesError');
       const incomingFiles = Array.from(input.files || []);
 
@@ -651,184 +749,485 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       if (selectedImageFiles.length > 0) {
         return selectedImageFiles.map((file) => ({ type: 'file', file }));
       }
-      return existingDraftImagePaths.map((path) => ({ type: 'path', path }));
+      return existingDraftImagePaths.map((path) => ({
+        type: 'path',
+        path,
+        deleted: existingDraftImageStates[path] || false
+      }));
     }
 
     function renderImagePreview() {
-      const grid = byId('imagePreviewGrid');
+      const grid = byId('mainImagesGrid');
       const err = byId('imagesError');
       const items = getActiveImageItems();
       const label = byId('imagesLabel');
 
-      label.textContent = `Product Images (${items.length}/8) `;
-      const mark = document.createElement('span');
-      mark.className = 'required-mark';
-      mark.textContent = '*';
-      label.appendChild(mark);
+      const activeCount = items.filter(img => !img.deleted).length;
+      label.innerHTML = `Product Images (${activeCount}/8) <span class="required-mark">*</span>`;
 
-      if (items.length <= 8) {
+      if (activeCount <= 8) {
         err.classList.add('hidden');
       }
 
-      if (!items.length) {
-        pinnedImageIndex = 0;
-        grid.innerHTML = '<div class="media-tile">No images selected</div>';
+      applyPinnedMainImageFallback();
+
+      const cards = [];
+
+      // Render existing images
+      existingDraftImagePaths.forEach((path, idx) => {
+        const key = `e:${idx}`;
+        const checked = pinnedImageKey === key ? 'checked' : '';
+        const deleted = existingDraftImageStates[path] || false;
+        const removedClass = deleted ? 'removed' : '';
+        const buttonLabel = deleted ? 'Undo Remove' : 'Remove';
+        cards.push(`
+          <div class="main-image-card ${removedClass}">
+            ${checked && !deleted ? '<span class="main-image-badge">Pinned</span>' : ''}
+            <img src="${escapeHtml(path)}" alt="Main image ${idx + 1}">
+            <div class="main-image-actions">
+              <label class="main-image-pin">
+                <input type="radio" name="mainPinnedImage" value="${key}" ${checked} ${deleted ? 'disabled' : ''}>
+                <span>Pin image</span>
+              </label>
+              <button type="button" class="main-image-remove-btn" data-existing-index="${idx}">${buttonLabel}</button>
+            </div>
+          </div>
+        `);
+      });
+
+      // Render new files
+      selectedImageFiles.forEach((file, idx) => {
+        const key = `n:${idx}`;
+        const checked = pinnedImageKey === key ? 'checked' : '';
+        cards.push(`
+          <div class="main-image-card">
+            ${checked ? '<span class="main-image-badge">Pinned</span>' : ''}
+            <img src="" alt="New main image ${idx + 1}" data-file-index="${idx}">
+            <div class="main-image-actions">
+              <label class="main-image-pin">
+                <input type="radio" name="mainPinnedImage" value="${key}" ${checked}>
+                <span>Pin image</span>
+              </label>
+              <button type="button" class="main-image-remove-btn" data-new-index="${idx}">Remove</button>
+            </div>
+          </div>
+        `);
+      });
+
+      if (!cards.length) {
+        grid.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;padding:20px;grid-column:1/-1;">No images selected</div>';
+      } else {
+        grid.innerHTML = cards.join('');
+        
+        // Load preview URLs for new files
+        selectedImageFiles.forEach((file, idx) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const img = grid.querySelector(`img[data-file-index="${idx}"]`);
+            if (img) img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        });
+
+        // Radio change handler
+        grid.querySelectorAll('input[name="mainPinnedImage"]').forEach((radio) => {
+          radio.addEventListener('change', () => {
+            if (radio.checked) {
+              pinnedImageKey = radio.value;
+              renderImagePreview();
+            }
+          });
+        });
+
+        // Existing image remove buttons
+        grid.querySelectorAll('[data-existing-index]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = Number(btn.getAttribute('data-existing-index'));
+            if (Number.isInteger(idx) && idx < existingDraftImagePaths.length) {
+              const path = existingDraftImagePaths[idx];
+              existingDraftImageStates[path] = !existingDraftImageStates[path];
+              applyPinnedMainImageFallback();
+              renderImagePreview();
+            }
+          });
+        });
+
+        // New file remove buttons
+        grid.querySelectorAll('[data-new-index]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = Number(btn.getAttribute('data-new-index'));
+            if (Number.isInteger(idx) && selectedImageFiles[idx]) {
+              selectedImageFiles.splice(idx, 1);
+              applyPinnedMainImageFallback();
+              renderImagePreview();
+            }
+          });
+        });
+      }
+    }
+
+    function applyPinnedMainImageFallback() {
+      const allImages = [
+        ...existingDraftImagePaths.map((path, idx) => ({ type: 'e', idx, deleted: existingDraftImageStates[path] })),
+        ...selectedImageFiles.map((_, idx) => ({ type: 'n', idx, deleted: false }))
+      ];
+
+      const isValid = (() => {
+        if (!pinnedImageKey) return false;
+        if (pinnedImageKey.startsWith('e:')) {
+          const idx = Number(pinnedImageKey.slice(2));
+          const path = existingDraftImagePaths[idx];
+          return path && !existingDraftImageStates[path];
+        }
+        if (pinnedImageKey.startsWith('n:')) {
+          const idx = Number(pinnedImageKey.slice(2));
+          return selectedImageFiles[idx];
+        }
+        return false;
+      })();
+
+      if (isValid) return;
+
+      // Find first available existing image
+      const firstExisting = existingDraftImagePaths.findIndex(path => !existingDraftImageStates[path]);
+      if (firstExisting >= 0) {
+        pinnedImageKey = `e:${firstExisting}`;
         return;
       }
 
-      if (pinnedImageIndex < 0 || pinnedImageIndex >= items.length) {
-        pinnedImageIndex = 0;
+      // Or first new file
+      if (selectedImageFiles.length > 0) {
+        pinnedImageKey = 'n:0';
+        return;
       }
 
-      grid.innerHTML = items.slice(0, 8).map(() => '<div class="media-tile">Loading...</div>').join('');
-      const tiles = Array.from(grid.children);
-
-      items.slice(0, 8).forEach((item, idx) => {
-        const pinned = idx === pinnedImageIndex;
-        tiles[idx].classList.toggle('pinned', pinned);
-        tiles[idx].style.position = 'relative';
-
-        const renderTile = (src) => {
-          tiles[idx].innerHTML = `
-            <img src="${src}" alt="preview">
-            ${pinned ? '<span class="pin-chip">Pinned</span>' : ''}
-            <button type="button" class="pin-btn" onclick="setPinnedImage(${idx})">${pinned ? 'Pinned' : 'Pin'}</button>
-          `;
-        };
-
-        if (item.type === 'file') {
-          const reader = new FileReader();
-          reader.onload = (e) => renderTile(e.target.result);
-          reader.readAsDataURL(item.file);
-        } else {
-          renderTile(item.path);
-        }
-      });
-    }
-
-    function setPinnedImage(index) {
-      const files = selectedImageFiles;
-      if (!files.length) return;
-      pinnedImageIndex = Math.max(0, Math.min(index, files.length - 1));
-      renderImagePreview();
+      pinnedImageKey = '';
     }
 
     function showVideoName() {
       const input = byId('videoInput');
       const view = byId('videoName');
+      const preview = byId('videoPreview');
+      if (!input || !view) return;
       const file = input.files && input.files[0] ? input.files[0] : null;
       if (file) {
         view.textContent = `Selected: ${file.name}`;
+        if (preview) {
+          preview.src = URL.createObjectURL(file);
+          preview.classList.remove('hidden');
+        }
         return;
       }
-      view.textContent = existingDraftVideoPath ? 'Selected: existing draft video' : '';
+      if (existingDraftVideoPath) {
+        const parts = String(existingDraftVideoPath).split(/[\\/]/);
+        view.textContent = `Selected: ${parts[parts.length - 1] || 'existing draft video'}`;
+        if (preview) {
+          preview.src = existingDraftVideoPath;
+          preview.classList.remove('hidden');
+        }
+        return;
+      }
+      view.textContent = '';
+      if (preview) {
+        preview.removeAttribute('src');
+        preview.classList.add('hidden');
+      }
     }
 
-    function addVariantRow(name = '', price = '', stock = '', variantId = null, existingImagePath = '') {
+    function addVariantRow(name = '', price = '', stock = '', variantId = null, existingImages = []) {
       const rows = byId('variantRows');
       if (!rows) return;
 
-      const row = document.createElement('div');
-      row.className = 'variant-row';
-      const resolvedVariantId = Number(variantId) > 0 ? Number(variantId) : nextVariantId++;
-      if (resolvedVariantId >= nextVariantId) {
-        nextVariantId = resolvedVariantId + 1;
-      }
-      row.dataset.variantId = String(resolvedVariantId);
-
-      const nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.className = 'input variant-name';
-      nameInput.placeholder = 'Variant Name (e.g. Red 64GB)';
-      nameInput.value = name;
-
-      const priceInput = document.createElement('input');
-      priceInput.type = 'number';
-      priceInput.min = '0';
-      priceInput.step = '0.01';
-      priceInput.className = 'input variant-price';
-      priceInput.placeholder = 'Variant Price';
-      priceInput.value = price;
-
-      const stockInput = document.createElement('input');
-      stockInput.type = 'number';
-      stockInput.min = '0';
-      stockInput.step = '1';
-      stockInput.className = 'input variant-stock';
-      stockInput.placeholder = 'Variant Stock';
-      stockInput.value = stock;
-
-      const imageInput = document.createElement('input');
-      imageInput.type = 'file';
-      imageInput.accept = 'image/*';
-      imageInput.className = 'input variant-image';
-
-      const existingImageHint = document.createElement('div');
-      existingImageHint.className = 'help-text';
-      existingImageHint.textContent = existingImagePath ? 'Existing variant image saved' : '';
-
-      if (existingImagePath) {
-        row.dataset.existingVariantImage = existingImagePath;
-      }
-
-      imageInput.addEventListener('change', () => {
-        if (imageInput.files && imageInput.files[0]) {
-          row.dataset.existingVariantImage = '';
-          existingImageHint.textContent = '';
-        }
+      const tempId = variantTempIdCounter++;
+      variantsList.push({
+        id: variantId || 0,
+        tempId: tempId,
+        name: name,
+        price: price,
+        stock: stock,
+        images: existingImages.length > 0 ? existingImages.map(path => ({ path, deleted: false, previewUrl: path })) : [],
+        newImages: [],
+        pinnedImageKey: ''
       });
 
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'variant-remove-btn';
-      removeBtn.textContent = 'Remove';
-      removeBtn.addEventListener('click', () => row.remove());
-
-      row.appendChild(nameInput);
-      row.appendChild(priceInput);
-      row.appendChild(stockInput);
-      row.appendChild(imageInput);
-      row.appendChild(existingImageHint);
-      row.appendChild(removeBtn);
-      rows.appendChild(row);
+      renderVariants();
     }
 
-    function getVariantsFromForm() {
-      const rows = Array.from(document.querySelectorAll('#variantRows .variant-row'));
-      const variants = [];
+    function renderVariants() {
+      const rows = byId('variantRows');
+      if (!rows) return;
 
-      rows.forEach((row) => {
-        const name = row.querySelector('.variant-name')?.value?.trim() || '';
-        const priceRaw = row.querySelector('.variant-price')?.value?.trim() || '';
-        const stockRaw = row.querySelector('.variant-stock')?.value?.trim() || '';
-        const imageInput = row.querySelector('.variant-image');
-        const imageFile = imageInput && imageInput.files && imageInput.files[0] ? imageInput.files[0] : null;
-        const existingImagePath = row.dataset.existingVariantImage || '';
-        const variantId = Number(row.dataset.variantId || 0);
+      rows.innerHTML = variantsList.map((variant, listIdx) => {
+        return `
+          <div class="variant-row" data-variant-list-idx="${listIdx}">
+            <div>
+              <input type="text" class="input variant-name" placeholder="Variant Name (e.g. Red 64GB)" value="${String(variant.name || '').replace(/</g, '&lt;')}">
+            </div>
+            <div>
+              <input type="number" min="0" step="0.01" class="input variant-price" placeholder="Price" value="${variant.price || ''}">
+            </div>
+            <div>
+              <input type="number" min="0" step="1" class="input variant-stock" placeholder="Stock" value="${variant.stock || ''}">
+            </div>
+            <div>
+              <input type="file" class="input variant-image-input" accept="image/*" multiple title="Add variant images" data-variant-temp-id="${variant.tempId}">
+              <div class="variant-image-count">0 / 8 images</div>
+              <div class="variant-images-grid"></div>
+            </div>
+            <button type="button" class="variant-remove-btn">Remove</button>
+          </div>
+        `;
+      }).join('');
 
-        if (!name && priceRaw === '' && stockRaw === '') {
-          return;
+      // Attach event listeners
+      rows.querySelectorAll('.variant-row').forEach((row, idx) => {
+        const variant = variantsList[idx];
+        if (!variant) return;
+
+        row.querySelector('.variant-name').addEventListener('change', (e) => {
+          variant.name = e.target.value;
+        });
+
+        row.querySelector('.variant-price').addEventListener('change', (e) => {
+          variant.price = e.target.value;
+        });
+
+        row.querySelector('.variant-stock').addEventListener('change', (e) => {
+          variant.stock = e.target.value;
+        });
+
+        const imageInput = row.querySelector('.variant-image-input');
+        if (imageInput) {
+          imageInput.addEventListener('change', () => handleVariantImageInputChange(idx, row));
         }
 
-        variants.push({
-          id: variantId,
-          name,
-          price: priceRaw,
-          stock: stockRaw,
-          imageFile,
-          existingImagePath
+        row.querySelector('.variant-remove-btn').addEventListener('click', () => {
+          variantsList.splice(idx, 1);
+          renderVariants();
+        });
+
+        renderVariantImageManager(idx, row);
+      });
+    }
+
+    function handleVariantImageInputChange(variantListIdx, row) {
+      const variant = variantsList[variantListIdx];
+      if (!variant) return;
+
+      const input = row.querySelector('.variant-image-input');
+      if (!input || !input.files) return;
+
+      const selectedFiles = Array.from(input.files);
+      input.value = '';
+
+      const totalImages = getVariantActiveImageCount(variant);
+      const remainingSlots = 8 - totalImages;
+
+      if (remainingSlots <= 0) {
+        showLocalSweetAlert('error', 'Image Limit Reached', 'Each variant can keep up to 8 images only.');
+        return;
+      }
+
+      const filesToAdd = selectedFiles.slice(0, remainingSlots);
+      filesToAdd.forEach((file) => {
+        const previewUrl = URL.createObjectURL(file);
+        variant.newImages.push({ file, previewUrl });
+      });
+
+      if (selectedFiles.length > filesToAdd.length) {
+        showLocalSweetAlert('warning', 'Image Limit', 'Some images were not added due to the 8-image limit.');
+      }
+
+      renderVariantImageManager(variantListIdx, row);
+    }
+
+    function getVariantActiveImageCount(variant) {
+      if (!variant) return 0;
+      const existingCount = (variant.images || []).filter(img => !img.deleted).length;
+      const newCount = (variant.newImages || []).length;
+      return existingCount + newCount;
+    }
+
+    function renderVariantImageManager(variantListIdx, row) {
+      const variant = variantsList[variantListIdx];
+      if (!variant) return;
+
+      const grid = row.querySelector('.variant-images-grid');
+      const countEl = row.querySelector('.variant-image-count');
+      if (!grid || !countEl) return;
+
+      applyVariantPinnedFallback(variant);
+
+      const cards = [];
+
+      // Existing images
+      (variant.images || []).forEach((item, idx) => {
+        const key = `e:${idx}`;
+        const checked = variant.pinnedImageKey === key ? 'checked' : '';
+        const removedClass = item.deleted ? 'removed' : '';
+        const buttonLabel = item.deleted ? 'Undo' : 'Remove';
+        cards.push(`
+          <div class="variant-image-card ${removedClass}">
+            ${checked && !item.deleted ? '<span class="variant-image-badge">Pinned</span>' : ''}
+            <img src="${String(item.previewUrl || item.path).replace(/</g, '&lt;')}" alt="Variant image">
+            <div class="variant-image-actions">
+              <label class="variant-image-pin">
+                <input type="radio" name="variantPinned_${variant.tempId}" value="${key}" ${checked} ${item.deleted ? 'disabled' : ''}>
+                <span>Pin</span>
+              </label>
+              <button type="button" class="variant-image-remove-btn" data-existing-index="${idx}" data-variant-list-idx="${variantListIdx}">${buttonLabel}</button>
+            </div>
+          </div>
+        `);
+      });
+
+      // New images
+      (variant.newImages || []).forEach((item, idx) => {
+        const key = `n:${idx}`;
+        const checked = variant.pinnedImageKey === key ? 'checked' : '';
+        cards.push(`
+          <div class="variant-image-card">
+            ${checked ? '<span class="variant-image-badge">Pinned</span>' : ''}
+            <img src="${String(item.previewUrl || '').replace(/</g, '&lt;')}" alt="New variant image">
+            <div class="variant-image-actions">
+              <label class="variant-image-pin">
+                <input type="radio" name="variantPinned_${variant.tempId}" value="${key}" ${checked}>
+                <span>Pin</span>
+              </label>
+              <button type="button" class="variant-image-remove-btn" data-new-index="${idx}" data-variant-list-idx="${variantListIdx}">Remove</button>
+            </div>
+          </div>
+        `);
+      });
+
+      grid.innerHTML = cards.length ? cards.join('') : '<div style="grid-column: 1/-1; padding: 20px; text-align: center; color: #999; font-size: 13px;">Click "Choose File" to add images (1-8)</div>';
+      countEl.textContent = `${getVariantActiveImageCount(variant)} / 8 images`;
+
+      // Radio buttons for pinning
+      grid.querySelectorAll(`input[name="variantPinned_${variant.tempId}"]`).forEach((radio) => {
+        radio.addEventListener('change', () => {
+          if (radio.checked) {
+            variant.pinnedImageKey = radio.value;
+            renderVariantImageManager(variantListIdx, row);
+          }
         });
       });
 
-      return variants;
+      // Remove buttons for existing images
+      grid.querySelectorAll('[data-existing-index]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.getAttribute('data-existing-index'));
+          if (Number.isInteger(idx) && variant.images[idx]) {
+            variant.images[idx].deleted = !variant.images[idx].deleted;
+            applyVariantPinnedFallback(variant);
+            renderVariantImageManager(variantListIdx, row);
+          }
+        });
+      });
+
+      // Remove buttons for new images
+      grid.querySelectorAll('[data-new-index]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.getAttribute('data-new-index'));
+          if (Number.isInteger(idx) && variant.newImages[idx]) {
+            const removed = variant.newImages.splice(idx, 1)[0];
+            if (removed && removed.previewUrl) {
+              URL.revokeObjectURL(removed.previewUrl);
+            }
+            applyVariantPinnedFallback(variant);
+            renderVariantImageManager(variantListIdx, row);
+          }
+        });
+      });
+    }
+
+    function applyVariantPinnedFallback(variant) {
+      if (!variant) return;
+      const key = variant.pinnedImageKey;
+
+      const isValid = (() => {
+        if (!key) return false;
+        if (key.startsWith('e:')) {
+          const idx = Number(key.slice(2));
+          return Number.isInteger(idx) && variant.images[idx] && !variant.images[idx].deleted;
+        }
+        if (key.startsWith('n:')) {
+          const idx = Number(key.slice(2));
+          return Number.isInteger(idx) && variant.newImages[idx];
+        }
+        return false;
+      })();
+
+      if (isValid) return;
+
+      const firstExisting = (variant.images || []).findIndex(img => !img.deleted);
+      if (firstExisting >= 0) {
+        variant.pinnedImageKey = `e:${firstExisting}`;
+        return;
+      }
+
+      if ((variant.newImages || []).length > 0) {
+        variant.pinnedImageKey = 'n:0';
+        return;
+      }
+
+      variant.pinnedImageKey = '';
+    }
+
+    function getVariantsFromForm() {
+      const rows = byId('variantRows');
+      if (rows) {
+        rows.querySelectorAll('.variant-row').forEach((row, idx) => {
+          const variant = variantsList[idx];
+          if (!variant) return;
+          const nameInput = row.querySelector('.variant-name');
+          const priceInput = row.querySelector('.variant-price');
+          const stockInput = row.querySelector('.variant-stock');
+          if (nameInput) variant.name = nameInput.value;
+          if (priceInput) variant.price = priceInput.value;
+          if (stockInput) variant.stock = stockInput.value;
+        });
+      }
+
+      return variantsList.map((variant) => {
+        const imageFiles = [];
+        const existingDeletedPaths = {};
+
+        // Collect new image files
+        (variant.newImages || []).forEach((img) => {
+          if (img.file) {
+            imageFiles.push(img.file);
+          }
+        });
+
+        // Track which existing images are deleted
+        (variant.images || []).forEach((img, idx) => {
+          if (img.deleted) {
+            existingDeletedPaths[String(idx)] = true;
+          }
+        });
+
+        return {
+          id: variant.id,
+          tempId: variant.tempId,
+          name: String(variant.name || '').trim(),
+          price: String(variant.price || '').trim(),
+          stock: String(variant.stock || '').trim(),
+          imageFiles: imageFiles,
+          existingImages: (variant.images || []).filter(img => !img.deleted).map(img => img.path || img.previewUrl),
+          pinnedImageKey: variant.pinnedImageKey || ''
+        };
+      });
     }
 
     function collectDraftPayload() {
       const variants = getVariantsFromForm().map((variant) => ({
         id: variant.id,
+        temp_id: variant.tempId,
         name: variant.name,
         price: variant.price,
-        stock: variant.stock
+        stock: variant.stock,
+        pinned_image_key: variant.pinnedImageKey || ''
       }));
 
       return {
@@ -837,8 +1236,8 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         product_description: byId('description').value,
         price: byId('price').value,
         product_stock: byId('stock').value,
-        pinned_image_index: pinnedImageIndex,
-        image_count: getActiveImageItems().length,
+        pinned_image_key: pinnedImageKey,
+        image_count: getActiveImageItems().filter(img => !img.deleted).length,
         has_video: ((byId('videoInput').files && byId('videoInput').files[0]) || existingDraftVideoPath) ? 1 : 0,
         use_new_category: useNewCategory,
         category_id: byId('categorySelect').value,
@@ -857,13 +1256,16 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         body.append('product_description', payload.product_description || '');
         body.append('price', payload.price || '');
         body.append('product_stock', payload.product_stock || '');
-        body.append('pinned_image_index', String(payload.pinned_image_index || 0));
+        body.append('pinned_image_key', payload.pinned_image_key || '');
         body.append('image_count', String(payload.image_count || 0));
         body.append('has_video', String(payload.has_video || 0));
         body.append('use_new_category', payload.use_new_category ? '1' : '0');
         body.append('category_id', payload.category_id || '');
         body.append('new_category_name', payload.new_category_name || '');
         body.append('variants', JSON.stringify(payload.variants || []));
+        body.append('deleted_image_paths', JSON.stringify(
+          existingDraftImagePaths.filter(path => existingDraftImageStates[path])
+        ));
 
         selectedImageFiles.slice(0, 8).forEach((file) => body.append('images[]', file));
 
@@ -875,9 +1277,11 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
 
         const variantFiles = getVariantsFromForm();
         variantFiles.forEach((variant) => {
-          if (variant.imageFile && Number(variant.id || 0) > 0) {
-            body.append(`variant_image_${Number(variant.id)}`, variant.imageFile);
-          }
+          const variantUploadId = Number(variant.id || 0) > 0 ? Number(variant.id) : Number(variant.tempId || 0);
+          if (!variantUploadId) return;
+          (variant.imageFiles || []).forEach((file, idx) => {
+            body.append(`variant_${variantUploadId}_image_${idx}`, file);
+          });
         });
 
         const res = await fetch('api/save-product-draft.php', {
@@ -892,13 +1296,20 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         if (Number(data.draft_id || 0) > 0) {
           currentDraftId = Number(data.draft_id);
           const url = new URL(window.location.href);
-          url.searchParams.set('draft_id', String(currentDraftId));
+          url.searchParams.delete('draft_id');
           window.history.replaceState({}, '', url.toString());
         }
 
         status.className = 'card ok-text';
         status.textContent = 'Draft saved to server successfully.';
         await showLocalSweetAlert('success', 'Draft Saved', 'Draft saved. You can manage it on the Drafts page.');
+
+        // Reload the saved draft back into the form so the saved images/video stay visible.
+        if (currentDraftId > 0) {
+          await loadDraftFromServer(currentDraftId);
+        } else {
+          await loadCategories();
+        }
       } catch (err) {
         status.className = 'card error-text';
         status.textContent = err.message || 'Failed to save draft.';
@@ -909,24 +1320,33 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
     function applyDraftToForm(draft) {
       if (!draft || typeof draft !== 'object') return;
 
-      byId('productName').value = draft.product_name || '';
-      byId('description').value = draft.product_description || '';
-      byId('price').value = draft.price || '';
-      byId('stock').value = draft.product_stock || '';
-      pinnedImageIndex = Number(draft.pinned_image_index || 0);
+      const productNameEl = byId('productName');
+      const descriptionEl = byId('description');
+      const priceEl = byId('price');
+      const stockEl = byId('stock');
+      const categorySelectEl = byId('categorySelect');
+      const newCategoryNameEl = byId('newCategoryName');
+
+      if (productNameEl) productNameEl.value = draft.product_name || '';
+      if (descriptionEl) descriptionEl.value = draft.product_description || '';
+      if (priceEl) priceEl.value = draft.price || '';
+      if (stockEl) stockEl.value = draft.product_stock || '';
+      if (categorySelectEl) categorySelectEl.value = draft.category_id || '';
+      if (newCategoryNameEl) newCategoryNameEl.value = draft.new_category_name || '';
+
+      pinnedImageKey = String(draft.pinned_image_key || '');
       toggleCategoryMode(Number(draft.use_new_category || 0) === 1);
-      byId('categorySelect').value = draft.category_id || '';
-      byId('newCategoryName').value = draft.new_category_name || '';
 
       existingDraftImagePaths = Array.isArray(draft?.media?.images)
         ? draft.media.images.map((item) => String(item?.path || '')).filter(Boolean)
         : [];
+      existingDraftImageStates = {};
       selectedImageFiles = [];
 
       if (Array.isArray(draft?.media?.images)) {
         const pinnedIdx = draft.media.images.findIndex((item) => !!item?.is_pinned);
         if (pinnedIdx >= 0) {
-          pinnedImageIndex = pinnedIdx;
+          pinnedImageKey = `e:${pinnedIdx}`;
         }
       }
 
@@ -935,16 +1355,19 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         ? draft.media.variant_images
         : {};
 
-      const rows = byId('variantRows');
-      if (rows) {
-        rows.innerHTML = '';
-        if (Array.isArray(draft.variants)) {
-          draft.variants.forEach((variant) => {
-            const variantId = Number(variant?.id || 0);
-            const existingPath = variantId > 0 ? String(existingVariantImageMap[String(variantId)] || '') : '';
-            addVariantRow(variant?.name || '', variant?.price || '', variant?.stock || '', variantId || null, existingPath);
-          });
-        }
+      variantsList = [];
+      if (Array.isArray(draft.variants)) {
+        draft.variants.forEach((variant) => {
+          const variantId = Number(variant?.id || 0);
+          const variantImages = Array.isArray(variant?.images) ? variant.images : [];
+          addVariantRow(
+            variant?.name || '',
+            variant?.price || '',
+            variant?.stock || '',
+            variantId || null,
+            variantImages
+          );
+        });
       }
 
       renderImagePreview();
@@ -971,7 +1394,7 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
     }
 
     function validateForm() {
-      const images = getActiveImageItems();
+      const images = getActiveImageItems().filter(img => !img.deleted);
       if (images.length === 0) {
         return 'At least 1 product image is required.';
       }
@@ -985,28 +1408,19 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       const description = byId('description').value.trim();
       if (!description) return 'Product description is required.';
 
-      // Price is always required
       const price = byId('price').value;
       if (price === '' || Number(price) < 0) return 'Price must be a non-negative number.';
 
-      // Stock is always required
       const stock = byId('stock').value;
       if (stock === '' || Number(stock) < 0) return 'Stock must be a non-negative number.';
 
       const variants = getVariantsFromForm();
       
-      // Validate each variant
       for (const variant of variants) {
         const variantName = String(variant.name || '').trim();
         const variantPrice = String(variant.price || '').trim();
         const variantStock = String(variant.stock || '').trim();
-        const variantImage = variant.imageFile || null;
-        const existingVariantImage = variant.existingImagePath || '';
-        const variantId = Number(variant.id || 0);
-
-        if (!variantId) {
-          return 'Variant identifier is invalid. Please remove and add the variant again.';
-        }
+        const allImages = [...(variant.imageFiles || []), ...(variant.existingImages || [])];
 
         if (!variantName) {
           return 'Each variant must have a name.';
@@ -1020,8 +1434,12 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
           return 'Each variant stock must be a non-negative number.';
         }
 
-        if (!variantImage && !existingVariantImage) {
-          return 'Each variant must have one image.';
+        if (allImages.length === 0) {
+          return 'Each variant must have at least one image.';
+        }
+
+        if (allImages.length > 8) {
+          return 'Each variant can have up to 8 images only.';
         }
       }
 
@@ -1046,13 +1464,14 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       const categoryLabel = useNewCategory
         ? (byId('newCategoryName').value.trim() || 'New Category')
         : (byId('categorySelect').selectedOptions[0]?.textContent || 'Existing Category');
+      const activeImages = getActiveImageItems().filter(img => !img.deleted);
       const infoSummary = [
         `Name: ${byId('productName').value.trim()}`,
         `Description: ${byId('description').value.trim() ? 'Provided' : 'Missing'}`,
         `Category: ${categoryLabel}`,
         `Price: PHP ${byId('price').value}`,
         `Stock: ${byId('stock').value}`,
-        `Images: ${getActiveImageItems().length}/8`,
+        `Images: ${activeImages.length}/8`,
         `Video: ${((byId('videoInput').files && byId('videoInput').files[0]) || existingDraftVideoPath) ? 'Provided' : 'None'}`,
         `Variants: ${getVariantsFromForm().length}`
       ].join('\n');
@@ -1075,16 +1494,13 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         const formData = new FormData();
         const variantsWithFiles = getVariantsFromForm();
         const variants = variantsWithFiles.map((variant) => ({
-          id: Number(variant.id || 0),
+          id: Number(variant.id || variant.tempId || 0),
+          temp_id: Number(variant.tempId || 0),
           name: String(variant.name || '').trim(),
           price: Number(variant.price),
-          stock: Number(variant.stock || 0)
+          stock: Number(variant.stock || 0),
+          pinnedImageKey: variant.pinnedImageKey || ''
         }));
-
-        console.log('=== PUBLISHING PRODUCT ===');
-        console.log('Variants extracted from form:', variantsWithFiles.length, variantsWithFiles);
-        console.log('Variants to send:', variants);
-        console.log('Variant count:', variants.length);
 
         formData.append('product_name', byId('productName').value.trim());
         formData.append('product_description', byId('description').value.trim());
@@ -1103,13 +1519,20 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
           formData.append('category_id', byId('categorySelect').value);
         }
 
-        const imageFiles = selectedImageFiles;
-        imageFiles.slice(0, 8).forEach((file) => formData.append('images[]', file));
-        formData.append('pinned_image_index', String(pinnedImageIndex));
-        variantsWithFiles.forEach((variant) => {
-          if (variant.imageFile && Number(variant.id || 0) > 0) {
-            formData.append(`variant_image_${Number(variant.id)}`, variant.imageFile);
+        // Add main product images (only non-deleted ones)
+        const mainImageItems = getActiveImageItems().filter(img => !img.deleted);
+        mainImageItems.forEach((item) => {
+          if (item.type === 'file') {
+            formData.append('images[]', item.file);
           }
+        });
+        formData.append('pinned_image_key', pinnedImageKey);
+
+        // Add variant images
+        variantsWithFiles.forEach((variant) => {
+          (variant.imageFiles || []).forEach((file, idx) => {
+            formData.append(`variant_${Number(variant.tempId)}_image_${idx}`, file);
+          });
         });
 
         const videoFile = byId('videoInput').files && byId('videoInput').files[0] ? byId('videoInput').files[0] : null;
@@ -1146,9 +1569,11 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         byId('addProductForm').reset();
         selectedImageFiles = [];
         existingDraftImagePaths = [];
+        existingDraftImageStates = {};
         existingDraftVideoPath = '';
         existingVariantImageMap = {};
-        pinnedImageIndex = 0;
+        variantsList = [];
+        pinnedImageKey = '';
         toggleCategoryMode(false);
         const variantRows = byId('variantRows');
         if (variantRows) {
@@ -1165,8 +1590,15 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       }
     }
 
-    byId('imagesInput').addEventListener('change', handleImagesSelection);
-    byId('videoInput').addEventListener('change', showVideoName);
+    const imagesInput = byId('imagesInput');
+    if (imagesInput) {
+      imagesInput.addEventListener('change', handleImagesSelection);
+    }
+    
+    const videoInput = byId('videoInput');
+    if (videoInput) {
+      videoInput.addEventListener('change', showVideoName);
+    }
 
     loadCategories().then(async () => {
       if (currentDraftId > 0) {

@@ -62,14 +62,14 @@ if ($role !== 'user') {
 
 
 
-    <script src="assets/js/user_dashboard_reusable_ui.js?v=20260401-1"></script>
+    <script src="assets/js/user_dashboard_reusable_ui.js?v=20260402-1"></script>
     <script src="assets/js/user_dashboard_cart.js?v=20260401-1"></script>
     <script src="assets/js/user_dashboard_helpers.js?v=20260401-2"></script>
     <script src="assets/js/user_dashboard_recipients.js?v=20260401-2"></script>
     <script src="assets/js/user_dashboard_search.js"></script>
-    <script src="assets/js/user_dashboard_app.js?v=20260401-6"></script>
+    <script src="assets/js/user_dashboard_app.js?v=20260402-1"></script>
     <script src="assets/js/user_dashboard_app_init.js"></script>
-    <script src="assets/js/category_products_custom_display.js"></script>
+    <script src="assets/js/category_products_custom_display.js?v=20260402-1"></script>
 
 
 </body>
