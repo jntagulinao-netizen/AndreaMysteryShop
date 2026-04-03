@@ -31,7 +31,7 @@ $includeArchived = isset($_GET['include_archived']) && $_GET['include_archived']
 
 $archiveFilter = $includeArchived ? '' : 'WHERE p.archived = 0';
 
-$sql = "SELECT p.product_id, p.product_name, p.product_description, p.price, p.product_stock, p.category_id, c.category_name, p.parent_product_id, p.archived,
+$sql = "SELECT p.product_id, p.product_name, p.product_description, p.price, p.product_stock, p.category_id, c.category_name, p.parent_product_id, p.archived, p.featured,
                      (SELECT IFNULL(SUM(oi.quantity), 0)
                             FROM order_items oi
                             JOIN orders o ON o.order_id = oi.order_id
@@ -53,7 +53,7 @@ $sql = "SELECT p.product_id, p.product_name, p.product_description, p.price, p.p
     LEFT JOIN product_images pi ON pi.product_id = p.product_id
         AND LOWER(pi.image_url) REGEXP '\\.(jpg|jpeg|png|gif|webp)$'
     $archiveFilter
-        GROUP BY p.product_id, p.product_name, p.product_description, p.price, p.product_stock, p.category_id, c.category_name, p.average_rating, p.parent_product_id, p.archived";
+        GROUP BY p.product_id, p.product_name, p.product_description, p.price, p.product_stock, p.category_id, c.category_name, p.average_rating, p.parent_product_id, p.archived, p.featured";
 
 $result = $conn->query($sql);
 if (!$result) {
@@ -83,6 +83,7 @@ while ($row = $result->fetch_assoc()) {
         'id' => (int)$row['product_id'], 
         'parent_product_id' => isset($row['parent_product_id']) ? (int)$row['parent_product_id'] : null,
         'archived' => (int)($row['archived'] ?? 0),
+        'featured' => (int)($row['featured'] ?? 0),
         'name' => $row['product_name'],
         'desc' => $row['product_description'],
         'price' => (float)$row['price'],

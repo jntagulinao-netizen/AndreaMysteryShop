@@ -67,10 +67,23 @@
         .product-grid { display:grid; grid-template-columns:1fr; gap:16px; }
         @media (min-width:640px) { .product-grid { grid-template-columns:repeat(2,1fr); } }
         @media (min-width:1024px) { .product-grid { grid-template-columns:repeat(4,1fr); } }
-        .product { cursor:pointer; }
-        .product .img-wrap { background:#f3f4f6; border-radius:10px; overflow:hidden; position:relative; padding-top:100%; }
-        .product .img-wrap img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .3s; }
-        .product:hover .img-wrap img { transform:scale(1.08); }
+        .product-card { background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 8px 20px rgba(2,6,23,0.08); transition:transform .2s ease, box-shadow .2s ease; cursor:pointer; display:flex; flex-direction:column; }
+        .product-card:hover { transform:translateY(-4px); box-shadow:0 14px 28px rgba(2,6,23,0.12); }
+        .product-image { background:#f3f4f6; overflow:hidden; position:relative; padding-top:100%; }
+        .product-image img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .3s; }
+        .product-card:hover .product-image img { transform:scale(1.06); }
+        .product-variant-badge { position:absolute; top:8px; right:8px; background:#e22a39; color:#fff; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; z-index:2; }
+        .product-info { padding:12px; }
+        .product-name { font-size:15px; font-weight:700; line-height:1.3; margin-bottom:8px; min-height:38px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .product-price { font-size:20px; color:#e22a39; font-weight:800; margin-top:8px; }
+        .product-reviews-meta,
+        .product-orders-meta,
+        .product-stock-meta { font-size:12px; color:#6b7280; }
+        .product-stock-meta.in { color:#16a34a; }
+        .product-stock-meta.out { color:#dc2626; }
+        .product-stock-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; }
+        .product-stock-overlay-text { color:#fff; font-weight:700; }
+        .featured-empty { border:1px dashed #d1d5db; border-radius:10px; padding:20px; color:#6b7280; text-align:center; }
         .rating { display:inline-flex; align-items:center; gap:6px; color:#6b7280; font-size:13px; }
 
         /* CTA */
@@ -231,64 +244,13 @@
             <div class="container">
                 <div class="top-row">
                     <h2>Featured Products</h2>
-                    <a href="LogIn.php" class="btn btn-primary">View All â†’</a>
+                    <a href="LogIn.php" class="btn btn-primary">View All</a>
                 </div>
                 
-                <div class="product-grid">
-                    <!-- Product 1 -->
-                    <div class="product">
-                        <div class="img-wrap">
-                            <img src="https://images.unsplash.com/photo-1687078426457-89ce2b562eaf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB3YXRjaCUyMHByb2R1Y3R8ZW58MXx8fHwxNzcxNTM1NjgxfDA&ixlib=rb-4.1.0&q=80&w=1080" alt="Premium Watch" />
-                        </div>
-                        <div class="rating"><svg width="16" height="16" viewBox="0 0 24 24" fill="#FBBF24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg><span>4.8</span></div>
-                        <h3>Premium Watch</h3>
-                        <p class="price">₱299</p>
-                    </div>
-
-                    <!-- Product 2 -->
-                    <div class="product">
-                        <div class="img-wrap">
-                            <img src="https://images.unsplash.com/photo-1758879219613-1e161ce3b369?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkZXNpZ25lciUyMGhhbmRiYWclMjBhY2Nlc3Nvcmllc3xlbnwxfHx8fDE3NzE1NDI5MDl8MA&ixlib=rb-4.1.0&q=80&w=1080" alt="Designer Handbag" />
-                        </div>
-                        <div class="rating"><svg width="16" height="16" viewBox="0 0 24 24" fill="#FBBF24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg><span>4.9</span></div>
-                        <h3>Designer Handbag</h3>
-                        <p class="price">₱459</p>
-                    </div>
-
-                    <!-- Product 3 -->
-                    <div class="product">
-                        <div class="img-wrap">
-                            <img src="https://images.unsplash.com/photo-1695459468644-717c8ae17eed?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdHlsaXNoJTIwc25lYWtlcnMlMjBzaG9lc3xlbnwxfHx8fDE3NzE1NDg3NjB8MA&ixlib=rb-4.1.0&q=80&w=1080" alt="Stylish Sneakers" />
-                        </div>
-                        <div class="rating"><svg width="16" height="16" viewBox="0 0 24 24" fill="#FBBF24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg><span>4.7</span></div>
-                        <h3>Stylish Sneakers</h3>
-                        <p class="price">₱179</p>
-                    </div>
-
-                    <!-- Product 4 -->
-                    <div class="product">
-                        <div class="img-wrap">
-                            <img src="https://images.unsplash.com/photo-1584036553516-bf83210aa16c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtaW5pbWFsJTIwc3VuZ2xhc3NlcyUyMHByb2R1Y3R8ZW58MXx8fHwxNzcxNTU3NTY3fDA&ixlib=rb-4.1.0&q=80&w=1080" alt="Minimal Sunglasses" />
-                        </div>
-                        <div class="rating"><svg width="16" height="16" viewBox="0 0 24 24" fill="#FBBF24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg><span>4.6</span></div>
-                        <h3>Minimal Sunglasses</h3>
-                        <p class="price">₱149</p>
-                    </div>
-                </div>
+                <div class="product-grid" id="featuredProductsGrid"></div>
             </div>
         </section>
 
-        <!-- CTA Section -->
-        <section class="cta">
-            <div class="container">
-                <h2>Join the LUXE Community</h2>
-                <p>Get exclusive access to new arrivals, special offers, and style inspiration.</p>
-                <form class="form">
-                    <input type="email" placeholder="Enter your email" class="email-input" />
-                    <button class="btn btn-primary" type="button">Subscribe</button>
-                </form>
-            </div>
-        </section>
     </main>
 
      <!-- Footer -->
@@ -297,8 +259,8 @@
             <div class="footer-grid">
                 <div>
                     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:22px;height:22px;color:inherit"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
-                        <span style="font-weight:700;font-size:16px;color:#fff">LUXE</span>
+                        <img src="logo.jpg" alt="Andrea Mystery Shop" style="width:32px;height:32px;border-radius:8px;object-fit:cover;display:block;" />
+                        <span style="font-weight:700;font-size:16px;color:#fff">Andrea Mystery Shop</span>
                     </div>
                     <p style="color:#9ca3af;font-size:13px;margin:0">Your destination for premium lifestyle products.</p>
                 </div>
@@ -332,7 +294,91 @@
             </div>
         </div>
     </footer>
-    <!-- mobile menu toggling removed â€” using bottom fixed nav for mobile -->
+    <!-- mobile menu toggling removed -- using bottom fixed nav for mobile -->
+
+    <script src="assets/js/user_dashboard_reusable_ui.js?v=20260403-1"></script>
+    <script>
+        function formatPeso(value) {
+            const amount = Number(value || 0);
+            if (!Number.isFinite(amount)) return '0';
+            return amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        }
+
+        function openProductModal() {
+            window.location.href = 'LogIn.php';
+        }
+
+        async function loadFeaturedProducts() {
+            const grid = document.getElementById('featuredProductsGrid');
+            if (!grid) return;
+
+            try {
+                const response = await fetch('api/get-products.php');
+                if (!response.ok) {
+                    throw new Error('Failed to load featured products.');
+                }
+
+                const products = await response.json();
+                const groupedFeaturedProducts = new Map();
+                (Array.isArray(products) ? products : [])
+                    .filter((item) => Number(item.archived || 0) === 0)
+                    .filter((item) => Number(item.featured || 0) === 1)
+                    .forEach((item) => {
+                        const productId = Number(item.id);
+                        const parentId = item.parent_product_id ? Number(item.parent_product_id) : null;
+                        const mainProductId = parentId || productId;
+
+                        if (!groupedFeaturedProducts.has(mainProductId)) {
+                            groupedFeaturedProducts.set(mainProductId, []);
+                        }
+
+                        groupedFeaturedProducts.get(mainProductId).push(item);
+                    });
+
+                const featuredMainProducts = Array.from(groupedFeaturedProducts.values())
+                    .map((groupItems) => {
+                        const mainProduct = groupItems.find((item) => !item.parent_product_id) || groupItems[0];
+                        const totalStock = groupItems.reduce((sum, item) => sum + Number(item.stock || 0), 0);
+                        const totalOrders = groupItems.reduce((sum, item) => sum + Number(item.orderCount || 0), 0);
+
+                        return {
+                            ...mainProduct,
+                            variantCount: groupItems.length > 1 ? groupItems.length : 0,
+                            groupStock: totalStock,
+                            groupOrderCount: totalOrders,
+                            isGroupOutOfStock: totalStock <= 0
+                        };
+                    })
+                    .filter((item) => Number(item.parent_product_id || 0) === 0 || item.parent_product_id === null)
+                    .slice(0, 4);
+
+                if (featuredMainProducts.length === 0) {
+                    grid.innerHTML = '<div class="featured-empty">No featured products available right now.</div>';
+                    return;
+                }
+
+                grid.innerHTML = featuredMainProducts.map((product) => {
+                    const productImage = Array.isArray(product.image) && product.image.length
+                        ? product.image[0]
+                        : 'https://via.placeholder.com/900x600?text=No+Image';
+                    const priceDisplay = `₱${formatPeso(product.price)}`;
+                    const avgRating = (Number(product.rating) || 0).toFixed(1);
+
+                    return window.DashboardReusableUI.renderProductCard(product, {
+                        isOutOfStock: Number(product.isGroupOutOfStock || product.groupStock || 0) <= 0,
+                        avgRating,
+                        variantCount: Number(product.variantCount || 0),
+                        priceDisplay,
+                        productImage
+                    });
+                }).join('');
+            } catch (error) {
+                grid.innerHTML = '<div class="featured-empty">Unable to load featured products right now.</div>';
+            }
+        }
+
+        loadFeaturedProducts();
+    </script>
 
 </body>
 </html>

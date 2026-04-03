@@ -36,6 +36,7 @@ $pinnedImageIndex = isset($_POST['pinned_image_index']) ? (int)$_POST['pinned_im
 $imageCount = isset($_POST['image_count']) ? (int)$_POST['image_count'] : 0;
 $hasVideo = (int)(($_POST['has_video'] ?? '0') === '1');
 $variantsRaw = trim((string)($_POST['variants'] ?? '[]'));
+$deletedImagePathsRaw = trim((string)($_POST['deleted_image_paths'] ?? '[]'));
 
 $finfo = new finfo(FILEINFO_MIME_TYPE);
 $allowedImageMimes = [
@@ -148,7 +149,7 @@ function saveDraftUpload(array $file, finfo $finfo, array $allowedMimes, string 
 }
 
 function fetchDraftMediaPaths(mysqli $conn, int $draftId, ?string $role = null, ?int $clientVariantId = null): array {
-    $sql = 'SELECT media_id, client_variant_id, file_path FROM product_draft_media WHERE draft_id = ?';
+    $sql = 'SELECT media_id, client_variant_id, file_path, sort_order FROM product_draft_media WHERE draft_id = ?';
     $types = 'i';
     $params = [$draftId];
 
@@ -163,6 +164,8 @@ function fetchDraftMediaPaths(mysqli $conn, int $draftId, ?string $role = null, 
         $params[] = $clientVariantId;
     }
 
+    $sql .= ' ORDER BY sort_order ASC, media_id ASC';
+
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
         return [];
@@ -175,7 +178,8 @@ function fetchDraftMediaPaths(mysqli $conn, int $draftId, ?string $role = null, 
         $rows[] = [
             'media_id' => (int)($row['media_id'] ?? 0),
             'client_variant_id' => (int)($row['client_variant_id'] ?? 0),
-            'file_path' => (string)($row['file_path'] ?? '')
+            'file_path' => (string)($row['file_path'] ?? ''),
+            'sort_order' => (int)($row['sort_order'] ?? 0)
         ];
     }
     $stmt->close();
@@ -212,6 +216,21 @@ function absolutePathFromRelative(string $relativePath, string $rootPath): strin
     return rtrim($rootPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . ltrim($normalized, DIRECTORY_SEPARATOR);
 }
 
+function normalizePathList($value): array {
+    if (!is_array($value)) {
+        return [];
+    }
+    $out = [];
+    foreach ($value as $item) {
+        $path = trim((string)$item);
+        if ($path === '') {
+            continue;
+        }
+        $out[] = $path;
+    }
+    return array_values(array_unique($out));
+}
+
 $price = null;
 if ($priceRaw !== '') {
     if (!is_numeric($priceRaw) || (float)$priceRaw < 0) {
@@ -241,6 +260,14 @@ if ($pinnedImageIndex < 0) {
 if ($pinnedImageKeyRaw !== '' && preg_match('/^[en]:(\d+)$/', $pinnedImageKeyRaw, $matches)) {
     $pinnedImageIndex = (int)$matches[1];
 }
+
+$deletedImagePathsDecoded = json_decode($deletedImagePathsRaw, true);
+if ($deletedImagePathsRaw !== '' && $deletedImagePathsRaw !== '[]' && !is_array($deletedImagePathsDecoded)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid deleted image paths format']);
+    exit;
+}
+$deletedImagePaths = normalizePathList($deletedImagePathsDecoded ?? []);
 
 $variantsDecoded = json_decode($variantsRaw, true);
 if (!is_array($variantsDecoded)) {
@@ -291,6 +318,7 @@ foreach ($variantsDecoded as $item) {
         'variant_name' => $variantName,
         'variant_price' => $variantPrice,
         'variant_stock' => $variantStock,
+        'existing_images' => normalizePathList($item['existing_images'] ?? []),
         'pinned_image_key' => trim((string)($item['pinned_image_key'] ?? $item['pinnedImageKey'] ?? ''))
     ];
 
@@ -438,29 +466,70 @@ try {
         }
     }
 
-    // Save new main images if uploaded.
-    if (!empty($mainImageFiles)) {
-        $existingMain = fetchDraftMediaPaths($conn, $draftId, 'main_image', null);
-        foreach ($existingMain as $oldMedia) {
-            $oldAbs = absolutePathFromRelative((string)$oldMedia['file_path'], $rootPath ?: '');
+    // Merge main images: keep non-deleted existing rows and append new uploads.
+    $existingMain = fetchDraftMediaPaths($conn, $draftId, 'main_image', null);
+    $deletedMainSet = array_flip($deletedImagePaths);
+    $keptExistingMain = [];
+
+    foreach ($existingMain as $row) {
+        $path = (string)($row['file_path'] ?? '');
+        if ($path === '') {
+            continue;
+        }
+        if (isset($deletedMainSet[$path])) {
+            $oldAbs = absolutePathFromRelative($path, $rootPath ?: '');
             if ($oldAbs && is_file($oldAbs)) {
                 @unlink($oldAbs);
             }
+            continue;
         }
-        deleteDraftMediaRows($conn, $draftId, 'main_image', null);
+        $keptExistingMain[] = $path;
+    }
 
+    $newMainRelativePaths = [];
+    foreach ($mainImageFiles as $idx => $file) {
+        $saved = saveDraftUpload($file, $finfo, $allowedImageMimes, 'draft_' . $draftId . '_img_' . ($idx + 1), $draftMediaAbsoluteDir);
+        $newlyCreatedFiles[] = $saved['absolute'];
+        $newMainRelativePaths[] = $saved['relative'];
+    }
+
+    $finalMainPaths = array_values(array_merge($keptExistingMain, $newMainRelativePaths));
+    if (count($finalMainPaths) > 8) {
+        throw new Exception('Maximum 8 images allowed for draft');
+    }
+
+    $pinnedMainFinalIndex = 0;
+    if ($pinnedImageKeyRaw !== '' && preg_match('/^([en]):(\d+)$/', $pinnedImageKeyRaw, $matches)) {
+        $bucket = $matches[1];
+        $rawIndex = (int)$matches[2];
+        if ($bucket === 'e' && isset($keptExistingMain[$rawIndex])) {
+            $pinnedMainFinalIndex = $rawIndex;
+        } elseif ($bucket === 'n' && isset($newMainRelativePaths[$rawIndex])) {
+            $pinnedMainFinalIndex = count($keptExistingMain) + $rawIndex;
+        }
+    } elseif ($pinnedImageIndex >= 0 && isset($finalMainPaths[$pinnedImageIndex])) {
+        $pinnedMainFinalIndex = $pinnedImageIndex;
+    }
+
+    if (!empty($finalMainPaths)) {
+        if ($pinnedMainFinalIndex < 0 || $pinnedMainFinalIndex >= count($finalMainPaths)) {
+            $pinnedMainFinalIndex = 0;
+        }
+    } else {
+        $pinnedMainFinalIndex = 0;
+    }
+
+    deleteDraftMediaRows($conn, $draftId, 'main_image', null);
+    if (!empty($finalMainPaths)) {
         $insertMediaStmt = $conn->prepare('INSERT INTO product_draft_media (draft_id, media_role, client_variant_id, file_path, sort_order, is_pinned) VALUES (?, ?, NULL, ?, ?, ?)');
         if (!$insertMediaStmt) {
             throw new Exception('Failed to prepare draft image insert');
         }
 
-        foreach ($mainImageFiles as $idx => $file) {
-            $saved = saveDraftUpload($file, $finfo, $allowedImageMimes, 'draft_' . $draftId . '_img_' . ($idx + 1), $draftMediaAbsoluteDir);
-            $newlyCreatedFiles[] = $saved['absolute'];
+        foreach ($finalMainPaths as $idx => $relativePath) {
             $role = 'main_image';
-            $relativePath = $saved['relative'];
             $sortOrder = (int)$idx;
-            $isPinned = $idx === $pinnedImageIndex ? 1 : 0;
+            $isPinned = $idx === $pinnedMainFinalIndex ? 1 : 0;
             $insertMediaStmt->bind_param('issii', $draftId, $role, $relativePath, $sortOrder, $isPinned);
             if (!$insertMediaStmt->execute()) {
                 throw new Exception('Failed to save draft image record');
@@ -468,6 +537,8 @@ try {
         }
         $insertMediaStmt->close();
     }
+
+    $imageCount = count($finalMainPaths);
 
     // Save new video if uploaded.
     if ($videoFile) {
@@ -496,57 +567,113 @@ try {
         $insertVideoStmt->close();
     }
 
-    // Save new variant images if uploaded.
-    if (!empty($variantImageFiles)) {
-        $variantPinnedByClientId = [];
-        foreach ($variants as $variant) {
-            $variantPinnedByClientId[(int)$variant['client_variant_id']] = (string)($variant['pinned_image_key'] ?? '');
+    // Merge variant images for every active variant.
+    $variantMetaByClientId = [];
+    foreach ($variants as $variant) {
+        $clientId = (int)($variant['client_variant_id'] ?? 0);
+        if ($clientId <= 0) {
+            continue;
+        }
+        $variantMetaByClientId[$clientId] = [
+            'pinned_key' => (string)($variant['pinned_image_key'] ?? ''),
+            'existing_images' => normalizePathList($variant['existing_images'] ?? [])
+        ];
+    }
+
+    $insertVariantMediaStmt = $conn->prepare('INSERT INTO product_draft_media (draft_id, media_role, client_variant_id, file_path, sort_order, is_pinned) VALUES (?, ?, ?, ?, ?, ?)');
+    if (!$insertVariantMediaStmt) {
+        throw new Exception('Failed to prepare draft variant image insert');
+    }
+
+    foreach ($variantClientIds as $clientVariantId) {
+        $clientVariantId = (int)$clientVariantId;
+        if ($clientVariantId <= 0) {
+            continue;
         }
 
-        $insertVariantMediaStmt = $conn->prepare('INSERT INTO product_draft_media (draft_id, media_role, client_variant_id, file_path, sort_order, is_pinned) VALUES (?, ?, ?, ?, ?, ?)');
-        if (!$insertVariantMediaStmt) {
-            throw new Exception('Failed to prepare draft variant image insert');
-        }
+        $existingVariantRows = fetchDraftMediaPaths($conn, $draftId, 'variant_image', $clientVariantId);
+        $keepPosted = $variantMetaByClientId[$clientVariantId]['existing_images'] ?? [];
+        $keepSet = array_flip($keepPosted);
+        $keepProvided = isset($variantMetaByClientId[$clientVariantId]);
+        $keptExistingVariant = [];
 
-        foreach ($variantImageFiles as $clientVariantId => $variantFilesForClient) {
-            if (!in_array((int)$clientVariantId, $variantClientIds, true)) {
+        foreach ($existingVariantRows as $row) {
+            $path = (string)($row['file_path'] ?? '');
+            if ($path === '') {
                 continue;
             }
-
-            $existingVariantMedia = fetchDraftMediaPaths($conn, $draftId, 'variant_image', (int)$clientVariantId);
-            foreach ($existingVariantMedia as $oldMedia) {
-                $oldAbs = absolutePathFromRelative((string)$oldMedia['file_path'], $rootPath ?: '');
+            $shouldKeep = $keepProvided ? isset($keepSet[$path]) : true;
+            if (!$shouldKeep) {
+                $oldAbs = absolutePathFromRelative($path, $rootPath ?: '');
                 if ($oldAbs && is_file($oldAbs)) {
                     @unlink($oldAbs);
                 }
+                continue;
             }
-            deleteDraftMediaRows($conn, $draftId, 'variant_image', (int)$clientVariantId);
+            $keptExistingVariant[] = $path;
+        }
 
-            $variantPinnedKey = (string)($variantPinnedByClientId[(int)$clientVariantId] ?? '');
-            $pinnedVariantImageIdx = 0;
-            if (preg_match('/^[en]:(\d+)$/', $variantPinnedKey, $pinnedMatches)) {
-                $pinnedVariantImageIdx = (int)$pinnedMatches[1];
-            }
+        $newVariantRelativePaths = [];
+        $variantFilesForClient = $variantImageFiles[$clientVariantId] ?? [];
+        foreach ($variantFilesForClient as $mediaSortOrder => $uploadedVariantFile) {
+            $savedVariant = saveDraftUpload($uploadedVariantFile, $finfo, $allowedImageMimes, 'draft_' . $draftId . '_variant_' . $clientVariantId . '_' . $mediaSortOrder, $draftMediaAbsoluteDir);
+            $newlyCreatedFiles[] = $savedVariant['absolute'];
+            $newVariantRelativePaths[] = $savedVariant['relative'];
+        }
 
-            $mediaSortOrder = 0;
-            foreach ($variantFilesForClient as $uploadedVariantFile) {
-                $savedVariant = saveDraftUpload($uploadedVariantFile, $finfo, $allowedImageMimes, 'draft_' . $draftId . '_variant_' . (int)$clientVariantId . '_' . $mediaSortOrder, $draftMediaAbsoluteDir);
-                $newlyCreatedFiles[] = $savedVariant['absolute'];
-                $role = 'variant_image';
-                $clientVariantIdVal = (int)$clientVariantId;
-                $variantRel = $savedVariant['relative'];
-                $sortOrder = $mediaSortOrder;
-                $isPinned = $mediaSortOrder === $pinnedVariantImageIdx ? 1 : 0;
-                $insertVariantMediaStmt->bind_param('isisii', $draftId, $role, $clientVariantIdVal, $variantRel, $sortOrder, $isPinned);
-                if (!$insertVariantMediaStmt->execute()) {
-                    throw new Exception('Failed to save draft variant image record');
-                }
-                $mediaSortOrder++;
+        $finalVariantPaths = array_values(array_merge($keptExistingVariant, $newVariantRelativePaths));
+        if (count($finalVariantPaths) > 2) {
+            throw new Exception('Each variant can have up to 2 images only');
+        }
+
+        $variantPinnedKey = (string)($variantMetaByClientId[$clientVariantId]['pinned_key'] ?? '');
+        $pinnedVariantFinalIdx = 0;
+        if ($variantPinnedKey !== '' && preg_match('/^([en]):(\d+)$/', $variantPinnedKey, $pinnedMatches)) {
+            $bucket = $pinnedMatches[1];
+            $rawIndex = (int)$pinnedMatches[2];
+            if ($bucket === 'e' && isset($keptExistingVariant[$rawIndex])) {
+                $pinnedVariantFinalIdx = $rawIndex;
+            } elseif ($bucket === 'n' && isset($newVariantRelativePaths[$rawIndex])) {
+                $pinnedVariantFinalIdx = count($keptExistingVariant) + $rawIndex;
             }
         }
 
-        $insertVariantMediaStmt->close();
+        if (!empty($finalVariantPaths)) {
+            if ($pinnedVariantFinalIdx < 0 || $pinnedVariantFinalIdx >= count($finalVariantPaths)) {
+                $pinnedVariantFinalIdx = 0;
+            }
+        } else {
+            $pinnedVariantFinalIdx = 0;
+        }
+
+        deleteDraftMediaRows($conn, $draftId, 'variant_image', $clientVariantId);
+        foreach ($finalVariantPaths as $sortOrder => $variantRel) {
+            $role = 'variant_image';
+            $isPinned = $sortOrder === $pinnedVariantFinalIdx ? 1 : 0;
+            $insertVariantMediaStmt->bind_param('isisii', $draftId, $role, $clientVariantId, $variantRel, $sortOrder, $isPinned);
+            if (!$insertVariantMediaStmt->execute()) {
+                throw new Exception('Failed to save draft variant image record');
+            }
+        }
     }
+
+    $insertVariantMediaStmt->close();
+
+    $finalHasVideo = 0;
+    $existingVideoRows = fetchDraftMediaPaths($conn, $draftId, 'video', null);
+    if (!empty($existingVideoRows)) {
+        $finalHasVideo = 1;
+    }
+
+    $syncDraftStmt = $conn->prepare('UPDATE product_drafts SET pinned_image_index = ?, image_count = ?, has_video = ? WHERE draft_id = ? AND admin_user_id = ?');
+    if (!$syncDraftStmt) {
+        throw new Exception('Failed to sync draft media metadata');
+    }
+    $syncDraftStmt->bind_param('iiiii', $pinnedMainFinalIndex, $imageCount, $finalHasVideo, $draftId, $adminUserId);
+    if (!$syncDraftStmt->execute()) {
+        throw new Exception('Failed to sync draft media metadata');
+    }
+    $syncDraftStmt->close();
 
     $conn->commit();
     echo json_encode([

@@ -1016,7 +1016,7 @@ if ($role !== 'admin') {
 								<div class="field-label">Product Variants (Optional)</div>
 								<div class="hint">Add multiple variant names and prices to publish several products at once.</div>
 								<div class="hint">Variant product name format: Base Product Name - Variant Name</div>
-								<div class="hint">Each variant can have 1 to 8 images. Pin one image as primary.</div>
+								<div class="hint">Each variant can have 1 to 2 images. Pin one image as primary.</div>
 								<div id="variantRows" class="variant-list"></div>
 								<button id="addVariantBtn" type="button" class="new-cat-btn variant-add-btn" onclick="addVariantRow()">+ Add Variant</button>
 							</div>
@@ -1067,6 +1067,28 @@ if ($role !== 'admin') {
 		let modalNewMainImages = [];
 		let modalPinnedImageKey = '';
 		let modalPendingVideoPreviewUrl = '';
+
+		function getMainImageCount() {
+			const existingImages = Array.isArray(modalDraft?.media?.images) ? modalDraft.media.images : [];
+			const keptExistingCount = existingImages.filter((_, idx) => !modalMainImageStates[String(idx)]).length;
+			return keptExistingCount + modalNewMainImages.length;
+		}
+
+		function getPinnedImageDisplayNumber() {
+			if (!modalPinnedImageKey) return '';
+			const match = String(modalPinnedImageKey).match(/^[en]:(\d+)$/);
+			if (!match) return '';
+			return String(Number(match[1]) + 1);
+		}
+
+		function updateMainImageCounter() {
+			const label = byId('imagesLabel');
+			if (!label) return;
+			const count = getMainImageCount();
+			const pinnedNumber = getPinnedImageDisplayNumber();
+			const pinnedText = pinnedNumber ? ` <span class="help">Pinned: ${escapeHtml(pinnedNumber)}</span>` : '';
+			label.innerHTML = `Product Images (${count}/8) <span class="required-mark">*</span>${pinnedText}`;
+		}
 
 		function formatDate(value) {
 			if (!value) return 'Unknown';
@@ -1288,17 +1310,36 @@ if ($role !== 'admin') {
 			if (!modalIsEditing && variant === null) return;
 			
 			const tempId = modalVariantTempIdCounter++;
+			const incomingImages = Array.isArray(variant?.images) ? variant.images : [];
+			const normalizedImages = incomingImages.map((img) => {
+				if (img && typeof img === 'object') {
+					return {
+						path: img.path || img.previewUrl || '',
+						previewUrl: img.previewUrl || img.path || '',
+						deleted: false,
+						is_pinned: !!img.is_pinned
+					};
+				}
+				return {
+					path: String(img || ''),
+					previewUrl: String(img || ''),
+					deleted: false,
+					is_pinned: false
+				};
+			});
+			const pinnedImageIndex = normalizedImages.findIndex((img) => img.is_pinned);
+			const pinnedImageKey = typeof variant?.pinnedImageKey === 'string' && variant.pinnedImageKey
+				? variant.pinnedImageKey
+				: (pinnedImageIndex >= 0 ? `e:${pinnedImageIndex}` : '');
 			const variantData = {
 				id: variant?.id || 0,
 				tempId: tempId,
 				name: variant?.name || '',
 				price: variant?.price || '',
 				stock: variant?.stock || '',
-				images: variant?.images && Array.isArray(variant.images) 
-					? variant.images.map(img => ({ path: img, deleted: false, previewUrl: img }))
-					: [],
+				images: normalizedImages,
 				newImages: [],
-				pinnedImageKey: ''
+				pinnedImageKey
 			};
 
 			modalVariantsList.push(variantData);
@@ -1322,7 +1363,7 @@ if ($role !== 'admin') {
 					</div>
 					<div>
 						<input type="file" class="input variant-image-input" accept="image/*" multiple title="Add variant images" data-variant-temp-id="${variant.tempId}">
-						<div class="variant-image-count">0 / 8 images</div>
+						<div class="variant-image-count">0 / 2 images</div>
 						<div class="variant-images-grid"></div>
 					</div>
 					<button type="button" class="variant-remove-btn">Remove</button>
@@ -1359,10 +1400,10 @@ if ($role !== 'admin') {
 						imageInput.value = '';
 						
 						const totalImages = getVariantActiveImageCount(variant);
-						const remainingSlots = 8 - totalImages;
+						const remainingSlots = 2 - totalImages;
 
 						if (remainingSlots <= 0) {
-							showLocalSweetAlert('error', 'Image Limit Reached', 'Each variant can keep up to 8 images only.');
+							showLocalSweetAlert('error', 'Image Limit Reached', 'Each variant can keep up to 2 images only.');
 							return;
 						}
 
@@ -1435,7 +1476,7 @@ if ($role !== 'admin') {
 			});
 
 			gridEl.innerHTML = cards.length ? cards.join('') : '<div style="grid-column: 1/-1; padding: 20px; text-align: center; color: #999; font-size: 13px;">Click "Choose File" to add images (1-8)</div>';
-			countEl.textContent = `${getVariantActiveImageCount(variant)} / 8 images`;
+			countEl.textContent = `${getVariantActiveImageCount(variant)} / 2 images`;
 
 			// Radio button handlers
 			gridEl.querySelectorAll(`input[name="variantPin_${variant.tempId}"]`).forEach((radio) => {
@@ -1559,6 +1600,7 @@ if ($role !== 'admin') {
 
 			const existingImages = Array.isArray(modalDraft?.media?.images) ? modalDraft.media.images : [];
 			applyModalPinnedMainImageFallback();
+			updateMainImageCounter();
 
 			const cards = [];
 
@@ -1720,7 +1762,8 @@ if ($role !== 'admin') {
 					name: v.name || '',
 					price: v.price ?? '',
 					stock: v.stock ?? '',
-					images: variantImages
+					images: variantImages,
+					pinnedImageKey: v.pinned_image_key || ''
 				});
 			});
 
@@ -1801,7 +1844,7 @@ if ($role !== 'admin') {
 				if (forPublish && (v.stock === '' || Number(v.stock) < 0)) return 'Each variant stock must be non-negative.';
 				const allImages = [...(v.imageFiles || []), ...(v.existingImages || [])];
 				if (forPublish && allImages.length === 0) return 'Each variant must have at least one image.';
-				if (forPublish && allImages.length > 8) return 'Each variant can have up to 8 images only.';
+				if (forPublish && allImages.length > 2) return 'Each variant can have up to 2 images only.';
 			}
 
 			const existingImgs = Array.isArray(modalDraft?.media?.images) ? modalDraft.media.images : [];
@@ -1852,6 +1895,7 @@ if ($role !== 'admin') {
 				name: v.name,
 				price: v.price,
 				stock: v.stock,
+				existing_images: Array.isArray(v.existingImages) ? v.existingImages : [],
 				pinnedImageKey: v.pinnedImageKey || ''
 			}));
 			fd.append('variants', JSON.stringify(variants));
@@ -1957,6 +2001,7 @@ if ($role !== 'admin') {
 					name: String(v.name || '').trim(),
 					price: Number(v.price),
 					stock: Number(v.stock || 0),
+					existing_images: Array.isArray(v.existingImages) ? v.existingImages : [],
 					pinnedImageKey: v.pinnedImageKey || ''
 				}));
 				fd.append('variants', JSON.stringify(variants));
@@ -1972,6 +2017,12 @@ if ($role !== 'admin') {
 				// Add new main images from modalNewMainImages
 				modalNewMainImages.slice(0, 8).forEach((img) => fd.append('images[]', img.file));
 				fd.append('pinned_image_key', modalPinnedImageKey || '');
+				const existingMainImages = Array.isArray(modalDraft?.media?.images) ? modalDraft.media.images : [];
+				fd.append('deleted_image_paths', JSON.stringify(
+					existingMainImages
+						.filter((_, idx) => modalMainImageStates[String(idx)])
+						.map((img) => img.path)
+				));
 
 				getVariantRowsData().forEach((v) => {
 					const variantUploadId = Number(v.id || 0) > 0 ? Number(v.id) : Number(v.tempId || 0);

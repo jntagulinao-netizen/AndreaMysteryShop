@@ -541,7 +541,7 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
           <div class="field-label">Product Variants (Optional)</div>
           <div class="hint">Add multiple variant names and prices to publish several products at once.</div>
           <div class="hint">Variant product name format: Base Product Name - Variant Name</div>
-          <div class="hint">Each variant can have 1 to 8 images. Pin one image as primary.</div>
+          <div class="hint">Each variant can have 1 to 2 images. Pin one image as primary.</div>
           <div id="variantRows" class="variant-list"></div>
           <button type="button" class="new-cat-btn variant-add-btn" onclick="addVariantRow()">+ Add Variant</button>
         </div>
@@ -971,7 +971,7 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
             </div>
             <div>
               <input type="file" class="input variant-image-input" accept="image/*" multiple title="Add variant images" data-variant-temp-id="${variant.tempId}">
-              <div class="variant-image-count">0 / 8 images</div>
+              <div class="variant-image-count">0 / 2 images</div>
               <div class="variant-images-grid"></div>
             </div>
             <button type="button" class="variant-remove-btn">Remove</button>
@@ -1021,10 +1021,10 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       input.value = '';
 
       const totalImages = getVariantActiveImageCount(variant);
-      const remainingSlots = 8 - totalImages;
+      const remainingSlots = 2 - totalImages;
 
       if (remainingSlots <= 0) {
-        showLocalSweetAlert('error', 'Image Limit Reached', 'Each variant can keep up to 8 images only.');
+        showLocalSweetAlert('error', 'Image Limit Reached', 'Each variant can keep up to 2 images only.');
         return;
       }
 
@@ -1035,7 +1035,7 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       });
 
       if (selectedFiles.length > filesToAdd.length) {
-        showLocalSweetAlert('warning', 'Image Limit', 'Some images were not added due to the 8-image limit.');
+        showLocalSweetAlert('warning', 'Image Limit', 'Some images were not added due to the 2-image limit.');
       }
 
       renderVariantImageManager(variantListIdx, row);
@@ -1101,7 +1101,7 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       });
 
       grid.innerHTML = cards.length ? cards.join('') : '<div style="grid-column: 1/-1; padding: 20px; text-align: center; color: #999; font-size: 13px;">Click "Choose File" to add images (1-8)</div>';
-      countEl.textContent = `${getVariantActiveImageCount(variant)} / 8 images`;
+      countEl.textContent = `${getVariantActiveImageCount(variant)} / 2 images`;
 
       // Radio buttons for pinning
       grid.querySelectorAll(`input[name="variantPinned_${variant.tempId}"]`).forEach((radio) => {
@@ -1438,8 +1438,8 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
           return 'Each variant must have at least one image.';
         }
 
-        if (allImages.length > 8) {
-          return 'Each variant can have up to 8 images only.';
+        if (allImages.length > 2) {
+          return 'Each variant can have up to 2 images only.';
         }
       }
 

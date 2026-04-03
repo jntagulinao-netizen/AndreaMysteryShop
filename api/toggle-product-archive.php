@@ -43,11 +43,19 @@ try {
 
     $mainProductId = !empty($selected['parent_product_id']) ? (int)$selected['parent_product_id'] : (int)$selected['product_id'];
 
-    $updateStmt = $conn->prepare('UPDATE products SET archived = ? WHERE product_id = ? OR parent_product_id = ?');
+    $featuredValue = $archive === 1 ? 0 : null;
+    $updateSql = $archive === 1
+        ? 'UPDATE products SET archived = ?, featured = ? WHERE product_id = ? OR parent_product_id = ?'
+        : 'UPDATE products SET archived = ? WHERE product_id = ? OR parent_product_id = ?';
+    $updateStmt = $conn->prepare($updateSql);
     if (!$updateStmt) {
         throw new Exception('Failed to prepare archive update');
     }
-    $updateStmt->bind_param('iii', $archive, $mainProductId, $mainProductId);
+    if ($archive === 1) {
+        $updateStmt->bind_param('iiii', $archive, $featuredValue, $mainProductId, $mainProductId);
+    } else {
+        $updateStmt->bind_param('iii', $archive, $mainProductId, $mainProductId);
+    }
     if (!$updateStmt->execute()) {
         throw new Exception('Failed to update archive state');
     }

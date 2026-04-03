@@ -9,14 +9,22 @@ if ($role !== 'admin') {
     header('Location: user_dashboard.php');
     exit;
 }
-$isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
+$allowedViews = ['active', 'archived', 'featured'];
+$requestedView = isset($_GET['view']) ? strtolower(trim((string)$_GET['view'])) : 'active';
+$currentView = in_array($requestedView, $allowedViews, true) ? $requestedView : 'active';
+$pageTitle = 'My Products - Admin';
+if ($currentView === 'archived') {
+  $pageTitle = 'Archived Products - Admin';
+} elseif ($currentView === 'featured') {
+  $pageTitle = 'Featured Products - Admin';
+}
 ?>
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title><?php echo $isArchivedView ? 'Archived Products - Admin' : 'My Products - Admin'; ?></title>
+  <title><?php echo $pageTitle; ?></title>
   <link rel="stylesheet" href="main.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -218,6 +226,20 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       font-weight: 700;
       z-index: 10;
     }
+    .product-featured-badge {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      background: #f6c343;
+      color: #3a2a00;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 800;
+      z-index: 10;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
     .product-image {
       height: 220px;
       flex: 0 0 220px;
@@ -385,6 +407,17 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
     .edit-btn.archive.restore {
       background: #2e7d32;
       border-color: #2e7d32;
+    }
+    .edit-btn.featured {
+      background: #f6c343;
+      color: #3a2a00;
+      border-color: #f6c343;
+      margin-right: auto;
+    }
+    .edit-btn.featured.active {
+      background: #fff7dc;
+      border-color: #e9b82f;
+      color: #7a5b00;
     }
 
     .variants-section {
@@ -876,7 +909,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
   <div class="page-container">
     <div class="page-header">
       <div class="back-arrow" onclick="window.location.href='admin_dashboard.php'">‹</div>
-      <div class="header-title">My Products</div>
+      <div class="header-title"><?php echo $currentView === 'archived' ? 'Archived Products' : ($currentView === 'featured' ? 'Featured Products' : 'My Products'); ?></div>
       <div class="header-meta">Updated <?php echo date('d/m/Y H:i:s'); ?></div>
       <div class="topbar-menu">
         <button type="button" class="menu-trigger" onclick="toggleTopbarMenu(event)">...</button>
@@ -896,8 +929,9 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
 
     <div class="filters">
       <div class="view-switch">
-        <a href="admin_my_products.php" class="<?php echo !$isArchivedView ? 'active' : ''; ?>">Active</a>
-        <a href="admin_my_products.php?view=archived" class="<?php echo $isArchivedView ? 'active' : ''; ?>">Archived</a>
+        <a href="admin_my_products.php?view=active" class="<?php echo $currentView === 'active' ? 'active' : ''; ?>">Active</a>
+        <a href="admin_my_products.php?view=featured" class="<?php echo $currentView === 'featured' ? 'active' : ''; ?>">Featured</a>
+        <a href="admin_my_products.php?view=archived" class="<?php echo $currentView === 'archived' ? 'active' : ''; ?>">Archived</a>
       </div>
       <input type="text" id="searchInput" placeholder="Search by product name..." style="flex: 1; max-width: 300px; border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; font-size: 14px; background: #fff;" onkeyup="applySearch()">
       <div id="categoryButtons" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -943,6 +977,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
             <div id="previewOrders" class="product-modal-meta"></div>
             <div id="previewCategory" class="product-modal-meta"></div>
             <div id="previewStatus" class="product-modal-meta"></div>
+            <div id="previewFeatured" class="product-modal-meta"></div>
             <p id="previewDesc" class="product-modal-desc"></p>
           </div>
 
@@ -1026,6 +1061,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
                 </div>
 
                 <div class="edit-actions">
+                  <button type="button" id="featureToggleBtn" class="edit-btn featured" onclick="toggleProductFeatured()">Mark as Featured</button>
                   <button type="button" id="archiveToggleBtn" class="edit-btn archive" onclick="toggleProductArchive()">Archive Product</button>
                   <button type="button" class="edit-btn" onclick="closeProductModal()">Cancel</button>
                   <button type="submit" class="edit-btn primary">Save Changes</button>
@@ -1053,7 +1089,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
 
   <script src="assets/js/user_dashboard_reusable_ui.js?v=20260331-1"></script>
   <script>
-    const isArchivedView = <?php echo $isArchivedView ? 'true' : 'false'; ?>;
+    const currentView = <?php echo json_encode($currentView); ?>;
     let products = [];
     let filteredProducts = [];
     let currentCategory = 'all';
@@ -1496,6 +1532,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
           groupStock: totalStock,
           isGroupOutOfStock: !inStock,
           isArchived: groupItems.some((item) => Number(item.archived || 0) === 1),
+          isFeatured: groupItems.some((item) => Number(item.featured || 0) === 1),
           groupOrderCount: groupItems.reduce((sum, item) => sum + Number(item.orderCount || 0), 0)
         };
       });
@@ -1524,6 +1561,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
         const image = Array.isArray(p.image) && p.image.length ? p.image[0] : 'https://via.placeholder.com/900x600?text=No+Image';
         const stockColor = isOutOfStock ? '#e22a39' : '#27ae60';
         const isArchived = Number(p.archived || 0) === 1 || p.isArchived;
+        const showFeaturedBadge = currentView === 'active' && Number(p.isFeatured || 0) === 1;
         const cardOpacity = (isOutOfStock || isArchived) ? 'opacity: 0.6;' : '';
 
         return `
@@ -1532,6 +1570,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
               <img src="${image}" alt="${p.name}" class="main-img">
               ${isArchived ? '<span class="product-archived-badge">Archived</span>' : ''}
               ${p.variantCount > 0 ? `<span class="product-variant-badge">${p.variantCount} options</span>` : ''}
+              ${showFeaturedBadge ? '<span class="product-featured-badge">Featured</span>' : ''}
               ${isOutOfStock ? '<div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; border-radius: 8px;"><span style="color: white; font-weight: bold; font-size: 16px;">Out of Stock</span></div>' : ''}
             </div>
             <div class="product-info">
@@ -1664,9 +1703,9 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
           <div class="variant-images-cell" data-variant-temp-id="${tempId}">
             <div class="variant-image-input-wrap">
               <input type="file" class="variant-image" accept="image/*" multiple title="Add variant images">
-              <small class="variant-image-note">Keep 1 to 8 images, choose one pinned, and remove unwanted ones.</small>
+              <small class="variant-image-note">Keep 1 to 2 images, choose one pinned, and remove unwanted ones.</small>
             </div>
-            <div class="variant-image-count">0 / 8 images</div>
+            <div class="variant-image-count">0 / 2 images</div>
             <div class="variant-images-grid"></div>
             <div class="variant-row-actions">
               <button type="button" class="variant-main-btn ${isMainSelection ? 'active' : ''}" data-main-selection="${escapeHtml(selectionKey)}">${mainActionLabel}</button>
@@ -1885,7 +1924,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       });
 
       grid.innerHTML = cards.join('');
-      countEl.textContent = `${getVariantActiveImageCount(variant)} / 8 images`;
+      countEl.textContent = `${getVariantActiveImageCount(variant)} / 2 images`;
 
       grid.querySelectorAll(`input[name="variantPinned_${tempId}"]`).forEach((radio) => {
         radio.addEventListener('change', () => {
@@ -1927,9 +1966,9 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       input.value = '';
       if (selectedFiles.length === 0) return;
 
-      const remainingSlots = 8 - getVariantActiveImageCount(variant);
+      const remainingSlots = 2 - getVariantActiveImageCount(variant);
       if (remainingSlots <= 0) {
-        await localAlert('warning', 'Image Limit Reached', 'Each variant can keep up to 8 images only.');
+        await localAlert('warning', 'Image Limit Reached', 'Each variant can keep up to 2 images only.');
         renderVariantImageManager(tempId, row);
         return;
       }
@@ -1943,7 +1982,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       });
 
       if (selectedFiles.length > filesToAdd.length) {
-        await localAlert('warning', 'Image Limit Reached', 'Only images within the 8-image limit were added for this variant.');
+        await localAlert('warning', 'Image Limit Reached', 'Only images within the 2-image limit were added for this variant.');
       }
 
       applyVariantPinnedFallback(variant);
@@ -2181,6 +2220,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       document.getElementById('previewOrders').textContent = `Orders: ${Number(product.orderCount || 0)}`;
       document.getElementById('previewCategory').textContent = `Category: ${product.categoryName || 'N/A'}`;
       document.getElementById('previewStatus').textContent = `Status: ${Number(product.archived || 0) === 1 ? 'Archived (hidden from users)' : 'Active (visible to users)'}`;
+      document.getElementById('previewFeatured').textContent = `Featured: ${Number(product.featured || 0) === 1 ? 'Yes' : 'No'}`;
       document.getElementById('previewDesc').textContent = product.desc || 'No description available.';
       document.getElementById('editProductId').value = String(product.id);
       document.getElementById('editProductName').value = product.name || '';
@@ -2212,6 +2252,12 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
         const archived = Number(product.archived || 0) === 1;
         archiveToggleBtn.textContent = archived ? 'Restore Product' : 'Archive Product';
         archiveToggleBtn.classList.toggle('restore', archived);
+      }
+      const featureToggleBtn = document.getElementById('featureToggleBtn');
+      if (featureToggleBtn) {
+        const featured = Number(product.featured || 0) === 1;
+        featureToggleBtn.textContent = featured ? 'Unmark Featured' : 'Mark as Featured';
+        featureToggleBtn.classList.toggle('active', featured);
       }
       fillCategoryDropdown(product.category);
       
@@ -2300,8 +2346,8 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
             if (activeVariantImageCount < 1) {
               throw new Error('Each variant must have at least one image.');
             }
-            if (activeVariantImageCount > 8) {
-              throw new Error('Each variant can keep up to 8 images only.');
+            if (activeVariantImageCount > 2) {
+              throw new Error('Each variant can keep up to 2 images only.');
             }
 
             const variantPayload = {
@@ -2536,6 +2582,80 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
       }
     }
 
+    async function toggleProductFeatured() {
+      const productId = Number(document.getElementById('editProductId').value || 0);
+      if (!productId) {
+        await localAlert('error', 'Invalid Product', 'Invalid product selected.');
+        return;
+      }
+
+      const product = products.find((p) => Number(p.id) === productId);
+      if (!product) {
+        await localAlert('error', 'Not Found', 'Product not found.');
+        return;
+      }
+
+      if (Number(product.archived || 0) === 1) {
+        await localAlert('warning', 'Archived Product', 'Restore this product first before marking it as featured.');
+        return;
+      }
+
+      const isFeatured = Number(product.featured || 0) === 1;
+      const nextFeaturedState = isFeatured ? 0 : 1;
+      const confirmed = await localConfirm(
+        isFeatured ? 'Remove Featured Product' : 'Set Featured Product',
+        isFeatured
+          ? 'Remove featured mark from this product family?'
+          : 'Mark this product family as featured? (Maximum of 3 featured products)',
+        isFeatured ? 'Remove' : 'Set Featured',
+        'Cancel'
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        const payload = new URLSearchParams();
+        payload.append('product_id', String(productId));
+        payload.append('feature', String(nextFeaturedState));
+
+        const response = await fetch('api/toggle-product-feature.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: payload.toString()
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Failed to update featured status.');
+        }
+
+        await loadProducts();
+        filterByCategory(currentCategory);
+
+        const updatedProduct = products.find((p) => Number(p.id) === productId);
+        if (updatedProduct) {
+          document.getElementById('previewFeatured').textContent = `Featured: ${Number(updatedProduct.featured || 0) === 1 ? 'Yes' : 'No'}`;
+          const featureToggleBtn = document.getElementById('featureToggleBtn');
+          if (featureToggleBtn) {
+            const featured = Number(updatedProduct.featured || 0) === 1;
+            featureToggleBtn.textContent = featured ? 'Unmark Featured' : 'Mark as Featured';
+            featureToggleBtn.classList.toggle('active', featured);
+          }
+        }
+
+        await localAlert(
+          'success',
+          nextFeaturedState === 1 ? 'Featured' : 'Updated',
+          nextFeaturedState === 1 ? 'Product marked as featured.' : 'Featured mark removed.'
+        );
+      } catch (error) {
+        await localAlert('error', 'Feature Update Failed', error.message || 'Failed to update featured status.');
+      }
+    }
+
     function closeProductModal() {
       const modal = document.getElementById('productModal');
       if (modal) {
@@ -2560,6 +2680,7 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
             id: p.id,
             parent_product_id: p.parent_product_id || null,
             archived: Number(p.archived || 0),
+            featured: Number(p.featured || 0),
             name: p.name,
             price: Number(p.price || 0).toFixed(2),
             originalPrice: p.original_price ? Number(p.original_price).toFixed(2) : null,
@@ -2575,7 +2696,13 @@ $isArchivedView = (isset($_GET['view']) && $_GET['view'] === 'archived');
           };
         });
 
-        products = allProducts.filter((p) => isArchivedView ? Number(p.archived) === 1 : Number(p.archived) === 0);
+        if (currentView === 'archived') {
+          products = allProducts.filter((p) => Number(p.archived) === 1);
+        } else if (currentView === 'featured') {
+          products = allProducts.filter((p) => Number(p.archived) === 0 && Number(p.featured) === 1);
+        } else {
+          products = allProducts.filter((p) => Number(p.archived) === 0);
+        }
 
         filteredProducts = [...products];
         renderProducts(filteredProducts);

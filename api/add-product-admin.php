@@ -31,6 +31,7 @@ $categoryIdRaw = trim($_POST['category_id'] ?? '0');
 $newCategoryName = trim($_POST['new_category_name'] ?? '');
 $pinnedImageKeyRaw = trim($_POST['pinned_image_key'] ?? '');
 $pinnedImageIndexRaw = trim($_POST['pinned_image_index'] ?? '0');
+$deletedImagePathsRaw = trim($_POST['deleted_image_paths'] ?? '[]');
 $draftIdRaw = trim($_POST['draft_id'] ?? '0');
 $variantsRaw = trim($_POST['variants'] ?? '');
 
@@ -119,7 +120,9 @@ if ($variantsRaw !== '') {
             'id' => $variantId,
             'name' => $variantName,
             'price' => round((float)$variantPriceRaw, 2),
-            'stock' => (int)$variantStockRaw
+            'stock' => (int)$variantStockRaw,
+            'existing_images' => normalizePathList($item['existing_images'] ?? []),
+            'pinned_image_key' => trim((string)($item['pinned_image_key'] ?? $item['pinnedImageKey'] ?? ''))
         ];
     }
 }
@@ -152,11 +155,7 @@ $pinnedImageIndex = is_numeric($pinnedImageIndexRaw) ? (int)$pinnedImageIndexRaw
 if ($pinnedImageKeyRaw !== '' && preg_match('/^[en]:(\d+)$/', $pinnedImageKeyRaw, $matches)) {
     $pinnedImageIndex = (int)$matches[1];
 }
-if (!empty($imageFiles)) {
-    if ($pinnedImageIndex < 0 || $pinnedImageIndex >= count($imageFiles)) {
-        $pinnedImageIndex = 0;
-    }
-} else {
+if ($pinnedImageIndex < 0) {
     $pinnedImageIndex = 0;
 }
 
@@ -190,6 +189,29 @@ function absolutePathFromRelative(string $relativePath): string {
     $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
     return rtrim((string)$root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . ltrim($normalized, DIRECTORY_SEPARATOR);
 }
+
+function normalizePathList($value): array {
+    if (!is_array($value)) {
+        return [];
+    }
+    $out = [];
+    foreach ($value as $item) {
+        $path = trim((string)$item);
+        if ($path === '') {
+            continue;
+        }
+        $out[] = $path;
+    }
+    return array_values(array_unique($out));
+}
+
+$deletedImagePathsDecoded = json_decode($deletedImagePathsRaw, true);
+if ($deletedImagePathsRaw !== '' && $deletedImagePathsRaw !== '[]' && !is_array($deletedImagePathsDecoded)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid deleted image paths format']);
+    exit;
+}
+$deletedImagePaths = normalizePathList($deletedImagePathsDecoded ?? []);
 
 foreach ($imageFiles as $file) {
     if ($file['error'] !== UPLOAD_ERR_OK) {
@@ -321,7 +343,10 @@ try {
                 } elseif ($role === 'video') {
                     $draftMedia['video'] = $path;
                 } elseif ($role === 'variant_image' && $clientVariantId > 0) {
-                    $draftMedia['variant_images'][$clientVariantId] = $path;
+                    if (!isset($draftMedia['variant_images'][$clientVariantId]) || !is_array($draftMedia['variant_images'][$clientVariantId])) {
+                        $draftMedia['variant_images'][$clientVariantId] = [];
+                    }
+                    $draftMedia['variant_images'][$clientVariantId][] = $path;
                 }
             }
             $mediaStmt->close();
@@ -335,12 +360,48 @@ try {
     if (count($variants) > 0) {
         foreach ($variants as $variant) {
             $variantId = (int)$variant['id'];
-            $hasUploadedVariantImage = !empty($variantImageFiles[$variantId]);
-            $hasDraftVariantImage = isset($draftMedia['variant_images'][$variantId]);
-            if (!$hasUploadedVariantImage && !$hasDraftVariantImage) {
+            $uploadedCount = isset($variantImageFiles[$variantId]) && is_array($variantImageFiles[$variantId]) ? count($variantImageFiles[$variantId]) : 0;
+            $draftVariantPaths = isset($draftMedia['variant_images'][$variantId]) && is_array($draftMedia['variant_images'][$variantId])
+                ? $draftMedia['variant_images'][$variantId]
+                : [];
+            $retainedVariantPaths = normalizePathList($variant['existing_images'] ?? []);
+            $keepProvided = array_key_exists('existing_images', $variant);
+
+            if ($keepProvided) {
+                $draftVariantPaths = array_values(array_filter($draftVariantPaths, static function (string $path) use ($retainedVariantPaths): bool {
+                    return in_array($path, $retainedVariantPaths, true);
+                }));
+            }
+
+            $finalVariantCount = count($draftVariantPaths) + $uploadedCount;
+            if ($finalVariantCount <= 0) {
                 throw new Exception('Each variant must have one image');
             }
+            if ($finalVariantCount > 2) {
+                throw new Exception('Each variant can have up to 2 images only');
+            }
         }
+    }
+
+    $keptDraftMainImages = [];
+    $deletedMainSet = array_flip($deletedImagePaths);
+    foreach ($draftMedia['main_images'] as $item) {
+        $path = (string)($item['path'] ?? '');
+        if ($path === '' || isset($deletedMainSet[$path])) {
+            continue;
+        }
+        $keptDraftMainImages[] = [
+            'path' => $path,
+            'is_pinned' => (bool)($item['is_pinned'] ?? false)
+        ];
+    }
+
+    $finalMainImageCount = count($keptDraftMainImages) + count($imageFiles);
+    if ($finalMainImageCount <= 0) {
+        throw new Exception('At least one product image is required');
+    }
+    if ($finalMainImageCount > 8) {
+        throw new Exception('You can upload up to 8 images only');
     }
 
     if ($categoryMode === 'new') {
@@ -464,88 +525,164 @@ try {
         $createdProductIds[] = $productId;
 
         if ($isMainProduct) {
-            // Main product: save all uploaded images
-            if (!empty($imageFiles)) {
-                foreach ($imageFiles as $index => $file) {
-                    $mime = $finfo->file($file['tmp_name']);
-                    $ext = $allowedImageMimes[$mime] ?? 'jpg';
-                    $fileName = 'product_' . $productId . '_img_' . ($index + 1) . '_' . time() . '_' . bin2hex(random_bytes(3)) . '.' . $ext;
-                    $targetAbsolute = $uploadDirAbsolute . DIRECTORY_SEPARATOR . $fileName;
-                    $relativePath = 'product_media/' . $fileName;
-
-                    if (!copy($file['tmp_name'], $targetAbsolute)) {
-                        throw new Exception('Failed to save uploaded image');
-                    }
-
-                    $createdFiles[] = $targetAbsolute;
-                    $isPinned = $index === $pinnedImageIndex ? 1 : 0;
-                    $insertMediaStmt->bind_param('isi', $productId, $relativePath, $isPinned);
-                    if (!$insertMediaStmt->execute()) {
-                        throw new Exception('Failed to save image record');
-                    }
+            // Main product: merge retained draft images with newly uploaded images.
+            $pinnedMainFinalIndex = 0;
+            if ($pinnedImageKeyRaw !== '' && preg_match('/^([en]):(\d+)$/', $pinnedImageKeyRaw, $pinMatch)) {
+                $bucket = $pinMatch[1];
+                $rawIdx = (int)$pinMatch[2];
+                if ($bucket === 'e' && isset($keptDraftMainImages[$rawIdx])) {
+                    $pinnedMainFinalIndex = $rawIdx;
+                } elseif ($bucket === 'n' && isset($imageFiles[$rawIdx])) {
+                    $pinnedMainFinalIndex = count($keptDraftMainImages) + $rawIdx;
                 }
-            } else {
-                foreach ($draftMedia['main_images'] as $index => $draftImage) {
-                    $sourceRelative = (string)($draftImage['path'] ?? '');
-                    $sourceAbsolute = absolutePathFromRelative($sourceRelative);
-                    if (!is_file($sourceAbsolute)) {
-                        throw new Exception('Draft image file is missing');
-                    }
+            } elseif ($pinnedImageIndex >= 0 && $pinnedImageIndex < $finalMainImageCount) {
+                $pinnedMainFinalIndex = $pinnedImageIndex;
+            }
 
-                    $sourceExt = pathinfo($sourceAbsolute, PATHINFO_EXTENSION);
-                    $ext = $sourceExt !== '' ? $sourceExt : 'jpg';
-                    $fileName = 'product_' . $productId . '_img_' . ($index + 1) . '_' . time() . '_' . bin2hex(random_bytes(3)) . '.' . $ext;
-                    $targetAbsolute = $uploadDirAbsolute . DIRECTORY_SEPARATOR . $fileName;
-                    $relativePath = 'product_media/' . $fileName;
+            if ($pinnedMainFinalIndex < 0 || $pinnedMainFinalIndex >= $finalMainImageCount) {
+                $pinnedMainFinalIndex = 0;
+            }
 
-                    if (!copy($sourceAbsolute, $targetAbsolute)) {
-                        throw new Exception('Failed to copy draft image');
-                    }
+            $mainOutputIndex = 0;
 
-                    $createdFiles[] = $targetAbsolute;
-                    $isPinned = ((bool)($draftImage['is_pinned'] ?? false)) ? 1 : 0;
-                    $insertMediaStmt->bind_param('isi', $productId, $relativePath, $isPinned);
-                    if (!$insertMediaStmt->execute()) {
-                        throw new Exception('Failed to save image record');
-                    }
+            foreach ($keptDraftMainImages as $draftImage) {
+                $sourceRelative = (string)($draftImage['path'] ?? '');
+                $sourceAbsolute = absolutePathFromRelative($sourceRelative);
+                if (!is_file($sourceAbsolute)) {
+                    throw new Exception('Draft image file is missing');
                 }
+
+                $sourceExt = pathinfo($sourceAbsolute, PATHINFO_EXTENSION);
+                $ext = $sourceExt !== '' ? $sourceExt : 'jpg';
+                $fileName = 'product_' . $productId . '_img_' . ($mainOutputIndex + 1) . '_' . time() . '_' . bin2hex(random_bytes(3)) . '.' . $ext;
+                $targetAbsolute = $uploadDirAbsolute . DIRECTORY_SEPARATOR . $fileName;
+                $relativePath = 'product_media/' . $fileName;
+
+                if (!copy($sourceAbsolute, $targetAbsolute)) {
+                    throw new Exception('Failed to copy draft image');
+                }
+
+                $createdFiles[] = $targetAbsolute;
+                $isPinned = $mainOutputIndex === $pinnedMainFinalIndex ? 1 : 0;
+                $insertMediaStmt->bind_param('isi', $productId, $relativePath, $isPinned);
+                if (!$insertMediaStmt->execute()) {
+                    throw new Exception('Failed to save image record');
+                }
+                $mainOutputIndex++;
+            }
+
+            foreach ($imageFiles as $file) {
+                $mime = $finfo->file($file['tmp_name']);
+                $ext = $allowedImageMimes[$mime] ?? 'jpg';
+                $fileName = 'product_' . $productId . '_img_' . ($mainOutputIndex + 1) . '_' . time() . '_' . bin2hex(random_bytes(3)) . '.' . $ext;
+                $targetAbsolute = $uploadDirAbsolute . DIRECTORY_SEPARATOR . $fileName;
+                $relativePath = 'product_media/' . $fileName;
+
+                if (!copy($file['tmp_name'], $targetAbsolute)) {
+                    throw new Exception('Failed to save uploaded image');
+                }
+
+                $createdFiles[] = $targetAbsolute;
+                $isPinned = $mainOutputIndex === $pinnedMainFinalIndex ? 1 : 0;
+                $insertMediaStmt->bind_param('isi', $productId, $relativePath, $isPinned);
+                if (!$insertMediaStmt->execute()) {
+                    throw new Exception('Failed to save image record');
+                }
+                $mainOutputIndex++;
             }
         } else if ($variantId > 0) {
-            // Variant: save only its single variant image
-            $variantImageFile = (!empty($variantImageFiles[$variantId]) && is_array($variantImageFiles[$variantId])) ? $variantImageFiles[$variantId][0] : null;
-            if ($variantImageFile) {
-                $variantMime = $finfo->file($variantImageFile['tmp_name']);
-                $variantExt = $allowedImageMimes[$variantMime] ?? 'jpg';
-                $variantFileName = 'product_' . $productId . '_variant_img_' . time() . '_' . bin2hex(random_bytes(3)) . '.' . $variantExt;
-                $variantTargetAbsolute = $uploadDirAbsolute . DIRECTORY_SEPARATOR . $variantFileName;
-                $variantRelativePath = 'product_media/' . $variantFileName;
-
-                if (!copy($variantImageFile['tmp_name'], $variantTargetAbsolute)) {
-                    throw new Exception('Failed to save variant image');
+            // Variant: merge retained draft images with newly uploaded images.
+            $variantMeta = null;
+            foreach ($variants as $v) {
+                if ((int)($v['id'] ?? 0) === $variantId) {
+                    $variantMeta = $v;
+                    break;
                 }
-            } else {
-                $draftVariantPath = (string)($draftMedia['variant_images'][$variantId] ?? '');
-                $sourceAbsolute = absolutePathFromRelative($draftVariantPath);
+            }
+
+            $retainedVariantPaths = normalizePathList($variantMeta['existing_images'] ?? []);
+            $keepProvided = is_array($variantMeta) && array_key_exists('existing_images', $variantMeta);
+            $draftVariantPaths = isset($draftMedia['variant_images'][$variantId]) && is_array($draftMedia['variant_images'][$variantId])
+                ? $draftMedia['variant_images'][$variantId]
+                : [];
+
+            if ($keepProvided) {
+                $draftVariantPaths = array_values(array_filter($draftVariantPaths, static function (string $path) use ($retainedVariantPaths): bool {
+                    return in_array($path, $retainedVariantPaths, true);
+                }));
+            }
+
+            $uploadedVariantFiles = (!empty($variantImageFiles[$variantId]) && is_array($variantImageFiles[$variantId]))
+                ? $variantImageFiles[$variantId]
+                : [];
+
+            $finalVariantCount = count($draftVariantPaths) + count($uploadedVariantFiles);
+            if ($finalVariantCount <= 0) {
+                throw new Exception('Missing image for one of the variants');
+            }
+            if ($finalVariantCount > 2) {
+                throw new Exception('Each variant can have up to 2 images only');
+            }
+
+            $variantPinnedFinalIdx = 0;
+            $variantPinnedKey = trim((string)($variantMeta['pinned_image_key'] ?? ''));
+            if ($variantPinnedKey !== '' && preg_match('/^([en]):(\d+)$/', $variantPinnedKey, $pinMatch)) {
+                $bucket = $pinMatch[1];
+                $rawIdx = (int)$pinMatch[2];
+                if ($bucket === 'e' && isset($draftVariantPaths[$rawIdx])) {
+                    $variantPinnedFinalIdx = $rawIdx;
+                } elseif ($bucket === 'n' && isset($uploadedVariantFiles[$rawIdx])) {
+                    $variantPinnedFinalIdx = count($draftVariantPaths) + $rawIdx;
+                }
+            }
+            if ($variantPinnedFinalIdx < 0 || $variantPinnedFinalIdx >= $finalVariantCount) {
+                $variantPinnedFinalIdx = 0;
+            }
+
+            $variantOutputIndex = 0;
+            foreach ($draftVariantPaths as $draftVariantPath) {
+                $sourceAbsolute = absolutePathFromRelative((string)$draftVariantPath);
                 if (!is_file($sourceAbsolute)) {
                     throw new Exception('Missing image for one of the variants');
                 }
 
                 $sourceExt = pathinfo($sourceAbsolute, PATHINFO_EXTENSION);
                 $variantExt = $sourceExt !== '' ? $sourceExt : 'jpg';
-                $variantFileName = 'product_' . $productId . '_variant_img_' . time() . '_' . bin2hex(random_bytes(3)) . '.' . $variantExt;
+                $variantFileName = 'product_' . $productId . '_variant_img_' . ($variantOutputIndex + 1) . '_' . time() . '_' . bin2hex(random_bytes(3)) . '.' . $variantExt;
                 $variantTargetAbsolute = $uploadDirAbsolute . DIRECTORY_SEPARATOR . $variantFileName;
                 $variantRelativePath = 'product_media/' . $variantFileName;
 
                 if (!copy($sourceAbsolute, $variantTargetAbsolute)) {
                     throw new Exception('Failed to copy draft variant image');
                 }
+
+                $createdFiles[] = $variantTargetAbsolute;
+                $isPinned = $variantOutputIndex === $variantPinnedFinalIdx ? 1 : 0;
+                $insertMediaStmt->bind_param('isi', $productId, $variantRelativePath, $isPinned);
+                if (!$insertMediaStmt->execute()) {
+                    throw new Exception('Failed to save variant image record');
+                }
+                $variantOutputIndex++;
             }
 
-            $createdFiles[] = $variantTargetAbsolute;
-            $isPinned = 1;
-            $insertMediaStmt->bind_param('isi', $productId, $variantRelativePath, $isPinned);
-            if (!$insertMediaStmt->execute()) {
-                throw new Exception('Failed to save variant image record');
+            foreach ($uploadedVariantFiles as $variantImageFile) {
+                $variantMime = $finfo->file($variantImageFile['tmp_name']);
+                $variantExt = $allowedImageMimes[$variantMime] ?? 'jpg';
+                $variantFileName = 'product_' . $productId . '_variant_img_' . ($variantOutputIndex + 1) . '_' . time() . '_' . bin2hex(random_bytes(3)) . '.' . $variantExt;
+                $variantTargetAbsolute = $uploadDirAbsolute . DIRECTORY_SEPARATOR . $variantFileName;
+                $variantRelativePath = 'product_media/' . $variantFileName;
+
+                if (!copy($variantImageFile['tmp_name'], $variantTargetAbsolute)) {
+                    throw new Exception('Failed to save variant image');
+                }
+
+                $createdFiles[] = $variantTargetAbsolute;
+                $isPinned = $variantOutputIndex === $variantPinnedFinalIdx ? 1 : 0;
+                $insertMediaStmt->bind_param('isi', $productId, $variantRelativePath, $isPinned);
+                if (!$insertMediaStmt->execute()) {
+                    throw new Exception('Failed to save variant image record');
+                }
+                $variantOutputIndex++;
             }
         }
 

@@ -77,7 +77,10 @@ function fetchDraftMedia(mysqli $conn, int $draftId): array {
             if (!isset($variantImages[$key]) || !is_array($variantImages[$key])) {
                 $variantImages[$key] = [];
             }
-            $variantImages[$key][] = $path;
+            $variantImages[$key][] = [
+                'path' => $path,
+                'is_pinned' => (int)($row['is_pinned'] ?? 0) === 1
+            ];
         }
     }
 
@@ -117,6 +120,12 @@ try {
             $variant['images'] = [];
             if ($variantId > 0 && isset($draftMedia['variant_images'][$variantKey]) && is_array($draftMedia['variant_images'][$variantKey])) {
                 $variant['images'] = $draftMedia['variant_images'][$variantKey];
+                foreach ($variant['images'] as $idx => $image) {
+                    if ((int)($image['is_pinned'] ?? 0) === 1) {
+                        $variant['pinned_image_key'] = 'e:' . (int)$idx;
+                        break;
+                    }
+                }
             }
             return $variant;
         }, $variants);

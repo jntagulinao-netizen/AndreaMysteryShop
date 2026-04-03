@@ -762,8 +762,8 @@ try {
             if ($finalVariantImageCount < 1) {
                 throw new Exception('Each variant must have at least one image');
             }
-            if ($finalVariantImageCount > 8) {
-                throw new Exception('Each variant can keep up to 8 images only');
+            if ($finalVariantImageCount > 2) {
+                throw new Exception('Each variant can keep up to 2 images only');
             }
 
             foreach ($variantImagesToDelete as $imageRow) {

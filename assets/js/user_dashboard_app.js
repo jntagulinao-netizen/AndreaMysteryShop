@@ -401,7 +401,8 @@
         function refreshMediaTabsForProduct(product) {
             const photosTab = document.getElementById('photosTab');
             const videosTab = document.getElementById('videosTab');
-            currentProductVideoUrl = String(product?.video_url || '').trim();
+            const isVariantProduct = !!product?.parent_product_id;
+            currentProductVideoUrl = isVariantProduct ? '' : String(product?.video_url || '').trim();
 
             // Video is now handled as a gallery option in Photos.
             currentMediaTab = 'photos';

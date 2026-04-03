@@ -288,8 +288,8 @@
             <div class="footer-grid">
                 <div>
                     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:22px;height:22px;color:inherit"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
-                        <span style="font-weight:700;font-size:16px;color:#fff">LUXE</span>
+                        <img src="logo.jpg" alt="Andrea Mystery Shop" style="width:32px;height:32px;border-radius:8px;object-fit:cover;display:block;" />
+                        <span style="font-weight:700;font-size:16px;color:#fff">Andrea Mystery Shop</span>
                     </div>
                     <p style="color:#9ca3af;font-size:13px;margin:0">Your destination for premium lifestyle products.</p>
                 </div>
