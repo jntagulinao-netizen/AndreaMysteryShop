@@ -339,32 +339,6 @@ session_start();
         document.addEventListener('DOMContentLoaded', function() {
             const p = new URLSearchParams(window.location.search);
 
-            // Handle login success with redirect
-            if (p.get('login_success') === '1') {
-                showAuthSweetAlert({
-                    type: 'success',
-                    title: 'Login Successful!',
-                    text: 'Welcome back!',
-                    confirmText: 'Continue',
-                    onConfirm: () => {
-                        // Determine redirect based on user role from session
-                        <?php 
-                        if(isset($_SESSION['user_role'])) {
-                            $role = strtolower($_SESSION['user_role']);
-                            if ($role === 'admin') {
-                                echo "window.location.href = 'admin_dashboard.php';";
-                            } elseif ($role === 'user') {
-                                echo "window.location.href = 'user_dashboard.php';";
-                            } else {
-                                echo "window.location.href = 'homePage.php';";
-                            }
-                        }
-                        ?>
-                    }
-                });
-                return;
-            }
-
             // Handle password reset success
             if (p.get('password_reset') === '1') {
                 showAuthSweetAlert({

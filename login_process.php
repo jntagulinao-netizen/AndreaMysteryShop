@@ -64,11 +64,11 @@ if ($r === 'admin') {
     $redirect = 'homePage.php';
 }
 
-// Return JSON for AJAX or redirect with success flag
+// Return JSON for AJAX or redirect directly to target page
 if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
     header('Content-Type: application/json');
     echo json_encode(['success' => true, 'redirect' => $redirect]);
 } else {
-    header('Location: LogIn.php?login_success=1');
+    header('Location: ' . $redirect);
     exit;
     }

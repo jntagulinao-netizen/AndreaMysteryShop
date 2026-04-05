@@ -13,6 +13,9 @@ if ($role === 'admin') {
 if ($role !== 'user') {
   echo 'Access denied.'; exit;
 }
+
+$showLoginSplash = !empty($_SESSION['login_success']);
+unset($_SESSION['login_success']);
 ?>
 <!doctype html>
 <html>
@@ -21,13 +24,31 @@ if ($role !== 'user') {
   <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>User Dashboard - LUXE</title>
   <link rel="stylesheet" href="main.css?v=20260331-1">
-        <link rel="stylesheet" href="assets/css/reusable_catalog_modal_reviews.css?v=20260401-3">
+        <link rel="stylesheet" href="assets/css/reusable_catalog_modal_reviews.css?v=20260404-2">
     <link rel="stylesheet" href="assets/css/user_dashboard_search.css?v=20260331-1">
     <link rel="stylesheet" href="assets/css/user_dashboard_cart.css?v=20260331-2">
     <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260401-2">
-  <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260401-4">
+    <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260404-6">
 </head>
 <body>
+    <?php if ($showLoginSplash): ?>
+    <div id="loginSplash" class="login-splash" role="status" aria-live="polite" aria-label="Opening dashboard" tabindex="0">
+      <div class="login-splash-cinematic" aria-hidden="true">
+        <span class="cinema-bar bar-a"></span>
+        <span class="cinema-bar bar-b"></span>
+        <span class="cinema-bar bar-c"></span>
+      </div>
+      <button type="button" class="login-splash-skip" id="loginSplashSkip">Skip</button>
+      <div class="login-splash-inner" id="loginSplashInner">
+        <img src="logo-removebg-preview.png" alt="Andrea Mystery Shop" class="login-splash-logo">
+        <div class="login-splash-title">Andrea Mystery Shop</div>
+        <div class="login-splash-text">The mystery opens now</div>
+        <div class="login-splash-progress"><span></span></div>
+        <div class="login-splash-hint">Tap anywhere to continue</div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <?php include __DIR__ . '/partials/user_dashboard/topbar_search.php'; ?>
 
    <!-- Mobile bottom navigation (Lazada-style) -->
@@ -59,13 +80,52 @@ if ($role !== 'user') {
 
     <?php include __DIR__ . '/partials/user_dashboard/product_modal_section.php'; ?>
 
-    <script src="assets/js/user_dashboard_reusable_ui.js?v=20260402-1"></script>
+    <script src="assets/js/user_dashboard_reusable_ui.js?v=20260404-2"></script>
     <script src="assets/js/user_dashboard_cart.js?v=20260401-1"></script>
     <script src="assets/js/user_dashboard_helpers.js?v=20260401-2"></script>
     <script src="assets/js/user_dashboard_recipients.js?v=20260401-2"></script>
     <script src="assets/js/user_dashboard_search.js"></script>
-    <script src="assets/js/user_dashboard_app.js?v=20260403-1"></script>
+    <script src="assets/js/user_dashboard_app.js?v=20260404-3"></script>
     <script src="assets/js/user_dashboard_app_init.js"></script>
+    <?php if ($showLoginSplash): ?>
+    <script>
+      (function () {
+        var splash = document.getElementById('loginSplash');
+        var skipBtn = document.getElementById('loginSplashSkip');
+        var isClosed = false;
+        if (!splash) return;
+
+        function closeSplash() {
+          if (isClosed) return;
+          isClosed = true;
+          splash.classList.add('is-hiding');
+          window.setTimeout(function () {
+            if (splash && splash.parentNode) {
+              splash.parentNode.removeChild(splash);
+            }
+          }, 420);
+        }
+
+        if (skipBtn) {
+          skipBtn.addEventListener('click', closeSplash);
+        }
+
+        splash.addEventListener('click', function (event) {
+          if (skipBtn && event.target === skipBtn) return;
+          closeSplash();
+        });
+
+        splash.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === ' ' || event.key === 'Escape') {
+            event.preventDefault();
+            closeSplash();
+          }
+        });
+
+        window.setTimeout(closeSplash, 2400);
+      })();
+    </script>
+    <?php endif; ?>
 </body>
 </html>
 

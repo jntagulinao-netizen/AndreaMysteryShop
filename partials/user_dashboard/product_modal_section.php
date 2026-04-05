@@ -50,6 +50,7 @@
                 </div>
             </div>
             <div id="recTab" class="detail-section">
+                <h3 class="recommendation-heading">Recommendation</h3>
                 <div class="review-list" id="recommendationList"></div>
             </div>
         </div>

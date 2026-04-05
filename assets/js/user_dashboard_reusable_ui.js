@@ -151,9 +151,10 @@
         const variantCount = options.variantCount;
         const priceDisplay = options.priceDisplay;
         const productImage = options.productImage;
+        const clickHandlerName = String(options.clickHandlerName || 'openProductModal');
 
         return `
-            <div class="product-card ${isOutOfStock ? 'is-out-of-stock' : ''}" data-id="${product.id}" onclick="openProductModal(${product.id})">
+            <div class="product-card ${isOutOfStock ? 'is-out-of-stock' : ''}" data-id="${product.id}" onclick="${clickHandlerName}(${product.id})">
                 <div class="product-image product-image-relative">
                     <img src="${productImage}" alt="${product.name}" class="main-img"/>
                     ${variantCount > 0 ? `<span class="product-variant-badge">${variantCount} options</span>` : ''}

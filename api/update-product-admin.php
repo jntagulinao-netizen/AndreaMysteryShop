@@ -516,6 +516,7 @@ $uploadDirAbsolute = realpath(__DIR__ . '/..') . DIRECTORY_SEPARATOR . 'product_
 $createdFiles = [];
 $deletedFilesAfterCommit = [];
 $resolvedMainProductId = $productId;
+$videoOwnerProductId = $productId;
 
 try {
     if (count($variants) > 0) {
@@ -692,11 +693,24 @@ try {
             }
             $setNewMainStmt->close();
 
+            // Keep product-family video attached to whoever is the new main product.
+            $moveMainVideoStmt = $conn->prepare('UPDATE product_images SET product_id = ? WHERE product_id = ? AND LOWER(image_url) REGEXP "\\.(mp4|webm|mov)$"');
+            if (!$moveMainVideoStmt) {
+                throw new Exception('Failed to prepare main video transfer');
+            }
+            $moveMainVideoStmt->bind_param('ii', $targetMainProductId, $familyMainProductId);
+            if (!$moveMainVideoStmt->execute()) {
+                throw new Exception('Failed to transfer main product video');
+            }
+            $moveMainVideoStmt->close();
+
             $resolvedMainProductId = $targetMainProductId;
         } else {
             $resolvedMainProductId = $familyMainProductId;
         }
     }
+
+    $videoOwnerProductId = $resolvedMainProductId;
 
     $variantImageUpdateIds = array_values(array_unique(array_merge(
         array_map('intval', array_keys($variantImageUpdates)),
@@ -1004,7 +1018,7 @@ try {
     if (!$existingVideosStmt) {
         throw new Exception('Failed to load existing product video');
     }
-    $existingVideosStmt->bind_param('i', $productId);
+    $existingVideosStmt->bind_param('i', $videoOwnerProductId);
     if (!$existingVideosStmt->execute()) {
         throw new Exception('Failed to read existing product video');
     }
@@ -1019,7 +1033,7 @@ try {
 
     if ($removeExistingVideo || $newProductVideo || $existingVideoUrl !== '') {
         foreach ($existingVideoRows as $videoRow) {
-            if (!$removeExistingVideo && !$newProductVideo && $existingVideoUrl !== '' && (string)$videoRow['image_url'] !== $existingVideoUrl) {
+            if (!$removeExistingVideo && !$newProductVideo && $existingVideoUrl !== '' && (string)$videoRow['image_url'] === $existingVideoUrl) {
                 continue;
             }
             $deleteVideoStmt = $conn->prepare('DELETE FROM product_images WHERE image_id = ? AND product_id = ?');
@@ -1027,7 +1041,7 @@ try {
                 throw new Exception('Failed to prepare video delete query');
             }
             $videoImageId = (int)$videoRow['image_id'];
-            $deleteVideoStmt->bind_param('ii', $videoImageId, $productId);
+            $deleteVideoStmt->bind_param('ii', $videoImageId, $videoOwnerProductId);
             if (!$deleteVideoStmt->execute()) {
                 throw new Exception('Failed to delete existing product video');
             }
@@ -1045,7 +1059,7 @@ try {
             throw new Exception('Failed to prepare upload directory for video');
         }
 
-        $videoFileName = 'product_' . $productId . '_video_' . time() . '_' . bin2hex(random_bytes(3)) . '.' . $newProductVideo['ext'];
+        $videoFileName = 'product_' . $videoOwnerProductId . '_video_' . time() . '_' . bin2hex(random_bytes(3)) . '.' . $newProductVideo['ext'];
         $videoTargetAbsolute = $uploadDirAbsolute . DIRECTORY_SEPARATOR . $videoFileName;
         $videoRelativePath = 'product_media/' . $videoFileName;
 
@@ -1058,7 +1072,7 @@ try {
         if (!$insertVideoStmt) {
             throw new Exception('Failed to prepare video insert query');
         }
-        $insertVideoStmt->bind_param('is', $productId, $videoRelativePath);
+        $insertVideoStmt->bind_param('is', $videoOwnerProductId, $videoRelativePath);
         if (!$insertVideoStmt->execute()) {
             throw new Exception('Failed to save video record');
         }
@@ -1086,7 +1100,7 @@ try {
     $finalVideoUrl = '';
     $finalVideoStmt = $conn->prepare('SELECT image_url FROM product_images WHERE product_id = ? AND LOWER(image_url) REGEXP "\\.(mp4|webm|mov)$" ORDER BY image_id DESC LIMIT 1');
     if ($finalVideoStmt) {
-        $finalVideoStmt->bind_param('i', $productId);
+        $finalVideoStmt->bind_param('i', $videoOwnerProductId);
         $finalVideoStmt->execute();
         $finalVideoRes = $finalVideoStmt->get_result();
         $finalVideoRow = $finalVideoRes ? $finalVideoRes->fetch_assoc() : null;

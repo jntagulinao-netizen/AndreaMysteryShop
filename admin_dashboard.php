@@ -10,6 +10,9 @@ if ($role !== 'admin') {
     exit;
 }
 
+$showLoginSplash = !empty($_SESSION['login_success']);
+unset($_SESSION['login_success']);
+
 require_once 'dbConnection.php';
 
 $metrics = [
@@ -260,6 +263,131 @@ function format_peso_display($amount) {
       justify-content: center;
       padding: 0 4px;
     }
+
+    .login-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 60000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 22%, #f7fbff 0%, #edf4fb 52%, #e6eff8 100%);
+      transition: opacity 0.42s ease;
+    }
+    .login-splash.is-hiding {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .login-splash-cinematic {
+      position: absolute;
+      inset: -8%;
+      pointer-events: none;
+    }
+    .cinema-bar {
+      position: absolute;
+      top: -20%;
+      height: 140%;
+      width: 18vw;
+      background: linear-gradient(180deg, rgba(61, 196, 184, 0), rgba(61, 196, 184, 0.24), rgba(237, 90, 169, 0));
+      filter: blur(10px);
+      opacity: 0;
+      transform: skewX(-12deg) translateX(-20vw);
+      animation: cinemaSweep 2.2s ease-out forwards;
+    }
+    .cinema-bar.bar-a { left: 20%; animation-delay: 0.1s; }
+    .cinema-bar.bar-b { left: 42%; animation-delay: 0.28s; }
+    .cinema-bar.bar-c { left: 64%; animation-delay: 0.46s; }
+
+    .login-splash-skip {
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top));
+      right: 14px;
+      border: 1px solid rgba(32, 93, 131, 0.24);
+      background: rgba(255,255,255,0.7);
+      color: #1f3f57;
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+    }
+
+    .login-splash-inner {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      text-align: center;
+      padding: 28px 26px;
+      border-radius: 18px;
+      background: linear-gradient(160deg, rgba(255,255,255,0.92), rgba(250,253,255,0.84));
+      border: 1px solid rgba(51, 121, 162, 0.14);
+      box-shadow: 0 24px 55px rgba(41, 86, 116, 0.16);
+      animation: splashPopIn 0.74s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      max-width: min(88vw, 420px);
+    }
+    .login-splash-logo {
+      width: min(38vw, 180px);
+      height: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 12px 24px rgba(30, 115, 135, 0.22));
+      animation: splashLogoPulse 1.5s ease-in-out infinite alternate;
+    }
+    .login-splash-title {
+      color: #1e3b4f;
+      font-weight: 800;
+      font-size: clamp(18px, 2.5vw, 24px);
+      letter-spacing: 0.03em;
+    }
+    .login-splash-text {
+      color: #3f5f75;
+      font-weight: 600;
+      font-size: clamp(13px, 2vw, 16px);
+      letter-spacing: 0.02em;
+    }
+    .login-splash-progress {
+      width: min(68vw, 260px);
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(46, 113, 148, 0.15);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .login-splash-progress > span {
+      display: block;
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #2fb7ad, #da4ca8);
+      animation: splashLoad 2.25s linear forwards;
+    }
+    .login-splash-hint {
+      color: rgba(53, 89, 111, 0.9);
+      font-size: 12px;
+      letter-spacing: 0.02em;
+    }
+
+    @keyframes splashPopIn {
+      0% { opacity: 0; transform: translateY(12px) scale(0.92); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes splashLogoPulse {
+      0% { transform: scale(0.98); }
+      100% { transform: scale(1.03); }
+    }
+    @keyframes splashLoad {
+      0% { width: 0; }
+      100% { width: 100%; }
+    }
+    @keyframes cinemaSweep {
+      0% { opacity: 0; transform: skewX(-12deg) translateX(-24vw); }
+      18% { opacity: 1; }
+      100% { opacity: 0; transform: skewX(-12deg) translateX(32vw); }
+    }
     
 
     @media (max-width: 768px) {
@@ -277,9 +405,45 @@ function format_peso_display($amount) {
       .function-label { font-size: 11px; min-height: 28px; }
       .function-msg-badge { display: none; }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      .login-splash-inner,
+      .login-splash-logo,
+      .login-splash-progress > span,
+      .cinema-bar {
+        animation: none;
+      }
+      .login-splash {
+        transition: none;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .login-splash-inner { padding: 22px 18px; }
+      .login-splash-title { font-size: 18px; }
+      .login-splash-hint { font-size: 11px; }
+    }
   </style>
 </head>
 <body>
+  <?php if ($showLoginSplash): ?>
+  <div id="loginSplash" class="login-splash" role="status" aria-live="polite" aria-label="Opening admin dashboard" tabindex="0">
+    <div class="login-splash-cinematic" aria-hidden="true">
+      <span class="cinema-bar bar-a"></span>
+      <span class="cinema-bar bar-b"></span>
+      <span class="cinema-bar bar-c"></span>
+    </div>
+    <button type="button" class="login-splash-skip" id="loginSplashSkip">Skip</button>
+    <div class="login-splash-inner" id="loginSplashInner">
+      <img src="logo-removebg-preview.png" alt="Andrea Mystery Shop" class="login-splash-logo">
+      <div class="login-splash-title">Admin Control Center</div>
+      <div class="login-splash-text">Preparing your dashboard view</div>
+      <div class="login-splash-progress"><span></span></div>
+      <div class="login-splash-hint">Tap anywhere to continue</div>
+    </div>
+  </div>
+  <?php endif; ?>
+
   <div class="page-container">
     <div class="page-header">
       <div class="header-title">Admin Dashboard</div>
@@ -382,6 +546,44 @@ function format_peso_display($amount) {
   </nav>
 
   <script>
+    <?php if ($showLoginSplash): ?>
+    (function () {
+      var splash = document.getElementById('loginSplash');
+      var skipBtn = document.getElementById('loginSplashSkip');
+      var isClosed = false;
+      if (!splash) return;
+
+      function closeSplash() {
+        if (isClosed) return;
+        isClosed = true;
+        splash.classList.add('is-hiding');
+        window.setTimeout(function () {
+          if (splash && splash.parentNode) {
+            splash.parentNode.removeChild(splash);
+          }
+        }, 420);
+      }
+
+      if (skipBtn) {
+        skipBtn.addEventListener('click', closeSplash);
+      }
+
+      splash.addEventListener('click', function (event) {
+        if (skipBtn && event.target === skipBtn) return;
+        closeSplash();
+      });
+
+      splash.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ' || event.key === 'Escape') {
+          event.preventDefault();
+          closeSplash();
+        }
+      });
+
+      window.setTimeout(closeSplash, 2400);
+    })();
+    <?php endif; ?>
+
     function setAdminMessagesBadge(count) {
       const desktopTile = document.getElementById('desktopMessagesTile');
       if (desktopTile) {

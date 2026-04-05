@@ -419,6 +419,47 @@ if ($currentView === 'archived') {
       border-color: #e9b82f;
       color: #7a5b00;
     }
+    .edit-actions-dropdown {
+      position: relative;
+      display: none;
+    }
+    .edit-actions-dropdown-menu {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 8px);
+      min-width: 210px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+      display: none;
+      z-index: 30;
+      overflow: hidden;
+    }
+    .edit-actions-dropdown-menu.active {
+      display: block;
+    }
+    .edit-actions-dropdown-menu .edit-btn {
+      width: 100%;
+      border: none;
+      border-radius: 0;
+      text-align: left;
+      background: #fff;
+      color: #333;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 12px;
+    }
+    .edit-actions-dropdown-menu .edit-btn + .edit-btn {
+      border-top: 1px solid #f0f0f0;
+    }
+    .edit-actions-dropdown-menu .edit-btn:hover {
+      background: #f8f8f8;
+    }
+    .edit-actions-dropdown-menu .edit-btn.featured,
+    .edit-actions-dropdown-menu .edit-btn.archive {
+      margin-right: 0;
+    }
 
     .variants-section {
       border: 1px solid #eee;
@@ -802,8 +843,83 @@ if ($currentView === 'archived') {
       .sort-select { margin-left: 0; width: 100%; }
       .modal-main-grid { grid-template-columns: 1fr; }
       .modal-preview { position: static; }
+      .product-modal-header {
+        padding: 10px 12px;
+        font-size: 16px;
+      }
+      .product-modal-content {
+        padding: 10px;
+      }
+      .modal-workspace {
+        border-radius: 10px;
+        overflow: visible;
+      }
+      .modal-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        overflow: hidden;
+      }
+      .modal-tabs::-webkit-scrollbar {
+        display: none;
+      }
+      .modal-tab {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 11px 12px;
+        font-size: 12px;
+        text-align: center;
+      }
+      .modal-panel {
+        padding: 12px;
+      }
+      .edit-form-group input,
+      .edit-form-group textarea,
+      .edit-form-group select {
+        font-size: 16px;
+      }
+      .edit-actions {
+        flex-wrap: wrap;
+        overflow: visible;
+        position: relative;
+        align-items: center;
+        gap: 8px;
+      }
+      .edit-actions .edit-btn {
+        flex: 1 1 calc(50% - 4px);
+        white-space: nowrap;
+      }
+      .edit-actions .edit-btn.archive,
+      .edit-actions .edit-btn.featured {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        margin-right: 0;
+      }
+      .edit-actions .edit-btn.primary {
+        flex: 1 1 calc(50% - 4px);
+      }
+      .edit-actions .edit-btn:not(.featured):not(.archive):not(.primary) {
+        flex: 1 1 calc(50% - 4px);
+      }
+      .edit-actions-dropdown {
+        display: none;
+      }
+      .edit-actions-dropdown-toggle {
+        display: none;
+      }
+      .edit-actions-dropdown-menu {
+        display: none;
+      }
       .variants-section {
         padding: 10px;
+      }
+      .variants-section-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .add-variant-btn {
+        width: 100%;
       }
       .variant-edit-row {
         grid-template-columns: 1fr;
@@ -817,9 +933,15 @@ if ($currentView === 'archived') {
         grid-column: 1;
       }
       .variant-images-cell {
-        flex-direction: column;
-        align-items: flex-start;
+        width: 100%;
         gap: 8px;
+      }
+      .variant-row-actions {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+      }
+      .variant-row-actions button {
+        flex: 1 1 100%;
       }
       .variant-image-preview {
         width: 56px;
@@ -828,9 +950,26 @@ if ($currentView === 'archived') {
       .main-images-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+      #productVideoPreview {
+        max-height: 180px !important;
+      }
     }
 
     @media (max-width: 520px) {
+      .page-container { width: calc(100% - 16px); }
+      .product-modal-header {
+        padding: 9px 10px;
+      }
+      .modal-panel {
+        padding: 10px;
+      }
+      .modal-tab {
+        min-width: 0;
+      }
+      .edit-actions .edit-btn {
+        font-size: 12px;
+        padding: 9px 10px;
+      }
       .variant-edit-row { padding: 7px; }
       .variant-image-input-wrap .variant-image {
         width: 100%;
@@ -1025,12 +1164,6 @@ if ($currentView === 'archived') {
                 </div>
 
                 <div class="edit-form-group">
-                  <label for="editProductImage">Add Main Product Images</label>
-                  <input type="file" id="editProductImage" accept="image/*" multiple>
-                  <small style="color:#777;font-size:12px;">Add more images for this main product. Maximum total is 8 images.</small>
-                </div>
-
-                <div class="edit-form-group">
                   <label for="editProductVideo">Product Video (0/1)</label>
                   <input type="file" id="editProductVideo" accept="video/mp4,video/webm,video/quicktime">
                   <small style="color:#777;font-size:12px;">Optional. Upload MP4, WEBM, or MOV. Selecting a new file replaces the current video.</small>
@@ -1041,6 +1174,12 @@ if ($currentView === 'archived') {
                   <div style="margin-top:8px;">
                     <button type="button" id="videoToggleBtn" class="edit-btn" onclick="toggleProductVideoRemoval()" style="display:none;">Remove Existing Video</button>
                   </div>
+                </div>
+
+                <div class="edit-form-group">
+                  <label for="editProductImage">Add Main Product Images</label>
+                  <input type="file" id="editProductImage" accept="image/*" multiple>
+                  <small style="color:#777;font-size:12px;">Add more images for this main product. Maximum total is 8 images.</small>
                 </div>
 
                 <div class="main-images-section">
@@ -1061,6 +1200,13 @@ if ($currentView === 'archived') {
                 </div>
 
                 <div class="edit-actions">
+                  <div class="edit-actions-dropdown" id="editActionsDropdownWrap">
+                    <button type="button" class="edit-btn edit-actions-dropdown-toggle" id="editActionsDropdownToggle" onclick="toggleEditActionsDropdown(event)">More Actions ▾</button>
+                    <div class="edit-actions-dropdown-menu" id="editActionsDropdownMenu">
+                      <button type="button" id="featureToggleBtnMobile" class="edit-btn featured" onclick="toggleProductFeatured(); closeEditActionsDropdown();">Mark as Featured</button>
+                      <button type="button" id="archiveToggleBtnMobile" class="edit-btn archive" onclick="toggleProductArchive(); closeEditActionsDropdown();">Archive Product</button>
+                    </div>
+                  </div>
                   <button type="button" id="featureToggleBtn" class="edit-btn featured" onclick="toggleProductFeatured()">Mark as Featured</button>
                   <button type="button" id="archiveToggleBtn" class="edit-btn archive" onclick="toggleProductArchive()">Archive Product</button>
                   <button type="button" class="edit-btn" onclick="closeProductModal()">Cancel</button>
@@ -1272,6 +1418,35 @@ if ($currentView === 'archived') {
       const dropdown = document.getElementById('topbarMenuDropdown');
       if (dropdown) {
         dropdown.classList.toggle('active');
+      }
+    }
+
+    function closeTopbarMenu() {
+      const dropdown = document.getElementById('topbarMenuDropdown');
+      if (dropdown) {
+        dropdown.classList.remove('active');
+      }
+    }
+
+    function toggleEditActionsDropdown(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const menu = document.getElementById('editActionsDropdownMenu');
+      if (!menu) return;
+      const willOpen = !menu.classList.contains('active');
+      closeEditActionsDropdown();
+      if (!willOpen) {
+        return;
+      }
+      menu.classList.add('active');
+    }
+
+    function closeEditActionsDropdown() {
+      const menu = document.getElementById('editActionsDropdownMenu');
+      if (menu) {
+        menu.classList.remove('active');
       }
     }
 
@@ -2253,12 +2428,25 @@ if ($currentView === 'archived') {
         archiveToggleBtn.textContent = archived ? 'Restore Product' : 'Archive Product';
         archiveToggleBtn.classList.toggle('restore', archived);
       }
+      const archiveToggleBtnMobile = document.getElementById('archiveToggleBtnMobile');
+      if (archiveToggleBtnMobile) {
+        const archived = Number(product.archived || 0) === 1;
+        archiveToggleBtnMobile.textContent = archived ? 'Restore Product' : 'Archive Product';
+        archiveToggleBtnMobile.classList.toggle('restore', archived);
+      }
       const featureToggleBtn = document.getElementById('featureToggleBtn');
       if (featureToggleBtn) {
         const featured = Number(product.featured || 0) === 1;
         featureToggleBtn.textContent = featured ? 'Unmark Featured' : 'Mark as Featured';
         featureToggleBtn.classList.toggle('active', featured);
       }
+      const featureToggleBtnMobile = document.getElementById('featureToggleBtnMobile');
+      if (featureToggleBtnMobile) {
+        const featured = Number(product.featured || 0) === 1;
+        featureToggleBtnMobile.textContent = featured ? 'Unmark Featured' : 'Mark as Featured';
+        featureToggleBtnMobile.classList.toggle('active', featured);
+      }
+      closeEditActionsDropdown();
       fillCategoryDropdown(product.category);
       
       const variants = loadVariantsForProduct(product.id, product.name, product.category);
@@ -2644,6 +2832,12 @@ if ($currentView === 'archived') {
             featureToggleBtn.textContent = featured ? 'Unmark Featured' : 'Mark as Featured';
             featureToggleBtn.classList.toggle('active', featured);
           }
+          const featureToggleBtnMobile = document.getElementById('featureToggleBtnMobile');
+          if (featureToggleBtnMobile) {
+            const featured = Number(updatedProduct.featured || 0) === 1;
+            featureToggleBtnMobile.textContent = featured ? 'Unmark Featured' : 'Mark as Featured';
+            featureToggleBtnMobile.classList.toggle('active', featured);
+          }
         }
 
         await localAlert(
@@ -2661,6 +2855,7 @@ if ($currentView === 'archived') {
       if (modal) {
         modal.classList.remove('active');
       }
+      closeEditActionsDropdown();
       revokePendingVideoPreview();
       revokeVariantImageUrls();
       currentEditingVariants = [];
@@ -2791,6 +2986,11 @@ if ($currentView === 'archived') {
       const menu = document.querySelector('.topbar-menu');
       if (dropdown && menu && !menu.contains(event.target)) {
         dropdown.classList.remove('active');
+      }
+
+      const editActionsWrap = document.getElementById('editActionsDropdownWrap');
+      if (editActionsWrap && !editActionsWrap.contains(event.target)) {
+        closeEditActionsDropdown();
       }
 
       const moreButton = document.getElementById('moreCategoriesBtn');

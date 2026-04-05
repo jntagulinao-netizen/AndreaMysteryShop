@@ -1301,7 +1301,7 @@
         }
 
         function getRecommendationTokens(text) {
-            const stopWords = new Set(['and', 'the', 'for', 'with', 'from', 'this', 'that', 'your', 'you', 'are', 'was', 'were', 'have', 'has', 'into', 'about']);
+            const stopWords = new Set(['and', 'the', 'for', 'with', 'from', 'this', 'that', 'your', 'you', 'are', 'was', 'were', 'have', 'has', 'into', 'about', 'item', 'items', 'best', 'new']);
             return String(text || '')
                 .toLowerCase()
                 .replace(/[^a-z0-9\s]/g, ' ')
@@ -1309,46 +1309,101 @@
                 .filter(token => token.length >= 3 && !stopWords.has(token));
         }
 
+        function getSharedTokenCount(leftTokens, rightTokens) {
+            let count = 0;
+            leftTokens.forEach((token) => {
+                if (rightTokens.has(token)) count += 1;
+            });
+            return count;
+        }
+
         function renderRecommendations(product) {
             const list = document.getElementById('recommendationList');
             if (!list || !product) return;
 
+            list.classList.add('recommendation-grid');
+
+            const baseProductId = Number(product.id);
             const baseName = String(product.name || '').toLowerCase();
             const baseCategory = String(product.categoryName || product.category || '').toLowerCase();
-            const baseTokens = new Set(getRecommendationTokens(`${product.name || ''} ${product.desc || ''} ${product.categoryName || ''}`));
+            const baseParentId = Number(product.parent_product_id || product.id || 0);
+            const baseNameTokens = new Set(getRecommendationTokens(product.name || ''));
+            const baseRelatedTokens = new Set(getRecommendationTokens(`${product.name || ''} ${product.desc || ''} ${product.categoryName || product.category || ''}`));
 
             const recommended = products
-                .filter((candidate) => Number(candidate.id) !== Number(product.id))
+                .filter((candidate) => Number(candidate.id) !== baseProductId)
                 .map((candidate) => {
+                    const candidateId = Number(candidate.id);
                     const candidateName = String(candidate.name || '').toLowerCase();
                     const candidateCategory = String(candidate.categoryName || candidate.category || '').toLowerCase();
+                    const candidateParentId = Number(candidate.parent_product_id || candidate.id || 0);
                     const sameCategory = baseCategory && candidateCategory === baseCategory;
-                    const similarName = !!baseName && !!candidateName && (candidateName.includes(baseName) || baseName.includes(candidateName));
+                    const sameFamily = baseParentId > 0 && candidateParentId > 0 && baseParentId === candidateParentId;
 
-                    const candidateTokens = new Set(getRecommendationTokens(`${candidate.name || ''} ${candidate.desc || ''} ${candidate.categoryName || ''}`));
-                    let sharedTokenCount = 0;
-                    baseTokens.forEach((token) => {
-                        if (candidateTokens.has(token)) sharedTokenCount += 1;
-                    });
-                    const hasCommonTerms = sharedTokenCount > 0;
+                    const candidateNameTokens = new Set(getRecommendationTokens(candidate.name || ''));
+                    const sharedNameTokenCount = getSharedTokenCount(baseNameTokens, candidateNameTokens);
+                    const partialNameMatch = !!baseName && !!candidateName && (candidateName.includes(baseName) || baseName.includes(candidateName));
+                    const similarName = partialNameMatch || sharedNameTokenCount > 0;
 
-                    if (!(sameCategory || similarName || hasCommonTerms)) {
+                    const candidateRelatedTokens = new Set(getRecommendationTokens(`${candidate.name || ''} ${candidate.desc || ''} ${candidate.categoryName || candidate.category || ''}`));
+                    const sharedRelatedTokenCount = getSharedTokenCount(baseRelatedTokens, candidateRelatedTokens);
+                    const hasRelatedTerms = sharedRelatedTokenCount > 0;
+
+                    if (!(sameFamily || sameCategory || similarName || hasRelatedTerms)) {
                         return null;
                     }
 
-                    const score = (sameCategory ? 60 : 0) + (similarName ? 30 : 0) + Math.min(sharedTokenCount, 8) * 5 + (Number(candidate.orderCount || 0) * 0.01);
+                    const score =
+                        (sameFamily ? 85 : 0) +
+                        (sameCategory ? 50 : 0) +
+                        (partialNameMatch ? 30 : 0) +
+                        Math.min(sharedNameTokenCount, 4) * 14 +
+                        Math.min(sharedRelatedTokenCount, 8) * 6 +
+                        (Number(candidate.orderCount || 0) * 0.01);
+
                     return { ...candidate, _score: score };
                 })
                 .filter(Boolean)
-                .sort((a, b) => Number(b._score || 0) - Number(a._score || 0));
+                .sort((a, b) => Number(b._score || 0) - Number(a._score || 0))
+                .slice(0, 8);
 
             if (!recommended.length) {
-                list.innerHTML = '<p class="empty-reviews-text">No recommendations available.</p>';
-                return;
+                const fallback = products
+                    .filter((candidate) => Number(candidate.id) !== baseProductId)
+                    .filter((candidate) => String(candidate.categoryName || candidate.category || '').toLowerCase() === baseCategory)
+                    .sort((a, b) => Number(b.orderCount || 0) - Number(a.orderCount || 0))
+                    .slice(0, 6);
+
+                if (!fallback.length) {
+                    list.innerHTML = '<p class="empty-reviews-text">No recommendations available.</p>';
+                    return;
+                }
+
+                fallback.forEach((item) => {
+                    item._score = Number(item.orderCount || 0);
+                });
+
+                recommended.push(...fallback);
             }
 
             list.innerHTML = recommended.map((rp) => {
-                return DashboardReusableUI.renderRecommendationItem(rp, formatPeso);
+                const stock = Number(rp.groupStock ?? rp.stock ?? 0);
+                const reviewCount = Number(rp.reviewCount || 0);
+                const orderCount = Number(rp.groupOrderCount || rp.orderCount || 0);
+                const image = Array.isArray(rp.image) ? (rp.image[0] || '') : (rp.image || '');
+                return DashboardReusableUI.renderProductCard({
+                    ...rp,
+                    reviewCount,
+                    groupStock: stock,
+                    groupOrderCount: orderCount
+                }, {
+                    isOutOfStock: stock <= 0,
+                    avgRating: reviewCount > 0 ? Number(rp.rating || 0).toFixed(1) : '0.0',
+                    variantCount: Number(rp.variantCount || 0),
+                    priceDisplay: `₱${formatPeso(rp.price)}`,
+                    productImage: image,
+                    clickHandlerName: 'openProductModalFromRecommendation'
+                });
             }).join('');
         }
 

@@ -126,6 +126,41 @@ main { margin-top: 90px; margin: 90px auto 40px; width: 100%; max-width: none; p
 .recommendation-content { min-width: 0; }
 .recommendation-name { font-weight: 700; line-height: 1.3; word-break: break-word; }
 .recommendation-price { color: #e22a39; font-weight: 700; margin-top: 4px; }
+.recommendation-heading { font-size: 20px; font-weight: 700; color: #2f2f2f; margin: 0 0 12px; }
+.recommendation-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    max-height: 460px;
+}
+
+@media (max-width: 768px) {
+    .recommendation-heading { font-size: 18px; margin-bottom: 10px; }
+    .recommendation-grid .product-card {
+        min-height: 0;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    }
+    .recommendation-grid .product-image {
+        height: 120px;
+        flex: 0 0 120px;
+    }
+    .recommendation-grid .product-info {
+        padding: 12px;
+        gap: 6px;
+    }
+    .recommendation-grid .product-name {
+        font-size: 14px;
+        min-height: 36px;
+    }
+    .recommendation-grid .product-price {
+        font-size: 18px;
+    }
+    .recommendation-grid .product-rating,
+    .recommendation-grid .product-stock-meta,
+    .recommendation-grid .product-orders-meta {
+        font-size: 12px;
+    }
+}
 
 .category-buttons-inline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .hidden-inline { display: none; }
