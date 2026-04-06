@@ -439,6 +439,51 @@ foreach ($orders as $order) {
   }
 }
 
+$latestReviewByUserProduct = [];
+$reviewUserIds = [];
+$reviewProductIds = [];
+foreach ($orders as $order) {
+  if (strtolower((string)($order['status'] ?? '')) !== 'reviewed') {
+    continue;
+  }
+  $userId = intval($order['user_id'] ?? 0);
+  $firstProductId = (!empty($order['items']) && isset($order['items'][0]['product_id'])) ? intval($order['items'][0]['product_id']) : 0;
+  if ($userId <= 0 || $firstProductId <= 0) {
+    continue;
+  }
+  $reviewUserIds[$userId] = true;
+  $reviewProductIds[$firstProductId] = true;
+}
+
+if (!empty($reviewUserIds) && !empty($reviewProductIds)) {
+  $userIds = array_map('intval', array_keys($reviewUserIds));
+  $productIds = array_map('intval', array_keys($reviewProductIds));
+  $userPlaceholders = implode(',', array_fill(0, count($userIds), '?'));
+  $productPlaceholders = implode(',', array_fill(0, count($productIds), '?'));
+  $reviewSql = "SELECT review_id, user_id, product_id, created_at
+                FROM reviews
+                WHERE user_id IN ($userPlaceholders)
+                  AND product_id IN ($productPlaceholders)
+                ORDER BY created_at DESC, review_id DESC";
+  $reviewStmt = $conn->prepare($reviewSql);
+  if ($reviewStmt) {
+    $types = str_repeat('i', count($userIds) + count($productIds));
+    $params = array_merge($userIds, $productIds);
+    $reviewStmt->bind_param($types, ...$params);
+    $reviewStmt->execute();
+    $reviewRes = $reviewStmt->get_result();
+    if ($reviewRes) {
+      while ($row = $reviewRes->fetch_assoc()) {
+        $key = intval($row['user_id']) . ':' . intval($row['product_id']);
+        if (!isset($latestReviewByUserProduct[$key])) {
+          $latestReviewByUserProduct[$key] = intval($row['review_id'] ?? 0);
+        }
+      }
+    }
+    $reviewStmt->close();
+  }
+}
+
 $statusDisplay = [
   'pending' => 'To Pay',
   'processing' => 'To Ship',
@@ -672,6 +717,10 @@ $statusDisplay = [
       font-size: 12px;
       font-weight: 600;
       transition: all 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .action-btn.primary { background: #2d68d8; color: #fff; border-color: #2d68d8; }
     .action-btn.primary:hover { background: #1f56bf; }
@@ -813,6 +862,117 @@ $statusDisplay = [
     .order-actions button.action-danger:hover { background: #c20000; }
     .order-actions button.action-disabled { background: #d6d9e2; color: #7d8395; border-color: #d6d9e2; cursor: not-allowed; }
 
+    .user-review-card { padding: 14px 16px; background: #fff; margin: 8px 16px 0; border-radius: 8px; }
+    .user-review-title { font-size: 14px; font-weight: 700; color: #1f2937; margin-bottom: 8px; }
+    .user-review-list { display: grid; gap: 10px; }
+    .user-review-item {
+      border: 1px solid #eceff2;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+    }
+    .user-review-meta { font-size: 12px; color: #6b7280; margin-bottom: 6px; }
+    .user-review-rating { font-size: 13px; color: #b45309; font-weight: 700; margin-bottom: 6px; }
+    .user-review-text {
+      font-size: 13px;
+      color: #4b5563;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      margin-bottom: 8px;
+      background: #f9fafb;
+      border: 1px solid #eceff2;
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .user-review-media { display: flex; gap: 8px; flex-wrap: wrap; }
+    .user-review-media-item {
+      width: 88px;
+      height: 88px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #f3f4f6;
+      overflow: hidden;
+      cursor: zoom-in;
+      position: relative;
+      padding: 0;
+    }
+    .user-review-media-item img,
+    .user-review-media-item video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border: none;
+      background: #f3f4f6;
+    }
+    .user-review-media-view-badge {
+      position: absolute;
+      background: rgba(15, 23, 42, 0.78);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      border-radius: 999px;
+      padding: 4px 6px;
+      letter-spacing: 0.2px;
+    }
+    .user-review-media-view-badge {
+      right: 6px;
+      bottom: 6px;
+    }
+    .review-manage-actions {
+      margin-top: 8px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .review-manage-btn {
+      width: auto;
+      padding: 8px 10px;
+    }
+
+    .media-viewer-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.86);
+      z-index: 2500;
+      padding: 16px;
+    }
+    .media-viewer-overlay.active { display: flex; }
+    .media-viewer-content {
+      max-width: 96vw;
+      max-height: 92vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .media-viewer-content img,
+    .media-viewer-content video {
+      max-width: 96vw;
+      max-height: 92vh;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      border-radius: 10px;
+      background: #000;
+    }
+    .media-viewer-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.45);
+      background: rgba(0,0,0,0.4);
+      color: #fff;
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
     @media (max-width: 768px) {
       .page-container { width: calc(100% - 24px); }
       .timeline { grid-template-columns: repeat(2, 1fr); }
@@ -892,6 +1052,9 @@ $statusDisplay = [
           $canArchive = in_array(strtolower((string)$status), ['reviewed', 'cancelled', 'canceled'], true) && !$isArchived && !$isBinned;
           $canMoveToBin = in_array(strtolower((string)$status), ['reviewed', 'cancelled', 'canceled'], true) && $isArchived && !$isBinned;
           $canUnarchive = in_array(strtolower((string)$status), ['reviewed', 'cancelled', 'canceled'], true) && $isBinned;
+          $firstProductId = (!empty($order['items']) && isset($order['items'][0]['product_id'])) ? intval($order['items'][0]['product_id']) : 0;
+          $targetReviewKey = intval($order['user_id'] ?? 0) . ':' . $firstProductId;
+          $targetReviewId = intval($latestReviewByUserProduct[$targetReviewKey] ?? 0);
           $timelineIndex = array_search($status, $linearFlow, true);
           $statusText = $isBinned ? 'Binned' : ($isArchived ? 'Archived' : ($statusDisplay[$status] ?? ucfirst($status)));
           $recipient = isset($recipientData[$order['recipient_id']]) ? $recipientData[$order['recipient_id']] : null;
@@ -1010,6 +1173,9 @@ $statusDisplay = [
               <div style="font-size: 16px; font-weight: 600; color: #333;">₱<?php echo number_format((float)$order['total_amount'], 2); ?></div>
             </div>
             <div class="action-buttons">
+              <?php if (strtolower((string)$status) === 'reviewed' && $firstProductId > 0): ?>
+                <a class="action-btn primary" href="admin_manage_reviews.php?focus_product_id=<?php echo intval($firstProductId); ?><?php echo $targetReviewId > 0 ? '&focus_review_id=' . intval($targetReviewId) : ''; ?>">Open Reviews</a>
+              <?php endif; ?>
               <?php if ($nextStatus): ?>
                 <form method="POST" class="order-action-form" style="display:inline;" data-confirm-type="warning" data-confirm-title="Change Order Status" data-confirm-message="Move this order to <?php echo htmlspecialchars($statusLabels[$nextStatus]); ?>?">
                   <input type="hidden" name="action" value="advance_status">
@@ -1070,7 +1236,7 @@ $statusDisplay = [
       </div>
 
       <div class="delivery-info">
-        <div class="delivery-info-title">📍 Delivering To <span id="recipientName">Recipient</span></div>
+        <div class="delivery-info-title">📍 <span id="recipientLabel">Delivering To</span> <span id="recipientName">Recipient</span></div>
         <div id="recipientPhone" class="delivery-phone"></div>
         <div id="recipientAddress" class="delivery-address"></div>
       </div>
@@ -1114,6 +1280,11 @@ $statusDisplay = [
           <span class="total-final-label">Total</span>
           <span class="total-final-value" id="totalAmount">₱0.00</span>
         </div>
+      </div>
+
+      <div class="user-review-card" id="userReviewCard" style="display:none;">
+        <div class="user-review-title">Customer Review(s)</div>
+        <div class="user-review-list" id="userReviewList"></div>
       </div>
 
       <div class="order-number">
@@ -1188,6 +1359,11 @@ $statusDisplay = [
         <button id="localSwalConfirm" type="button" class="swal-btn primary">OK</button>
       </div>
     </div>
+  </div>
+
+  <div id="mediaViewerOverlay" class="media-viewer-overlay" role="dialog" aria-modal="true" aria-label="Media Viewer">
+    <button type="button" class="media-viewer-close" onclick="closeMediaViewer()">×</button>
+    <div id="mediaViewerContent" class="media-viewer-content"></div>
   </div>
 
 
@@ -1541,8 +1717,221 @@ $statusDisplay = [
       });
     }
 
+    function openMediaViewer(mediaUrl, mediaType) {
+      const overlay = document.getElementById('mediaViewerOverlay');
+      const content = document.getElementById('mediaViewerContent');
+      if (!overlay || !content || !mediaUrl) return;
+
+      content.innerHTML = '';
+      const isVideo = String(mediaType || '').includes('video/');
+
+      if (isVideo) {
+        const video = document.createElement('video');
+        video.src = mediaUrl;
+        video.controls = true;
+        video.autoplay = true;
+        video.playsInline = true;
+        content.appendChild(video);
+      } else {
+        const img = document.createElement('img');
+        img.src = mediaUrl;
+        img.alt = 'Review media full view';
+        content.appendChild(img);
+      }
+
+      overlay.classList.add('active');
+    }
+
+    function closeMediaViewer() {
+      const overlay = document.getElementById('mediaViewerOverlay');
+      const content = document.getElementById('mediaViewerContent');
+      if (!overlay || !content) return;
+      content.innerHTML = '';
+      overlay.classList.remove('active');
+    }
+
+    function generateVideoThumbFromUrlAO(url) {
+      return new Promise((resolve) => {
+        const source = String(url || '').trim();
+        if (!source) {
+          resolve('');
+          return;
+        }
+
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
+        video.src = source;
+
+        const finish = (thumb) => {
+          video.removeAttribute('src');
+          video.load();
+          resolve(thumb || '');
+        };
+
+        video.addEventListener('loadedmetadata', () => {
+          const duration = Number(video.duration || 0);
+          const captureAt = duration > 0.5 ? Math.min(Math.max(duration * 0.1, 0.1), duration - 0.1) : 0;
+
+          const captureFrame = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = video.videoWidth || 320;
+              canvas.height = video.videoHeight || 180;
+              const context = canvas.getContext('2d');
+              if (!context) {
+                finish('');
+                return;
+              }
+              context.drawImage(video, 0, 0, canvas.width, canvas.height);
+              finish(canvas.toDataURL('image/jpeg', 0.9));
+            } catch (error) {
+              finish('');
+            }
+          };
+
+          if (captureAt > 0) {
+            video.addEventListener('seeked', captureFrame, { once: true });
+            video.currentTime = captureAt;
+          } else {
+            captureFrame();
+          }
+        }, { once: true });
+
+        video.addEventListener('error', () => finish(''), { once: true });
+      });
+    }
+
+    function maskReviewerName(name) {
+      const raw = String(name || '').trim();
+      if (!raw) return 'U***r';
+      if (raw.length === 1) return `${raw}***`;
+      if (raw.length === 2) return `${raw.charAt(0)}***${raw.charAt(1)}`;
+      return `${raw.slice(0, 2)}***${raw.slice(-1)}`;
+    }
+
+    function clearReviewedOrderReviews() {
+      const card = document.getElementById('userReviewCard');
+      const list = document.getElementById('userReviewList');
+      if (card) card.style.display = 'none';
+      if (list) list.innerHTML = '';
+    }
+
+    function goToManageSpecificReview(reviewId, productId) {
+      const params = new URLSearchParams();
+      if (productId) {
+        params.set('focus_product_id', String(productId));
+      }
+      if (reviewId) {
+        params.set('focus_review_id', String(reviewId));
+      }
+      window.location.href = `admin_manage_reviews.php?${params.toString()}`;
+    }
+
+    async function loadReviewedOrderReviews(status, productId) {
+      clearReviewedOrderReviews();
+      if (status !== 'reviewed' || !productId) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`api/get-reviews.php?product_id=${encodeURIComponent(productId)}`);
+        const data = await response.json();
+        if (!data || !data.success || !Array.isArray(data.reviews) || data.reviews.length === 0) {
+          return;
+        }
+
+        const card = document.getElementById('userReviewCard');
+        const list = document.getElementById('userReviewList');
+        if (!card || !list) {
+          return;
+        }
+
+        data.reviews.forEach((review) => {
+          const item = document.createElement('div');
+          item.className = 'user-review-item';
+
+          const meta = document.createElement('div');
+          meta.className = 'user-review-meta';
+          meta.textContent = `By: ${review.is_anonymous ? maskReviewerName(review.user_name) : (review.user_name || 'User')} | ${review.created_at || ''} | Review #${Number(review.review_id) || 0}`;
+          item.appendChild(meta);
+
+          const rating = document.createElement('div');
+          rating.className = 'user-review-rating';
+          const stars = Math.max(0, Math.min(5, parseInt(review.rating, 10) || 0));
+          rating.textContent = `Rating: ${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`;
+          item.appendChild(rating);
+
+          const text = document.createElement('div');
+          text.className = 'user-review-text';
+          text.textContent = review.review_text || 'No review text provided.';
+          item.appendChild(text);
+
+          const files = Array.isArray(review.media_files) ? review.media_files : [];
+          if (files.length > 0) {
+            const mediaWrap = document.createElement('div');
+            mediaWrap.className = 'user-review-media';
+
+            files.forEach((file) => {
+              if (!file || !file.url) return;
+              const mediaUrl = String(file.url);
+              const mediaType = String(file.media_type || '');
+
+              const tile = document.createElement('button');
+              tile.type = 'button';
+              tile.className = 'user-review-media-item';
+              tile.addEventListener('click', () => openMediaViewer(mediaUrl, mediaType));
+
+              const viewBadge = document.createElement('div');
+              viewBadge.className = 'user-review-media-view-badge';
+              viewBadge.textContent = 'VIEW';
+
+              if (mediaType.includes('video/')) {
+                const thumb = document.createElement('img');
+                thumb.alt = 'Review video thumbnail';
+                tile.appendChild(thumb);
+                tile.appendChild(viewBadge);
+
+                generateVideoThumbFromUrlAO(mediaUrl).then((thumbUrl) => {
+                  thumb.src = thumbUrl || 'logo.jpg';
+                });
+              } else {
+                const img = document.createElement('img');
+                img.src = mediaUrl;
+                img.alt = 'Review media';
+                tile.appendChild(img);
+                tile.appendChild(viewBadge);
+              }
+
+              mediaWrap.appendChild(tile);
+            });
+
+            item.appendChild(mediaWrap);
+          }
+
+          const manageBtn = document.createElement('button');
+          manageBtn.type = 'button';
+          manageBtn.className = 'action-btn primary review-manage-btn';
+          manageBtn.textContent = 'Manage This Review';
+          manageBtn.addEventListener('click', () => goToManageSpecificReview(Number(review.review_id) || 0, Number(review.product_id || productId) || 0));
+          const manageActions = document.createElement('div');
+          manageActions.className = 'review-manage-actions';
+          manageActions.appendChild(manageBtn);
+          item.appendChild(manageActions);
+
+          list.appendChild(item);
+        });
+
+        card.style.display = 'block';
+      } catch (error) {
+        clearReviewedOrderReviews();
+      }
+    }
+
     function openOrderDetail(element) {
       const orderId = element.dataset.orderId || '';
+      const productId = Number(element.dataset.productId || 0);
       const status = element.dataset.orderStatus || 'cancelled';
       const isArchived = element.dataset.isArchived === '1';
       const isBinned = element.dataset.isBinned === '1';
@@ -1571,9 +1960,23 @@ $statusDisplay = [
       document.getElementById('statusTitle').textContent = config.titleText;
       document.getElementById('statusMessage').textContent = config.message;
 
+      const recipientLabelEl = document.getElementById('recipientLabel');
+      if (recipientLabelEl) {
+        if (status === 'reviewed') {
+          recipientLabelEl.textContent = 'Reviewed By';
+        } else if (status === 'cancelled') {
+          recipientLabelEl.textContent = 'Cancelled By';
+        } else if (status === 'delivered' || status === 'received') {
+          recipientLabelEl.textContent = 'Received By';
+        } else {
+          recipientLabelEl.textContent = 'Delivering To';
+        }
+      }
+
       document.getElementById('recipientName').textContent = element.dataset.recipientName || 'Recipient';
       document.getElementById('recipientPhone').textContent = element.dataset.recipientPhone || '(+63) 000000000';
       document.getElementById('recipientAddress').textContent = element.dataset.recipientAddress || 'Address not available';
+      loadReviewedOrderReviews(status, productId);
 
       const orderDateValue = element.dataset.orderDate || '';
       const baseDate = new Date(orderDateValue.replace(' ', 'T'));
@@ -1697,6 +2100,17 @@ $statusDisplay = [
       const filterDropdown = document.getElementById('filterDropdown');
       if (filterDropdown && filterBtn && !filterBtn.contains(event.target) && !filterDropdown.contains(event.target)) {
         closeFilterDropdown();
+      }
+
+      const mediaOverlay = document.getElementById('mediaViewerOverlay');
+      if (mediaOverlay && event.target === mediaOverlay) {
+        closeMediaViewer();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeMediaViewer();
       }
     });
 

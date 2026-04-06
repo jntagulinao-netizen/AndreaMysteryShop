@@ -927,6 +927,7 @@
                         return {
                             review_id: r.review_id,
                             user: r.user_name || 'Anonymous User',
+                            is_anonymous: !!r.is_anonymous,
                             rating: parseInt(r.rating) || 0,
                             date: r.created_at || '2 days ago',
                             text: r.review_text || '[No text provided]',
@@ -1195,9 +1196,110 @@
         }
 
         let reviewMediaMap = {};
+        const reviewVideoThumbCache = new Map();
 
         function renderReviewMediaNode(media, variantClass = '') {
             return DashboardReusableUI.renderReviewMediaNode(media, variantClass);
+        }
+
+        function generateReviewVideoThumb(url) {
+            const mediaUrl = String(url || '').trim();
+            if (!mediaUrl) {
+                return Promise.resolve('');
+            }
+
+            if (reviewVideoThumbCache.has(mediaUrl)) {
+                return Promise.resolve(reviewVideoThumbCache.get(mediaUrl));
+            }
+
+            return new Promise((resolve) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.muted = true;
+                video.playsInline = true;
+                video.src = mediaUrl;
+
+                const finish = (thumb) => {
+                    reviewVideoThumbCache.set(mediaUrl, thumb || '');
+                    video.removeAttribute('src');
+                    video.load();
+                    resolve(thumb || '');
+                };
+
+                video.addEventListener('loadedmetadata', () => {
+                    const duration = Number(video.duration || 0);
+                    const captureAt = duration > 0.5 ? Math.min(Math.max(duration * 0.1, 0.1), duration - 0.1) : 0;
+
+                    const captureFrame = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = video.videoWidth || 320;
+                            canvas.height = video.videoHeight || 180;
+                            const context = canvas.getContext('2d');
+                            if (!context) {
+                                finish('');
+                                return;
+                            }
+                            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            finish(canvas.toDataURL('image/jpeg', 0.9));
+                        } catch (error) {
+                            console.error('Error building review video thumbnail:', error);
+                            finish('');
+                        }
+                    };
+
+                    if (captureAt > 0) {
+                        video.addEventListener('seeked', captureFrame, { once: true });
+                        video.currentTime = captureAt;
+                    } else {
+                        captureFrame();
+                    }
+                }, { once: true });
+
+                video.addEventListener('error', () => {
+                    finish('');
+                }, { once: true });
+            });
+        }
+
+        function applyReviewVideoPoster(targetContainer, media) {
+            if (!targetContainer || !media || !String(media.media_type || '').includes('video/')) {
+                return;
+            }
+
+            const videoEl = targetContainer.querySelector('video');
+            if (!videoEl) {
+                return;
+            }
+
+            generateReviewVideoThumb(media.url).then((thumb) => {
+                if (!thumb) {
+                    return;
+                }
+                videoEl.poster = thumb;
+            });
+        }
+
+        function hydrateReviewVideoThumbs(container) {
+            const scope = container || document;
+            const videoThumbs = scope.querySelectorAll('.review-media-video-thumb[data-review-video-url]');
+            videoThumbs.forEach((thumbBtn) => {
+                const mediaUrl = thumbBtn.getAttribute('data-review-video-url') || '';
+                if (!mediaUrl) {
+                    return;
+                }
+
+                generateReviewVideoThumb(mediaUrl).then((thumb) => {
+                    if (!thumb) {
+                        return;
+                    }
+                    thumbBtn.style.backgroundImage = `url("${thumb}")`;
+                    thumbBtn.style.backgroundSize = 'cover';
+                    thumbBtn.style.backgroundPosition = 'center';
+                    thumbBtn.style.backgroundRepeat = 'no-repeat';
+                    thumbBtn.style.color = 'transparent';
+                });
+            });
         }
 
         function switchReviewMedia(reviewId, mediaIndex) {
@@ -1211,6 +1313,7 @@
                     media,
                     'review-media-main'
                 );
+                applyReviewVideoPoster(main, media);
             }
 
             const thumbs = document.querySelectorAll(`.review-media-thumb[data-review-id="${reviewId}"]`);
@@ -1247,7 +1350,7 @@
                     if (mediaList.length > 1) {
                         const thumbsHtml = mediaList.map((media, idx) => {
                             if ((media.media_type || '').includes('video/')) {
-                                return `<button type="button" class="review-media-thumb review-media-video-thumb ${idx === 0 ? 'active' : ''}" data-review-id="${r.review_id}" onclick="switchReviewMedia(${r.review_id}, ${idx})">VIDEO</button>`;
+                                return `<video src="${media.url}" class="review-media-thumb review-media-video-thumb ${idx === 0 ? 'active' : ''}" data-review-id="${r.review_id}" onclick="switchReviewMedia(${r.review_id}, ${idx})" muted playsinline preload="metadata"></video>`;
                             }
                             return `<img src="${media.url}" class="review-media-thumb ${idx === 0 ? 'active' : ''}" data-review-id="${r.review_id}" onclick="switchReviewMedia(${r.review_id}, ${idx})" alt="review-thumb-${idx}">`;
                         }).join('');
@@ -1289,6 +1392,17 @@
                 
                 return `<div class="review-item"><div class="review-avatar">${r.user[0].toUpperCase()}</div><div class="review-content"><div class="review-header"><span class="reviewer-name">${r.user}</span><span class="review-stars">★${'★'.repeat(r.rating-1)}${'☆'.repeat(5-r.rating)}</span><span class="review-date">${r.date}</span></div><p class="review-text">${r.text}</p>${mediaHtml}${adminReplyHtml}</div></div>`;
             }).join('') || '<p class="empty-reviews-text">No reviews yet. Be the first!</p>';
+
+            hydrateReviewVideoThumbs(container);
+            Object.keys(reviewMediaMap).forEach((reviewId) => {
+                const mediaList = reviewMediaMap[reviewId] || [];
+                const first = mediaList[0];
+                if (!first) {
+                    return;
+                }
+                const main = document.getElementById(`reviewMediaMain-${reviewId}`);
+                applyReviewVideoPoster(main, first);
+            });
         }
 
         function toggleAdminReply(replyId, btn) {

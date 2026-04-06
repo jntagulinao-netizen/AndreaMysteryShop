@@ -1,7 +1,37 @@
 <?php
 require_once '../dbConnection.php';
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 header('Content-Type: application/json');
+
+function mask_anonymous_name_display($name) {
+    $raw = trim((string)$name);
+    if ($raw === '') {
+        return 'an***s';
+    }
+
+    $letters = preg_replace('/[^a-z0-9]/i', '', $raw);
+    $letters = strtolower((string)$letters);
+    if ($letters === '') {
+        $letters = 'user';
+    }
+
+    $len = strlen($letters);
+    if ($len <= 1) {
+        return $letters . '***';
+    }
+    if ($len === 2) {
+        return substr($letters, 0, 1) . '***';
+    }
+    if ($len === 3) {
+        return substr($letters, 0, 1) . '***' . substr($letters, -1);
+    }
+
+    return substr($letters, 0, 2) . '***' . substr($letters, -1);
+}
 
 $productId = intval($_GET['product_id'] ?? 0);
 
@@ -12,6 +42,8 @@ if ($productId <= 0) {
 }
 
 try {
+    $currentUserId = intval($_SESSION['user_id'] ?? 0);
+
     $anonymousColumnExists = false;
     $anonymousColumnCheck = $conn->query("SHOW COLUMNS FROM reviews LIKE 'is_anonymous'");
     if ($anonymousColumnCheck && $anonymousColumnCheck->num_rows > 0) {
@@ -42,7 +74,7 @@ try {
         }
     }
 
-    $query = 'SELECT r.review_id, r.rating, r.review_text, r.review_image, r.review_image_type, r.created_at, u.full_name';
+    $query = 'SELECT r.review_id, r.user_id, r.rating, r.review_text, r.review_image, r.review_image_type, r.created_at, u.full_name';
     if ($anonymousColumnExists) {
         $query .= ', r.is_anonymous';
     }
@@ -116,6 +148,7 @@ try {
     foreach ($rows as $row) {
         $reviewId = intval($row['review_id']);
         $isAnonymous = isset($row['is_anonymous']) ? intval($row['is_anonymous']) === 1 : false;
+        $rawName = $row['full_name'] ? trim((string)$row['full_name']) : 'Anonymous User';
         $mediaFiles = $mediaByReview[$reviewId] ?? [];
 
         if (empty($mediaFiles) && !empty($row['review_image']) && !empty($row['review_image_type'])) {
@@ -130,7 +163,9 @@ try {
         $hasMedia = !empty($mediaFiles);
         $reviews[] = [
             'review_id' => $reviewId,
-            'user_name' => $isAnonymous ? 'Anonymous User' : ($row['full_name'] ? trim($row['full_name']) : 'Anonymous User'),
+            'user_id' => intval($row['user_id'] ?? 0),
+            'is_mine' => $currentUserId > 0 && intval($row['user_id'] ?? 0) === $currentUserId,
+            'user_name' => $isAnonymous ? mask_anonymous_name_display($rawName) : $rawName,
             'is_anonymous' => $isAnonymous,
             'rating' => intval($row['rating']),
             'review_text' => trim($row['review_text']),

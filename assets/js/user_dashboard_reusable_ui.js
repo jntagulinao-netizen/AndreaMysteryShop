@@ -1,12 +1,80 @@
 (function (window) {
     let reviewMediaDelegationBound = false;
+    let reviewMediaBadgeStylesBound = false;
+
+    function ensureReviewMediaBadgeStyles() {
+        if (reviewMediaBadgeStylesBound || document.getElementById('reviewMediaBadgeStyles')) {
+            reviewMediaBadgeStylesBound = true;
+            return;
+        }
+
+        const style = document.createElement('style');
+        style.id = 'reviewMediaBadgeStyles';
+        style.textContent = `
+            .review-media-clickable {
+                position: relative;
+                display: inline-block;
+                cursor: zoom-in;
+                line-height: 0;
+            }
+            .review-media-clickable.review-media-main,
+            .review-media-clickable.review-media-single {
+                display: block;
+                max-width: 100%;
+            }
+            .review-media-view-badge {
+                position: absolute;
+                right: 8px;
+                bottom: 8px;
+                background: rgba(15, 23, 42, 0.78);
+                color: #fff;
+                font-size: 10px;
+                font-weight: 700;
+                line-height: 1;
+                border-radius: 999px;
+                padding: 4px 7px;
+                letter-spacing: 0.2px;
+                pointer-events: none;
+            }
+            .review-media-clickable:focus-visible {
+                outline: 2px solid #2563eb;
+                outline-offset: 2px;
+                border-radius: 8px;
+            }
+        `;
+        document.head.appendChild(style);
+        reviewMediaBadgeStylesBound = true;
+    }
 
     function bindReviewMediaDelegatedClicks() {
         if (reviewMediaDelegationBound) {
             return;
         }
 
+        ensureReviewMediaBadgeStyles();
+
         document.addEventListener('click', (event) => {
+            const target = event.target.closest('.js-review-media-open');
+            if (!target) {
+                return;
+            }
+
+            const mediaUrl = target.getAttribute('data-review-media-url') || '';
+            const mediaType = target.getAttribute('data-review-media-type') || '';
+            if (!mediaUrl) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            openReviewMediaLightbox(mediaUrl, mediaType);
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') {
+                return;
+            }
+
             const target = event.target.closest('.js-review-media-open');
             if (!target) {
                 return;
@@ -194,9 +262,9 @@
         const safeUrl = String(media.url).replace(/"/g, '&quot;');
         const safeType = String(media.media_type || '').replace(/"/g, '&quot;');
         if ((media.media_type || '').includes('video/')) {
-            return `<video src="${media.url}" class="review-image ${safeClass} js-review-media-open" data-review-media-url="${safeUrl}" data-review-media-type="${safeType}" controls style="cursor: zoom-in;"></video>`;
+            return `<div class="review-media-clickable ${safeClass} js-review-media-open" data-review-media-url="${safeUrl}" data-review-media-type="${safeType}" role="button" tabindex="0" aria-label="Open review media"><video src="${media.url}" class="review-image ${safeClass}" preload="metadata" muted playsinline></video><span class="review-media-view-badge">VIEW</span></div>`;
         }
-        return `<img src="${media.url}" alt="Review image" class="review-image ${safeClass} js-review-media-open" data-review-media-url="${safeUrl}" data-review-media-type="${safeType}" style="cursor: zoom-in;">`;
+        return `<div class="review-media-clickable ${safeClass} js-review-media-open" data-review-media-url="${safeUrl}" data-review-media-type="${safeType}" role="button" tabindex="0" aria-label="Open review media"><img src="${media.url}" alt="Review image" class="review-image ${safeClass}"><span class="review-media-view-badge">VIEW</span></div>`;
     }
 
     function renderRecommendationItem(product, formatPeso) {

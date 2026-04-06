@@ -739,28 +739,88 @@ if ($currentView === 'archived') {
     }
     .reviews-header-box strong { color: #333; font-size: 14px; }
     .reviews-header-box span { color: #e22a39; font-weight: 700; font-size: 13px; }
-    .review-list { display: grid; gap: 10px; }
-    .review-item {
-      border: 1px solid #eee;
+    .product-review-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .product-review-item {
+      border: 1px solid #eceff2;
       border-radius: 10px;
-      padding: 10px 12px;
+      padding: 12px;
       background: #fff;
     }
-    .review-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-    .review-user { font-size: 13px; color: #333; font-weight: 700; }
-    .review-date { font-size: 12px; color: #888; }
-    .review-stars { color: #ffa500; font-size: 13px; margin-bottom: 6px; }
-    .review-text { color: #444; font-size: 13px; line-height: 1.45; }
-    .review-media { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-    .review-media img,
-    .review-media video { width: 88px; height: 88px; object-fit: cover; border-radius: 8px; border: 1px solid #eee; background: #f7f7f7; }
-    .review-media-group { margin-top: 12px; }
-    .review-media-main { max-width: 100%; max-height: 320px; border-radius: 8px; display: block; margin-top: 0; }
-    .review-media-single { max-width: 100%; max-height: 300px; border-radius: 8px; margin-top: 12px; display: block; }
-    .review-media-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-    .review-media-thumb { width: 56px; height: 56px; object-fit: cover; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; }
-    .review-media-thumb.active { border-color: #e22a39; }
-    .review-media-video-thumb { background: #f5f5f5; color: #555; font-size: 10px; font-weight: 700; }
+    .admin-review-meta {
+      font-size: 13px;
+      color: #6b7280;
+      margin: 8px 0 12px;
+    }
+    .admin-review-rating {
+      display: inline-block;
+      background: #fff4e5;
+      border: 1px solid #ffd8a8;
+      color: #b45309;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .review-text {
+      background: #f9fafb;
+      border: 1px solid #eceff2;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 14px;
+      color: #374151;
+      line-height: 1.45;
+      margin-bottom: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .modal-media-wrap { margin: 0 0 12px; }
+    .modal-media-wrap .review-image { max-width: 100%; max-height: 320px; border-radius: 8px; }
+    .modal-media-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .modal-media-grid .review-media-clickable {
+      width: 96px;
+      height: 96px;
+      overflow: hidden;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      background: #f3f4f6;
+    }
+    .modal-media-grid .review-media-clickable .review-image {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      object-fit: cover;
+      border-radius: 0;
+      border: none;
+      margin: 0;
+      display: block;
+    }
+    .review-manage-actions {
+      margin-top: 8px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .review-manage-btn {
+      border-color: #2d68d8;
+      background: #2d68d8;
+      color: #fff;
+      font-size: 12px;
+      padding: 8px 10px;
+    }
+    .review-manage-btn:hover {
+      background: #1f56bf;
+      border-color: #1f56bf;
+    }
     .reviews-empty,
     .reviews-loading {
       text-align: center;
@@ -1233,7 +1293,7 @@ if ($currentView === 'archived') {
   </div>
 
 
-  <script src="assets/js/user_dashboard_reusable_ui.js?v=20260331-1"></script>
+  <script src="assets/js/user_dashboard_reusable_ui.js?v=20260406-2"></script>
   <script>
     const currentView = <?php echo json_encode($currentView); ?>;
     let products = [];
@@ -1251,6 +1311,7 @@ if ($currentView === 'archived') {
     let currentVideoUrl = '';
     let removeExistingVideo = false;
     let pendingVideoPreviewUrl = '';
+    let videoPreviewPosterToken = 0;
     let newVariantTempCounter = 1;
     let pendingMainVariantSelection = '';
     let currentPage = 1;
@@ -1282,6 +1343,82 @@ if ($currentView === 'archived') {
       return clean.split(/[\\/]/).pop() || '';
     }
 
+    function buildVideoPosterFromSource(videoSrc) {
+      return new Promise((resolve) => {
+        const source = String(videoSrc || '').trim();
+        if (!source) {
+          resolve('');
+          return;
+        }
+
+        const tempVideo = document.createElement('video');
+        tempVideo.preload = 'metadata';
+        tempVideo.muted = true;
+        tempVideo.playsInline = true;
+        tempVideo.src = source;
+
+        const finish = (posterUrl) => {
+          try {
+            tempVideo.removeAttribute('src');
+            tempVideo.load();
+          } catch (e) {
+          }
+          resolve(posterUrl || '');
+        };
+
+        tempVideo.addEventListener('loadedmetadata', () => {
+          const duration = Number(tempVideo.duration || 0);
+          const captureAt = duration > 0.5
+            ? Math.min(Math.max(duration * 0.1, 0.1), duration - 0.1)
+            : 0;
+
+          const captureFrame = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = tempVideo.videoWidth || 320;
+              canvas.height = tempVideo.videoHeight || 180;
+              const context = canvas.getContext('2d');
+              if (!context) {
+                finish('');
+                return;
+              }
+              context.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+              finish(canvas.toDataURL('image/jpeg', 0.9));
+            } catch (error) {
+              finish('');
+            }
+          };
+
+          if (captureAt > 0) {
+            tempVideo.addEventListener('seeked', captureFrame, { once: true });
+            try {
+              tempVideo.currentTime = captureAt;
+            } catch (e) {
+              captureFrame();
+            }
+          } else {
+            captureFrame();
+          }
+        }, { once: true });
+
+        tempVideo.addEventListener('error', () => finish(''), { once: true });
+      });
+    }
+
+    function applyVideoPreviewPoster(player, videoSrc) {
+      if (!player) return;
+      const token = ++videoPreviewPosterToken;
+      player.poster = '';
+      buildVideoPosterFromSource(videoSrc).then((posterUrl) => {
+        if (token !== videoPreviewPosterToken) {
+          return;
+        }
+        if (posterUrl) {
+          player.poster = posterUrl;
+        }
+      });
+    }
+
     function renderVideoManager() {
       const input = document.getElementById('editProductVideo');
       const status = document.getElementById('productVideoStatus');
@@ -1297,6 +1434,7 @@ if ($currentView === 'archived') {
         revokePendingVideoPreview();
         pendingVideoPreviewUrl = URL.createObjectURL(selectedFile);
         player.src = pendingVideoPreviewUrl;
+        applyVideoPreviewPoster(player, pendingVideoPreviewUrl);
         player.load();
         wrap.style.display = 'block';
         status.textContent = `New video selected: ${selectedFile.name}. It will replace the current video when saved.`;
@@ -1313,6 +1451,7 @@ if ($currentView === 'archived') {
 
       if (currentVideoUrl && !removeExistingVideo) {
         player.src = currentVideoUrl;
+        applyVideoPreviewPoster(player, currentVideoUrl);
         player.load();
         wrap.style.display = 'block';
         const fileName = getVideoFileName(currentVideoUrl);
@@ -1485,6 +1624,17 @@ if ($currentView === 'archived') {
       return amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
     }
 
+    function goToManageSpecificReview(reviewId, productId) {
+      const params = new URLSearchParams();
+      if (productId) {
+        params.set('focus_product_id', String(productId));
+      }
+      if (reviewId) {
+        params.set('focus_review_id', String(reviewId));
+      }
+      window.location.href = `admin_manage_reviews.php?${params.toString()}`;
+    }
+
     function renderReusableReviewMediaNode(media, variantClass = '') {
       if (window.DashboardReusableUI && typeof window.DashboardReusableUI.renderReviewMediaNode === 'function') {
         return window.DashboardReusableUI.renderReviewMediaNode(media, variantClass);
@@ -1492,10 +1642,12 @@ if ($currentView === 'archived') {
 
       if (!media || !media.url) return '';
       const safeClass = variantClass || '';
+      const safeUrl = String(media.url).replace(/"/g, '&quot;');
+      const safeType = String(media.media_type || '').replace(/"/g, '&quot;');
       if ((media.media_type || '').includes('video/')) {
-        return `<video src="${media.url}" class="review-image ${safeClass}" controls></video>`;
+        return `<div class="review-media-clickable ${safeClass} js-review-media-open" data-review-media-url="${safeUrl}" data-review-media-type="${safeType}" role="button" tabindex="0" aria-label="Open review media"><video src="${media.url}" class="review-image ${safeClass}" preload="metadata" muted playsinline></video><span class="review-media-view-badge">VIEW</span></div>`;
       }
-      return `<img src="${media.url}" alt="Review image" class="review-image ${safeClass}">`;
+      return `<div class="review-media-clickable ${safeClass} js-review-media-open" data-review-media-url="${safeUrl}" data-review-media-type="${safeType}" role="button" tabindex="0" aria-label="Open review media"><img src="${media.url}" alt="Review image" class="review-image ${safeClass}"><span class="review-media-view-badge">VIEW</span></div>`;
     }
 
     function switchReviewMedia(reviewId, mediaIndex) {
@@ -1557,12 +1709,10 @@ if ($currentView === 'archived') {
           return;
         }
 
-        content.className = 'review-list';
+        content.className = 'product-review-list';
         content.innerHTML = reviews.map((review) => {
-          const rating = Number(review.rating) || 0;
-          const stars = '★'.repeat(Math.max(0, Math.min(5, rating))) + '☆'.repeat(Math.max(0, 5 - Math.max(0, Math.min(5, rating))));
           const mediaFiles = Array.isArray(review.media_files) ? review.media_files : [];
-          let mediaHtml = '';
+          let mediaNode = '';
 
           if (mediaFiles.length > 0) {
             const mediaList = mediaFiles.map((file) => ({
@@ -1573,39 +1723,37 @@ if ($currentView === 'archived') {
             reviewMediaMap[review.review_id] = mediaList;
 
             if (mediaList.length > 1) {
-              const thumbsHtml = mediaList.map((media, idx) => {
-                if ((media.media_type || '').includes('video/')) {
-                  return `<button type="button" class="review-media-thumb review-media-video-thumb ${idx === 0 ? 'active' : ''}" data-review-id="${review.review_id}" onclick="switchReviewMedia(${review.review_id}, ${idx})">VIDEO</button>`;
-                }
-                return `<img src="${escapeHtml(media.url)}" class="review-media-thumb ${idx === 0 ? 'active' : ''}" data-review-id="${review.review_id}" onclick="switchReviewMedia(${review.review_id}, ${idx})" alt="review-thumb-${idx}">`;
-              }).join('');
-
-              mediaHtml = `
-                <div class="review-media-group">
-                  <div id="reviewMediaMain-${review.review_id}">${renderReusableReviewMediaNode(mediaList[0], 'review-media-main')}</div>
-                  <div class="review-media-thumbs">${thumbsHtml}</div>
-                </div>
-              `;
+              mediaNode = `<div class="modal-media-grid">${mediaList.map((item) => renderReusableReviewMediaNode({
+                url: item.url,
+                media_type: item.media_type || ''
+              }, 'review-media-tile')).join('')}</div>`;
             } else {
-              mediaHtml = renderReusableReviewMediaNode(mediaList[0], 'review-media-single');
+              mediaNode = renderReusableReviewMediaNode({
+                url: mediaList[0].url,
+                media_type: mediaList[0].media_type || ''
+              }, 'review-media-single');
             }
           } else if (review.has_media) {
             const mediaUrl = `api/get-review-media.php?review_id=${review.review_id}`;
-            mediaHtml = renderReusableReviewMediaNode(
+            mediaNode = renderReusableReviewMediaNode(
               { url: mediaUrl, media_type: review.media_type || '' },
               'review-media-single'
             );
           }
 
           return `
-            <div class="review-item">
-              <div class="review-top">
-                <div class="review-user">${escapeHtml(review.user_name || 'Anonymous User')}</div>
-                <div class="review-date">${escapeHtml(formatReviewDate(review.created_at))}</div>
+            <div class="product-review-item">
+              <div class="admin-review-meta">
+                By: ${escapeHtml(review.is_anonymous ? 'Anonymous User' : (review.user_name || 'Anonymous User'))}
+                | ${escapeHtml(review.created_at || '')}
+                | Review #${Number(review.review_id)}
               </div>
-              <div class="review-stars">${stars}</div>
-              <div class="review-text">${escapeHtml(review.review_text || 'No written feedback.')}</div>
-              ${mediaHtml}
+              <div class="admin-review-rating">Rating: ${Number(review.rating) || 0}/5</div>
+              <div class="review-text">${escapeHtml(review.review_text || '')}</div>
+              ${mediaNode ? `<div class="modal-media-wrap">${mediaNode}</div>` : ''}
+              <div class="review-manage-actions">
+                <button type="button" class="edit-btn review-manage-btn" onclick="goToManageSpecificReview(${Number(review.review_id) || 0}, ${Number(review.product_id || productId) || Number(productId) || 0})">Manage This Review</button>
+              </div>
             </div>
           `;
         }).join('');

@@ -132,7 +132,7 @@ $statusDisplay = [
     'processing' => 'To Ship',
     'shipped' => 'To Receive',
     'delivered' => 'Order Delivered',
-    'received' => 'Order Received',
+    'received' => 'To Review',
     'reviewed' => 'Reviewed',
     'cancelled' => 'Cancelled',
 ];
@@ -364,6 +364,88 @@ $statusDisplay = [
         .order-actions button.action-primary:hover { background: #c20000; }
         .order-actions button:hover { background: #f9f9f9; }
 
+        .user-review-card { padding: 14px 16px; background: #fff; margin: 8px 16px 0; border-radius: 8px; }
+        .user-review-title { font-size: 14px; font-weight: 700; color: #1f2937; margin-bottom: 6px; }
+        .user-review-rating { font-size: 13px; color: #b45309; font-weight: 600; margin-bottom: 6px; }
+        .user-review-text { font-size: 13px; color: #4b5563; line-height: 1.45; white-space: pre-wrap; margin-bottom: 8px; }
+        .user-review-media { display: flex; gap: 8px; flex-wrap: wrap; }
+        .user-review-media-item {
+            width: 88px;
+            height: 88px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f3f4f6;
+            overflow: hidden;
+            cursor: zoom-in;
+            position: relative;
+            padding: 0;
+        }
+        .user-review-media-item img,
+        .user-review-media-item video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            border: none;
+            background: #f3f4f6;
+        }
+        .user-review-media-view-badge {
+            position: absolute;
+            right: 6px;
+            bottom: 6px;
+            background: rgba(15, 23, 42, 0.78);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            border-radius: 999px;
+            padding: 4px 6px;
+            letter-spacing: 0.2px;
+        }
+
+        .media-viewer-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.86);
+            z-index: 2500;
+            padding: 16px;
+        }
+        .media-viewer-overlay.active { display: flex; }
+        .media-viewer-content {
+            max-width: 96vw;
+            max-height: 92vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .media-viewer-content img,
+        .media-viewer-content video {
+            max-width: 96vw;
+            max-height: 92vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 10px;
+            background: #000;
+        }
+        .media-viewer-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.45);
+            background: rgba(0,0,0,0.4);
+            color: #fff;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
         /* Review Modal (Shopee-like mobile layout) */
         .review-modal-content {
             background: #f5f5f5;
@@ -500,12 +582,21 @@ $statusDisplay = [
             background: #f7f7f7;
             border-radius: 10px;
             min-height: 140px;
+            display: block;
+            cursor: pointer;
+            padding: 12px;
+        }
+        .review-upload-box.has-preview {
+            background: #fff;
+            min-height: auto;
+        }
+        #uploadPlaceholder {
+            min-height: 116px;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             text-align: center;
-            cursor: pointer;
-            padding: 12px;
         }
         .review-upload-icon {
             font-size: 34px;
@@ -529,6 +620,47 @@ $statusDisplay = [
             border-radius: 8px;
             display: none;
             margin: 0 auto;
+        }
+        .review-preview-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            width: 100%;
+        }
+        .review-preview-item {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e7e7e7;
+            background: #fff;
+            position: relative;
+        }
+        .review-preview-item img,
+        .review-preview-item video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            background: #f4f4f4;
+        }
+        .review-preview-badge {
+            position: absolute;
+            left: 6px;
+            bottom: 6px;
+            background: rgba(17, 24, 39, 0.82);
+            color: #fff;
+            font-size: 10px;
+            line-height: 1;
+            font-weight: 700;
+            border-radius: 999px;
+            padding: 4px 6px;
+            letter-spacing: 0.2px;
+        }
+        @media (max-width: 480px) {
+            .review-preview-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
         }
         .review-upload-remove {
             margin-top: 10px;
@@ -813,7 +945,7 @@ $statusDisplay = [
             <!-- Delivery Info -->
             <div class="delivery-info">
                 <div class="delivery-info-title">
-                    📍 Delivering To <span id="recipientName">Recipient</span>
+                    📍 <span id="recipientLabel">Delivering To</span> <span id="recipientName">Recipient</span>
                 </div>
                 <div id="recipientPhone" class="delivery-phone"></div>
                 <div id="recipientAddress" class="delivery-address"></div>
@@ -860,6 +992,13 @@ $statusDisplay = [
                     <span class="total-final-label">Total</span>
                     <span class="total-final-value" id="totalAmount">₱0.00</span>
                 </div>
+            </div>
+
+            <div class="user-review-card" id="userReviewCard" style="display:none;">
+                <div class="user-review-title">Your Review</div>
+                <div class="user-review-rating" id="userReviewRating"></div>
+                <div class="user-review-text" id="userReviewText"></div>
+                <div class="user-review-media" id="userReviewMedia"></div>
             </div>
 
             <!-- Order Number -->
@@ -966,8 +1105,7 @@ $statusDisplay = [
                             <div class="review-upload-note">Multiple files allowed, max total 25MB</div>
                         </div>
                         <div id="uploadPreview" style="display: none; margin-top: 8px; width: 100%;">
-                            <img id="uploadPreviewImg" class="review-preview-media" alt="Upload preview">
-                            <video id="uploadPreviewVideo" class="review-preview-media" controls></video>
+                            <div id="uploadPreviewGrid" class="review-preview-grid"></div>
                             <div id="uploadSummary" style="margin-top: 8px; color: #666; font-size: 12px; text-align: center;"></div>
                             <div style="text-align:center;">
                                 <button type="button" class="review-upload-remove" onclick="clearMediaUpload()">Remove</button>
@@ -994,6 +1132,11 @@ $statusDisplay = [
             </div>
             </div>
         </div>
+    </div>
+
+    <div id="mediaViewerOverlay" class="media-viewer-overlay" role="dialog" aria-modal="true" aria-label="Media Viewer">
+        <button type="button" class="media-viewer-close" onclick="closeMediaViewer()">×</button>
+        <div id="mediaViewerContent" class="media-viewer-content"></div>
     </div>
 
     <!-- Mobile Navigation -->
@@ -1346,13 +1489,13 @@ $statusDisplay = [
                             // "All" shows all non-archived orders
                             shouldShow = true;
                         } else if (currentStatus === 'delivered') {
-                            // "Completed" shows delivered/received/reviewed statuses
-                            shouldShow = status === 'delivered' || status === 'received' || status === 'reviewed';
+                            // "Completed" shows delivered orders only
+                            shouldShow = status === 'delivered';
                         } else if (currentStatus === 'delivered-unreviewed') {
-                            // "To review" shows deliverable orders waiting rating: delivered or received
-                            shouldShow = (status === 'delivered' || status === 'received');
+                            // "To review" shows orders that are already confirmed as received.
+                            shouldShow = status === 'received';
                         } else if (currentStatus === 'reviewed') {
-                            // "Reviewed" shows only reviewed status
+                            // "Reviewed" shows reviewed orders only
                             shouldShow = status === 'reviewed';
                         } else {
                             // Other statuses match directly
@@ -1549,6 +1692,7 @@ $statusDisplay = [
             const productId = element.dataset.productId || itemId;
             currentReviewProductId = productId;
             document.getElementById('hiddenProductId').value = productId;
+            loadOwnReviewForProductInModal(status, productId);
 
             // Get total from the order group
             const totalText = orderGroup.querySelector('div[style*="text-align: right"]')?.querySelector('div:last-child')?.textContent;
@@ -1570,6 +1714,19 @@ $statusDisplay = [
             document.getElementById('statusTitle').textContent = config.titleText;
             document.getElementById('statusMessage').textContent = config.message;
             document.getElementById('detailStatus').textContent = config.title;
+
+            const recipientLabelEl = document.getElementById('recipientLabel');
+            if (recipientLabelEl) {
+                if (status === 'reviewed') {
+                    recipientLabelEl.textContent = 'Reviewed By';
+                } else if (status === 'cancelled') {
+                    recipientLabelEl.textContent = 'Cancelled By';
+                } else if (status === 'delivered' || status === 'received') {
+                    recipientLabelEl.textContent = 'Received By';
+                } else {
+                    recipientLabelEl.textContent = 'Delivering To';
+                }
+            }
 
             // Update recipient info from data attributes
             document.getElementById('recipientName').textContent = recipientName || 'Recipient';
@@ -1683,6 +1840,184 @@ $statusDisplay = [
         let currentReviewProductId = null;
         let currentReviewItemId = null;
         let selectedReviewMediaFilesPH = [];
+        let reviewPreviewUrlsPH = [];
+        let reviewPreviewRenderTokenPH = 0;
+
+        function openMediaViewer(mediaUrl, mediaType) {
+            const overlay = document.getElementById('mediaViewerOverlay');
+            const content = document.getElementById('mediaViewerContent');
+            if (!overlay || !content || !mediaUrl) return;
+
+            content.innerHTML = '';
+            const isVideo = String(mediaType || '').includes('video/');
+
+            if (isVideo) {
+                const video = document.createElement('video');
+                video.src = mediaUrl;
+                video.controls = true;
+                video.autoplay = true;
+                video.playsInline = true;
+                content.appendChild(video);
+            } else {
+                const img = document.createElement('img');
+                img.src = mediaUrl;
+                img.alt = 'Review media full view';
+                content.appendChild(img);
+            }
+
+            overlay.classList.add('active');
+        }
+
+        function closeMediaViewer() {
+            const overlay = document.getElementById('mediaViewerOverlay');
+            const content = document.getElementById('mediaViewerContent');
+            if (!overlay || !content) return;
+            content.innerHTML = '';
+            overlay.classList.remove('active');
+        }
+
+        function generateVideoThumbFromUrlPH(url) {
+            return new Promise((resolve) => {
+                const source = String(url || '').trim();
+                if (!source) {
+                    resolve('');
+                    return;
+                }
+
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.muted = true;
+                video.playsInline = true;
+                video.src = source;
+
+                const finish = (thumb) => {
+                    video.removeAttribute('src');
+                    video.load();
+                    resolve(thumb || '');
+                };
+
+                video.addEventListener('loadedmetadata', () => {
+                    const duration = Number(video.duration || 0);
+                    const captureAt = duration > 0.5 ? Math.min(Math.max(duration * 0.1, 0.1), duration - 0.1) : 0;
+
+                    const captureFrame = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = video.videoWidth || 320;
+                            canvas.height = video.videoHeight || 180;
+                            const context = canvas.getContext('2d');
+                            if (!context) {
+                                finish('');
+                                return;
+                            }
+                            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            finish(canvas.toDataURL('image/jpeg', 0.9));
+                        } catch (error) {
+                            console.error('Error creating remote video thumbnail:', error);
+                            finish('');
+                        }
+                    };
+
+                    if (captureAt > 0) {
+                        video.addEventListener('seeked', captureFrame, { once: true });
+                        video.currentTime = captureAt;
+                    } else {
+                        captureFrame();
+                    }
+                }, { once: true });
+
+                video.addEventListener('error', () => finish(''), { once: true });
+            });
+        }
+
+        function clearUserReviewModalSection() {
+            const card = document.getElementById('userReviewCard');
+            const rating = document.getElementById('userReviewRating');
+            const text = document.getElementById('userReviewText');
+            const media = document.getElementById('userReviewMedia');
+            if (card) card.style.display = 'none';
+            if (rating) rating.textContent = '';
+            if (text) text.textContent = '';
+            if (media) media.innerHTML = '';
+        }
+
+        async function loadOwnReviewForProductInModal(status, productId) {
+            clearUserReviewModalSection();
+
+            if (status !== 'reviewed' || !productId) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`api/get-reviews.php?product_id=${encodeURIComponent(productId)}`);
+                const data = await response.json();
+                if (!data || !data.success || !Array.isArray(data.reviews)) {
+                    return;
+                }
+
+                const myReview = data.reviews.find((review) => !!review.is_mine);
+                if (!myReview) {
+                    return;
+                }
+
+                const card = document.getElementById('userReviewCard');
+                const ratingEl = document.getElementById('userReviewRating');
+                const textEl = document.getElementById('userReviewText');
+                const mediaEl = document.getElementById('userReviewMedia');
+                if (!card || !ratingEl || !textEl || !mediaEl) {
+                    return;
+                }
+
+                const stars = Math.max(0, Math.min(5, parseInt(myReview.rating, 10) || 0));
+                ratingEl.textContent = `Rating: ${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`;
+                textEl.textContent = myReview.review_text || 'No review text provided.';
+
+                const files = Array.isArray(myReview.media_files) ? myReview.media_files : [];
+                files.forEach((file) => {
+                    if (!file || !file.url) {
+                        return;
+                    }
+
+                    const mediaUrl = String(file.url);
+                    const mediaType = String(file.media_type || '');
+                    const tile = document.createElement('button');
+                    tile.type = 'button';
+                    tile.className = 'user-review-media-item';
+                    tile.addEventListener('click', () => openMediaViewer(mediaUrl, mediaType));
+
+                    const viewBadge = document.createElement('div');
+                    viewBadge.className = 'user-review-media-view-badge';
+                    viewBadge.textContent = 'VIEW';
+
+                    if (mediaType.includes('video/')) {
+                        const thumb = document.createElement('img');
+                        thumb.alt = 'Review video thumbnail';
+                        tile.appendChild(thumb);
+                        tile.appendChild(viewBadge);
+
+                        generateVideoThumbFromUrlPH(mediaUrl).then((thumbUrl) => {
+                            if (thumbUrl) {
+                                thumb.src = thumbUrl;
+                            } else {
+                                thumb.src = 'logo.jpg';
+                            }
+                        });
+                    } else {
+                        const img = document.createElement('img');
+                        img.src = mediaUrl;
+                        img.alt = 'Review media';
+                        tile.appendChild(img);
+                        tile.appendChild(viewBadge);
+                    }
+
+                    mediaEl.appendChild(tile);
+                });
+
+                card.style.display = 'block';
+            } catch (error) {
+                console.error('Failed to load user review in modal:', error);
+            }
+        }
 
         function getMediaFileKeyPH(file) {
             return `${file.name}::${file.size}::${file.lastModified}`;
@@ -1698,6 +2033,150 @@ $statusDisplay = [
                     existing.add(key);
                 }
             });
+        }
+
+        function clearRenderedPreviewMediaPH() {
+            reviewPreviewRenderTokenPH += 1;
+            reviewPreviewUrlsPH.forEach((url) => {
+                try {
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    console.warn('Failed to revoke preview URL', e);
+                }
+            });
+            reviewPreviewUrlsPH = [];
+
+            const grid = document.getElementById('uploadPreviewGrid');
+            if (grid) {
+                grid.innerHTML = '';
+            }
+
+            const uploadArea = document.getElementById('uploadArea');
+            if (uploadArea) {
+                uploadArea.classList.remove('has-preview');
+            }
+        }
+
+        function generateVideoThumbDataUrlPH(file) {
+            return new Promise((resolve) => {
+                const video = document.createElement('video');
+                const objectUrl = URL.createObjectURL(file);
+                video.preload = 'metadata';
+                video.muted = true;
+                video.playsInline = true;
+                video.src = objectUrl;
+
+                const cleanup = () => {
+                    URL.revokeObjectURL(objectUrl);
+                    video.removeAttribute('src');
+                    video.load();
+                };
+
+                const fail = () => {
+                    cleanup();
+                    resolve('');
+                };
+
+                video.addEventListener('loadedmetadata', () => {
+                    const duration = Number(video.duration || 0);
+                    const captureAt = duration > 0.5 ? Math.min(Math.max(duration * 0.1, 0.1), duration - 0.1) : 0;
+
+                    const captureFrame = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = video.videoWidth || 320;
+                            canvas.height = video.videoHeight || 180;
+                            const context = canvas.getContext('2d');
+                            if (!context) {
+                                fail();
+                                return;
+                            }
+                            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                            cleanup();
+                            resolve(dataUrl);
+                        } catch (error) {
+                            console.error('Error creating video thumbnail:', error);
+                            fail();
+                        }
+                    };
+
+                    if (captureAt > 0) {
+                        video.addEventListener('seeked', captureFrame, { once: true });
+                        video.currentTime = captureAt;
+                    } else {
+                        captureFrame();
+                    }
+                }, { once: true });
+
+                video.addEventListener('error', fail, { once: true });
+            });
+        }
+
+        function renderReviewUploadPreviewPH() {
+            const preview = document.getElementById('uploadPreview');
+            const placeholder = document.getElementById('uploadPlaceholder');
+            const uploadSummary = document.getElementById('uploadSummary');
+            const grid = document.getElementById('uploadPreviewGrid');
+            const uploadArea = document.getElementById('uploadArea');
+            if (!preview || !placeholder || !uploadSummary || !grid) {
+                return;
+            }
+
+            clearRenderedPreviewMediaPH();
+            const renderToken = reviewPreviewRenderTokenPH;
+
+            if (!selectedReviewMediaFilesPH.length) {
+                preview.style.display = 'none';
+                placeholder.style.display = 'block';
+                uploadSummary.textContent = '';
+                return;
+            }
+
+            preview.style.display = 'block';
+            placeholder.style.display = 'none';
+            if (uploadArea) {
+                uploadArea.classList.add('has-preview');
+            }
+
+            selectedReviewMediaFilesPH.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'review-preview-item';
+                const img = document.createElement('img');
+                img.alt = `${file.type.startsWith('video/') ? 'Video' : 'Image'} preview ${index + 1}`;
+                item.appendChild(img);
+
+                if (file.type.startsWith('video/')) {
+                    const badge = document.createElement('div');
+                    badge.className = 'review-preview-badge';
+                    badge.textContent = 'VIDEO';
+                    item.appendChild(badge);
+
+                    generateVideoThumbDataUrlPH(file).then((dataUrl) => {
+                        if (renderToken !== reviewPreviewRenderTokenPH) {
+                            return;
+                        }
+
+                        if (dataUrl) {
+                            img.src = dataUrl;
+                        } else {
+                            const fallbackUrl = URL.createObjectURL(file);
+                            reviewPreviewUrlsPH.push(fallbackUrl);
+                            img.src = fallbackUrl;
+                        }
+                    });
+                } else {
+                    const url = URL.createObjectURL(file);
+                    reviewPreviewUrlsPH.push(url);
+                    img.src = url;
+                }
+
+                grid.appendChild(item);
+            });
+
+            const totalSize = selectedReviewMediaFilesPH.reduce((sum, file) => sum + (file.size || 0), 0);
+            const totalMb = (totalSize / (1024 * 1024)).toFixed(2);
+            uploadSummary.textContent = `${selectedReviewMediaFilesPH.length} file(s) selected • ${totalMb}MB total`;
         }
         
         async function handleAction(action, configStatus, orderId, productName = '') {
@@ -1851,39 +2330,15 @@ $statusDisplay = [
                 return;
             }
 
-            const firstFile = selectedReviewMediaFilesPH[0];
-            const previewUrl = URL.createObjectURL(firstFile);
-            
-            const preview = document.getElementById('uploadPreview');
-            const placeholder = document.getElementById('uploadPlaceholder');
-            const previewImg = document.getElementById('uploadPreviewImg');
-            const previewVideo = document.getElementById('uploadPreviewVideo');
-            const uploadSummary = document.getElementById('uploadSummary');
-
-            preview.style.display = 'block';
-            placeholder.style.display = 'none';
-
-            if (firstFile.type.startsWith('image/')) {
-                previewImg.src = previewUrl;
-                previewImg.style.display = 'block';
-                previewVideo.style.display = 'none';
-            } else if (firstFile.type.startsWith('video/')) {
-                previewVideo.src = previewUrl;
-                previewVideo.style.display = 'block';
-                previewImg.style.display = 'none';
-            }
-
-            const totalMb = (totalSize / (1024 * 1024)).toFixed(2);
-            uploadSummary.textContent = `${selectedReviewMediaFilesPH.length} file(s) selected • ${totalMb}MB total`;
+            renderReviewUploadPreviewPH();
         }
         
         function clearMediaUpload() {
             document.getElementById('reviewMediaInput').value = '';
             selectedReviewMediaFilesPH = [];
+            clearRenderedPreviewMediaPH();
             document.getElementById('uploadPreview').style.display = 'none';
             document.getElementById('uploadPlaceholder').style.display = 'block';
-            document.getElementById('uploadPreviewImg').src = '';
-            document.getElementById('uploadPreviewVideo').src = '';
             document.getElementById('uploadSummary').textContent = '';
         }
         
@@ -2046,6 +2501,17 @@ $statusDisplay = [
             const searchWrapper = document.querySelector('.search-wrapper');
             if (searchWrapper && !searchWrapper.contains(e.target)) {
                 document.getElementById('searchSuggestions').style.display = 'none';
+            }
+
+            const mediaOverlay = document.getElementById('mediaViewerOverlay');
+            if (mediaOverlay && e.target === mediaOverlay) {
+                closeMediaViewer();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeMediaViewer();
             }
         });
     </script>

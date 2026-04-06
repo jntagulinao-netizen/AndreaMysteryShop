@@ -162,7 +162,7 @@ $profileResult = $profileStmt->get_result();
 $profile = $profileResult->fetch_assoc() ?: ['phone_number' => '', 'gender' => '', 'birthday' => '', 'profile_picture' => ''];
 $profileStmt->close();
 
-$orderStmt = $conn->prepare('SELECT order_id, recipient_id, order_date, status, payment_method, total_amount FROM orders WHERE user_id = ? ORDER BY order_date DESC');
+$orderStmt = $conn->prepare('SELECT order_id, recipient_id, order_date, status, payment_method, total_amount, archived, binned FROM orders WHERE user_id = ? ORDER BY order_date DESC');
 $orderStmt->bind_param('i', $userId);
 $orderStmt->execute();
 $orderResult = $orderStmt->get_result();
@@ -183,10 +183,18 @@ $statusCounts = [
 ];
 $toRateCount = 0;
 foreach ($orders as $order) {
-    if (isset($statusCounts[$order['status']])) {
-        $statusCounts[$order['status']]++;
+    $normalizedStatus = strtolower(trim((string)($order['status'] ?? '')));
+    if ($normalizedStatus === 'completed') {
+        $normalizedStatus = 'delivered';
     }
-    if ($order['status'] === 'delivered' || $order['status'] === 'received') {
+
+    if (isset($statusCounts[$normalizedStatus])) {
+        $statusCounts[$normalizedStatus]++;
+    }
+
+    $isArchived = intval($order['archived'] ?? 0) === 1;
+    $isBinned = intval($order['binned'] ?? 0) === 1;
+    if (!$isArchived && !$isBinned && $normalizedStatus === 'received') {
         $toRateCount++;
     }
 }

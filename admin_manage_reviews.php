@@ -87,6 +87,8 @@ $flash = $_SESSION['admin_reviews_flash'] ?? null;
 unset($_SESSION['admin_reviews_flash']);
 
 $searchTerm = trim((string)($_GET['search'] ?? ''));
+$focusProductId = max(0, intval($_GET['focus_product_id'] ?? 0));
+$focusReviewId = max(0, intval($_GET['focus_review_id'] ?? 0));
 $sortOrder = strtolower(trim((string)($_GET['sort'] ?? 'newest')));
 if (!in_array($sortOrder, ['newest', 'oldest'], true)) {
   $sortOrder = 'newest';
@@ -134,7 +136,8 @@ if ($listResult) {
             'is_anonymous' => intval($row['is_anonymous'] ?? 0) === 1,
             'user_name' => $row['user_name'],
             'media_type' => null,
-            'media_url' => null
+            'media_url' => null,
+            'media_files' => []
         ];
         $reviewIds[] = $rid;
     }
@@ -148,14 +151,10 @@ if ($tableCheck && $tableCheck->num_rows > 0) {
 
 if ($mediaTableExists && !empty($reviewIds)) {
     $placeholders = implode(',', array_fill(0, count($reviewIds), '?'));
-    $mediaSql = "SELECT m.review_id, m.media_id, m.media_type
-                 FROM review_media_files m
-                 INNER JOIN (
-                   SELECT review_id, MIN(media_id) AS min_media_id
-                   FROM review_media_files
-                   WHERE review_id IN ($placeholders)
-                   GROUP BY review_id
-                 ) mm ON mm.min_media_id = m.media_id";
+    $mediaSql = "SELECT review_id, media_id, media_type
+                 FROM review_media_files
+                 WHERE review_id IN ($placeholders)
+                 ORDER BY review_id ASC, media_id ASC";
 
     $mediaStmt = $conn->prepare($mediaSql);
     if ($mediaStmt) {
@@ -168,8 +167,17 @@ if ($mediaTableExists && !empty($reviewIds)) {
             if (!isset($reviews[$rid])) {
                 continue;
             }
-            $reviews[$rid]['media_type'] = $m['media_type'];
-            $reviews[$rid]['media_url'] = 'api/get-review-media.php?media_id=' . intval($m['media_id']);
+          $mediaUrl = 'api/get-review-media.php?media_id=' . intval($m['media_id']);
+          $mediaType = (string)($m['media_type'] ?? '');
+          $reviews[$rid]['media_files'][] = [
+            'url' => $mediaUrl,
+            'media_type' => $mediaType
+          ];
+
+          if (empty($reviews[$rid]['media_url'])) {
+            $reviews[$rid]['media_type'] = $mediaType;
+            $reviews[$rid]['media_url'] = $mediaUrl;
+          }
         }
         $mediaStmt->close();
     }
@@ -194,8 +202,14 @@ if (!empty($reviews)) {
             continue;
         }
 
-        $reviews[$rid]['media_type'] = $legacyRow['review_image_type'];
-        $reviews[$rid]['media_url'] = 'api/get-review-media.php?review_id=' . $rid;
+        $legacyMediaType = (string)$legacyRow['review_image_type'];
+        $legacyMediaUrl = 'api/get-review-media.php?review_id=' . $rid;
+        $reviews[$rid]['media_type'] = $legacyMediaType;
+        $reviews[$rid]['media_url'] = $legacyMediaUrl;
+        $reviews[$rid]['media_files'][] = [
+          'url' => $legacyMediaUrl,
+          'media_type' => $legacyMediaType
+        ];
     }
 }
 
@@ -223,9 +237,12 @@ foreach ($reviews as $review) {
     $productsWithReviews[$pid]['latest_review_ts'] = $createdTs;
   }
 
-  if ($productsWithReviews[$pid]['preview_media_url'] === null && !empty($review['media_url'])) {
-    if (stripos((string)$review['media_type'], 'image') !== false) {
-      $productsWithReviews[$pid]['preview_media_url'] = $review['media_url'];
+  if ($productsWithReviews[$pid]['preview_media_url'] === null && !empty($review['media_files']) && is_array($review['media_files'])) {
+    foreach ($review['media_files'] as $mediaFile) {
+      if (stripos((string)($mediaFile['media_type'] ?? ''), 'image') !== false && !empty($mediaFile['url'])) {
+        $productsWithReviews[$pid]['preview_media_url'] = (string)$mediaFile['url'];
+        break;
+      }
     }
   }
 
@@ -243,6 +260,12 @@ unset($product);
 
 $productsWithReviews = array_values($productsWithReviews);
 $totalProductsWithReviews = count($productsWithReviews);
+
+if ($focusProductId > 0) {
+  $productsWithReviews = array_values(array_filter($productsWithReviews, static function (array $product) use ($focusProductId): bool {
+    return intval($product['product_id'] ?? 0) === $focusProductId;
+  }));
+}
 
 if ($searchTerm !== '') {
   $needle = strtolower($searchTerm);
@@ -285,7 +308,7 @@ if ($currentPage > $totalPages) {
 $offset = ($currentPage - 1) * $perPage;
 $pagedProductsWithReviews = array_slice($productsWithReviews, $offset, $perPage);
 
-function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrder, int $perPage): string {
+function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrder, int $perPage, int $focusProductId = 0, int $focusReviewId = 0): string {
   $query = [
     'page' => max(1, $page),
     'sort' => $sortOrder,
@@ -293,6 +316,12 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
   ];
   if ($searchTerm !== '') {
     $query['search'] = $searchTerm;
+  }
+  if ($focusProductId > 0) {
+    $query['focus_product_id'] = $focusProductId;
+  }
+  if ($focusReviewId > 0) {
+    $query['focus_review_id'] = $focusReviewId;
   }
   return 'admin_manage_reviews.php?' . http_build_query($query);
 }
@@ -521,6 +550,10 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
       padding: 12px;
       background: #fff;
     }
+    .product-review-item.focused-review {
+      border-color: #2d68d8;
+      box-shadow: 0 0 0 3px rgba(45, 104, 216, 0.16);
+    }
     .admin-review-meta {
       font-size: 13px;
       color: #6b7280;
@@ -562,6 +595,30 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
 
     .modal-media-wrap { margin: 0 0 12px; }
     .modal-media-wrap .review-image { max-width: 100%; max-height: 320px; border-radius: 8px; }
+    .modal-media-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .modal-media-grid .review-media-clickable {
+      width: 96px;
+      height: 96px;
+      overflow: hidden;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      background: #f3f4f6;
+    }
+    .modal-media-grid .review-media-clickable .review-image {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      object-fit: cover;
+      border-radius: 0;
+      border: none;
+      margin: 0;
+      display: block;
+    }
 
     .reply-inline {
       display: flex;
@@ -712,11 +769,11 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
           <div class="pagination-wrap">
             <?php $prevPage = max(1, $currentPage - 1); ?>
             <?php $nextPage = min($totalPages, $currentPage + 1); ?>
-            <a class="pagination-link <?php echo $currentPage <= 1 ? 'disabled' : ''; ?>" href="<?php echo htmlspecialchars(buildAdminReviewPageUrl($prevPage, $searchTerm, $sortOrder, $perPage), ENT_QUOTES, 'UTF-8'); ?>">Prev</a>
+            <a class="pagination-link <?php echo $currentPage <= 1 ? 'disabled' : ''; ?>" href="<?php echo htmlspecialchars(buildAdminReviewPageUrl($prevPage, $searchTerm, $sortOrder, $perPage, $focusProductId, $focusReviewId), ENT_QUOTES, 'UTF-8'); ?>">Prev</a>
             <?php for ($p = 1; $p <= $totalPages; $p++): ?>
-              <a class="pagination-link <?php echo $p === $currentPage ? 'active' : ''; ?>" href="<?php echo htmlspecialchars(buildAdminReviewPageUrl($p, $searchTerm, $sortOrder, $perPage), ENT_QUOTES, 'UTF-8'); ?>"><?php echo intval($p); ?></a>
+              <a class="pagination-link <?php echo $p === $currentPage ? 'active' : ''; ?>" href="<?php echo htmlspecialchars(buildAdminReviewPageUrl($p, $searchTerm, $sortOrder, $perPage, $focusProductId, $focusReviewId), ENT_QUOTES, 'UTF-8'); ?>"><?php echo intval($p); ?></a>
             <?php endfor; ?>
-            <a class="pagination-link <?php echo $currentPage >= $totalPages ? 'disabled' : ''; ?>" href="<?php echo htmlspecialchars(buildAdminReviewPageUrl($nextPage, $searchTerm, $sortOrder, $perPage), ENT_QUOTES, 'UTF-8'); ?>">Next</a>
+            <a class="pagination-link <?php echo $currentPage >= $totalPages ? 'disabled' : ''; ?>" href="<?php echo htmlspecialchars(buildAdminReviewPageUrl($nextPage, $searchTerm, $sortOrder, $perPage, $focusProductId, $focusReviewId), ENT_QUOTES, 'UTF-8'); ?>">Next</a>
           </div>
         <?php endif; ?>
       </div>
@@ -735,9 +792,11 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
     </div>
   </div>
 
-  <script src="assets/js/user_dashboard_reusable_ui.js"></script>
+  <script src="assets/js/user_dashboard_reusable_ui.js?v=20260406-2"></script>
   <script>
     const productReviews = <?php echo json_encode($pagedProductsWithReviews, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+    const focusProductId = <?php echo intval($focusProductId); ?>;
+    const focusReviewId = <?php echo intval($focusReviewId); ?>;
     const productReviewMap = {};
     productReviews.forEach((p) => { productReviewMap[Number(p.product_id)] = p; });
 
@@ -766,6 +825,14 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
         .replace(/'/g, '&#039;');
     }
 
+    function maskReviewerName(name) {
+      const raw = String(name || '').trim();
+      if (!raw) return 'U***r';
+      if (raw.length === 1) return `${raw}***`;
+      if (raw.length === 2) return `${raw.charAt(0)}***${raw.charAt(1)}`;
+      return `${raw.slice(0, 2)}***${raw.slice(-1)}`;
+    }
+
     function autoGrowTextarea(el) {
       if (!el) return;
       el.style.height = 'auto';
@@ -774,25 +841,41 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
 
     function renderReviewItems(reviews) {
       return reviews.map((review) => {
-        const mediaNode = review.media_url
-          ? (window.DashboardReusableUI && typeof window.DashboardReusableUI.renderReviewMediaNode === 'function'
-              ? window.DashboardReusableUI.renderReviewMediaNode({
-                  url: review.media_url,
-                  media_type: review.media_type || ''
-                }, 'review-media-single')
-              : '<a href="' + escapeHtml(review.media_url) + '" target="_blank" rel="noopener noreferrer">View attached media</a>')
-          : '';
+        const reviewId = Number(review.review_id) || 0;
+        const isFocused = focusReviewId > 0 && reviewId === focusReviewId;
+        const mediaFiles = Array.isArray(review.media_files)
+          ? review.media_files.filter((item) => item && item.url)
+          : (review.media_url ? [{ url: review.media_url, media_type: review.media_type || '' }] : []);
+
+        let mediaNode = '';
+        if (mediaFiles.length > 0) {
+          if (window.DashboardReusableUI && typeof window.DashboardReusableUI.renderReviewMediaNode === 'function') {
+            if (mediaFiles.length > 1) {
+              mediaNode = `<div class="modal-media-grid">${mediaFiles.map((item) => window.DashboardReusableUI.renderReviewMediaNode({
+                url: item.url,
+                media_type: item.media_type || ''
+              }, 'review-media-tile')).join('')}</div>`;
+            } else {
+              mediaNode = window.DashboardReusableUI.renderReviewMediaNode({
+                url: mediaFiles[0].url,
+                media_type: mediaFiles[0].media_type || ''
+              }, 'review-media-single');
+            }
+          } else {
+            mediaNode = mediaFiles.map((item) => '<a href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener noreferrer">View attached media</a>').join('<br>');
+          }
+        }
 
         const replyMeta = review.admin_reply_at
           ? ('Last reply saved: ' + escapeHtml(review.admin_reply_at))
           : 'No admin reply yet.';
 
         return `
-          <div class="product-review-item">
+          <div class="product-review-item ${isFocused ? 'focused-review' : ''}" data-review-id="${reviewId}">
             <div class="admin-review-meta">
-              By: ${escapeHtml(review.is_anonymous ? 'Anonymous User' : review.user_name)}
+              By: ${escapeHtml(review.is_anonymous ? maskReviewerName(review.user_name) : review.user_name)}
               | ${escapeHtml(review.created_at)}
-              | Review #${Number(review.review_id)}
+              | Review #${reviewId}
             </div>
             <div class="admin-review-rating">Rating: ${Number(review.rating)}/5</div>
             <div class="review-text">${escapeHtml(review.review_text || '')}</div>
@@ -843,6 +926,13 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
 
       modal.classList.add('show');
       document.body.style.overflow = 'hidden';
+
+      if (focusReviewId > 0) {
+        const focused = reviewList.querySelector(`.product-review-item[data-review-id="${focusReviewId}"]`);
+        if (focused && typeof focused.scrollIntoView === 'function') {
+          focused.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
     }
 
     function closeReviewModal() {
@@ -989,6 +1079,22 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
       if (!message) return;
       const title = type === 'error' ? 'Action Failed' : 'Action Successful';
       showLocalSweetAlert(title, message, type);
+    })();
+
+    (function autoOpenFocusedReview() {
+      if (focusProductId <= 0) return;
+      if (!productReviewMap[focusProductId]) return;
+      openReviewModal(focusProductId);
+
+      // Keep deep-link auto-open for first load only; prevent re-open on refresh.
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('focus_product_id');
+        url.searchParams.delete('focus_review_id');
+        window.history.replaceState({}, '', url.toString());
+      } catch (e) {
+        // no-op
+      }
     })();
   </script>
 </body>
