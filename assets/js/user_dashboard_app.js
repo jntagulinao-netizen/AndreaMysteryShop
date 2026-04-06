@@ -916,7 +916,7 @@
         async function fetchProductReviews(productId) {
             try {
                 console.log('Fetching reviews for product:', productId);
-                const response = await fetch(`api/get-reviews.php?product_id=${productId}`);
+                const response = await fetch(`api/get-reviews.php?product_id=${productId}&include_family=1`);
                 const data = await response.json();
                 console.log('API Response:', data);
                 

@@ -100,5 +100,43 @@ while ($row = $result->fetch_assoc()) {
     ];
 }
 
+// Keep review metrics stable across variant-main switches by aggregating within each family.
+$familyReviewTotals = [];
+foreach ($products as $item) {
+    $productId = (int)($item['id'] ?? 0);
+    $parentId = isset($item['parent_product_id']) ? (int)$item['parent_product_id'] : 0;
+    $familyId = $parentId > 0 ? $parentId : $productId;
+
+    if (!isset($familyReviewTotals[$familyId])) {
+        $familyReviewTotals[$familyId] = [
+            'count' => 0,
+            'weighted_sum' => 0.0,
+        ];
+    }
+
+    $count = (int)($item['reviewCount'] ?? 0);
+    $rating = (float)($item['rating'] ?? 0);
+    $familyReviewTotals[$familyId]['count'] += $count;
+    $familyReviewTotals[$familyId]['weighted_sum'] += ($rating * $count);
+}
+
+foreach ($products as &$item) {
+    $productId = (int)($item['id'] ?? 0);
+    $parentId = isset($item['parent_product_id']) ? (int)$item['parent_product_id'] : 0;
+    $familyId = $parentId > 0 ? $parentId : $productId;
+
+    if (!isset($familyReviewTotals[$familyId])) {
+        continue;
+    }
+
+    $familyCount = (int)$familyReviewTotals[$familyId]['count'];
+    $familyWeightedSum = (float)$familyReviewTotals[$familyId]['weighted_sum'];
+    $familyRating = $familyCount > 0 ? ($familyWeightedSum / $familyCount) : 0.0;
+
+    $item['reviewCount'] = $familyCount;
+    $item['rating'] = $familyRating;
+}
+unset($item);
+
 echo json_encode($products);
 $conn->close();

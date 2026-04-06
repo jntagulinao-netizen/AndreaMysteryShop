@@ -739,6 +739,28 @@ if ($currentView === 'archived') {
     }
     .reviews-header-box strong { color: #333; font-size: 14px; }
     .reviews-header-box span { color: #e22a39; font-weight: 700; font-size: 13px; }
+    .reviews-product-selector {
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .reviews-product-selector label {
+      font-size: 12px;
+      color: #555;
+      font-weight: 700;
+    }
+    .reviews-product-selector select {
+      min-width: 220px;
+      max-width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+      color: #333;
+      background: #fff;
+    }
     .product-review-list {
       display: flex;
       flex-direction: column;
@@ -1010,6 +1032,17 @@ if ($currentView === 'archived') {
       .main-images-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+      .reviews-product-selector {
+        justify-content: center;
+        text-align: center;
+      }
+      .reviews-product-selector label {
+        width: 100%;
+        text-align: center;
+      }
+      .reviews-product-selector select {
+        margin: 0 auto;
+      }
       #productVideoPreview {
         max-height: 180px !important;
       }
@@ -1190,6 +1223,10 @@ if ($currentView === 'archived') {
               <div class="reviews-header-box">
                 <strong>Customer Feedback</strong>
                 <span id="reviewsCountBadge">0 reviews</span>
+              </div>
+              <div id="reviewsProductSelectorWrap" class="reviews-product-selector" style="display:none;">
+                <label for="reviewsProductSelect">Showing reviews for</label>
+                <select id="reviewsProductSelect"></select>
               </div>
               <div id="reviewsContent" class="reviews-loading">Loading reviews...</div>
             </div>
@@ -1681,6 +1718,62 @@ if ($currentView === 'archived') {
       }
     }
 
+    function getReviewFamilyProducts(productId) {
+      const selected = products.find((p) => Number(p.id) === Number(productId));
+      if (!selected) {
+        return [];
+      }
+
+      const selectedId = Number(selected.id);
+      const mainId = Number(selected.parent_product_id || 0) > 0 ? Number(selected.parent_product_id) : selectedId;
+      const family = products.filter((p) => {
+        const pId = Number(p.id);
+        const pParent = Number(p.parent_product_id || 0);
+        return pId === mainId || pParent === mainId;
+      });
+
+      return family.sort((a, b) => {
+        const aMain = Number(a.parent_product_id || 0) === 0 ? 0 : 1;
+        const bMain = Number(b.parent_product_id || 0) === 0 ? 0 : 1;
+        if (aMain !== bMain) {
+          return aMain - bMain;
+        }
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+    }
+
+    function setupReviewsProductSelector(baseProductId) {
+      const wrap = document.getElementById('reviewsProductSelectorWrap');
+      const select = document.getElementById('reviewsProductSelect');
+      if (!wrap || !select) {
+        return;
+      }
+
+      const family = getReviewFamilyProducts(baseProductId);
+      if (!family.length) {
+        wrap.style.display = 'none';
+        select.innerHTML = '';
+        return;
+      }
+
+      select.innerHTML = family.map((item) => {
+        const itemId = Number(item.id) || 0;
+        const label = String(item.name || `Product #${itemId}`);
+        const isMain = Number(item.parent_product_id || 0) === 0;
+        return `<option value="${itemId}">${escapeHtml(label)}${isMain ? ' (Main)' : ''}</option>`;
+      }).join('');
+
+      select.value = String(Number(baseProductId) || 0);
+      wrap.style.display = family.length > 1 ? 'flex' : 'none';
+
+      select.onchange = () => {
+        const selectedId = Number(select.value || 0);
+        if (selectedId > 0) {
+          loadProductReviews(selectedId);
+        }
+      };
+    }
+
     async function loadProductReviews(productId) {
       const content = document.getElementById('reviewsContent');
       const badge = document.getElementById('reviewsCountBadge');
@@ -1712,6 +1805,7 @@ if ($currentView === 'archived') {
         content.className = 'product-review-list';
         content.innerHTML = reviews.map((review) => {
           const mediaFiles = Array.isArray(review.media_files) ? review.media_files : [];
+          const displayName = (String(review.user_name || '').trim()) || (review.is_anonymous ? 'an***s' : 'User');
           let mediaNode = '';
 
           if (mediaFiles.length > 0) {
@@ -1744,7 +1838,7 @@ if ($currentView === 'archived') {
           return `
             <div class="product-review-item">
               <div class="admin-review-meta">
-                By: ${escapeHtml(review.is_anonymous ? 'Anonymous User' : (review.user_name || 'Anonymous User'))}
+                By: ${escapeHtml(displayName)}
                 | ${escapeHtml(review.created_at || '')}
                 | Review #${Number(review.review_id)}
               </div>
@@ -2599,6 +2693,7 @@ if ($currentView === 'archived') {
       
       const variants = loadVariantsForProduct(product.id, product.name, product.category);
       renderVariantsEditSection(variants);
+      setupReviewsProductSelector(product.id);
       
       switchModalTab('reviews');
       await loadProductReviews(product.id);

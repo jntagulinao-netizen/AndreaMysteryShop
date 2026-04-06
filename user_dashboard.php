@@ -85,7 +85,7 @@ unset($_SESSION['login_success']);
     <script src="assets/js/user_dashboard_helpers.js?v=20260401-2"></script>
     <script src="assets/js/user_dashboard_recipients.js?v=20260401-2"></script>
     <script src="assets/js/user_dashboard_search.js"></script>
-    <script src="assets/js/user_dashboard_app.js?v=20260406-3"></script>
+    <script src="assets/js/user_dashboard_app.js?v=20260406-4"></script>
     <script src="assets/js/user_dashboard_app_init.js"></script>
     <?php if ($showLoginSplash): ?>
     <script>

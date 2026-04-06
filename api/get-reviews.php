@@ -34,6 +34,7 @@ function mask_anonymous_name_display($name) {
 }
 
 $productId = intval($_GET['product_id'] ?? 0);
+$includeFamily = isset($_GET['include_family']) && $_GET['include_family'] === '1';
 
 if ($productId <= 0) {
     http_response_code(400);
@@ -74,7 +75,44 @@ try {
         }
     }
 
-    $query = 'SELECT r.review_id, r.user_id, r.rating, r.review_text, r.review_image, r.review_image_type, r.created_at, u.full_name';
+    $targetProductIds = [$productId];
+    if ($includeFamily) {
+        $familyRootId = $productId;
+        $familyRootStmt = $conn->prepare('SELECT product_id, parent_product_id FROM products WHERE product_id = ? LIMIT 1');
+        if ($familyRootStmt) {
+            $familyRootStmt->bind_param('i', $productId);
+            $familyRootStmt->execute();
+            $familyRootResult = $familyRootStmt->get_result();
+            if ($familyRootResult && ($familyRow = $familyRootResult->fetch_assoc())) {
+                $parentId = isset($familyRow['parent_product_id']) ? intval($familyRow['parent_product_id']) : 0;
+                if ($parentId > 0) {
+                    $familyRootId = $parentId;
+                }
+            }
+            $familyRootStmt->close();
+        }
+
+        $familyIds = [];
+        $familyIdsStmt = $conn->prepare('SELECT product_id FROM products WHERE product_id = ? OR parent_product_id = ?');
+        if ($familyIdsStmt) {
+            $familyIdsStmt->bind_param('ii', $familyRootId, $familyRootId);
+            $familyIdsStmt->execute();
+            $familyIdsResult = $familyIdsStmt->get_result();
+            while ($familyIdsResult && ($familyIdRow = $familyIdsResult->fetch_assoc())) {
+                $pid = intval($familyIdRow['product_id'] ?? 0);
+                if ($pid > 0) {
+                    $familyIds[] = $pid;
+                }
+            }
+            $familyIdsStmt->close();
+        }
+
+        if (!empty($familyIds)) {
+            $targetProductIds = array_values(array_unique($familyIds));
+        }
+    }
+
+    $query = 'SELECT r.review_id, r.product_id, r.user_id, r.rating, r.review_text, r.review_image, r.review_image_type, r.created_at, u.full_name';
     if ($anonymousColumnExists) {
         $query .= ', r.is_anonymous';
     }
@@ -91,7 +129,7 @@ try {
     $query .= ' FROM reviews r
               LEFT JOIN users u ON r.user_id = u.user_id
               LEFT JOIN users admin_user ON admin_user.user_id = r.admin_reply_by
-              WHERE r.product_id = ?
+              WHERE r.product_id IN (' . implode(',', array_fill(0, count($targetProductIds), '?')) . ')
               ORDER BY r.created_at DESC
               LIMIT 50';
     
@@ -100,7 +138,8 @@ try {
         throw new Exception('Database prepare error: ' . $conn->error);
     }
     
-    $stmt->bind_param('i', $productId);
+    $types = str_repeat('i', count($targetProductIds));
+    $stmt->bind_param($types, ...$targetProductIds);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -163,6 +202,7 @@ try {
         $hasMedia = !empty($mediaFiles);
         $reviews[] = [
             'review_id' => $reviewId,
+            'product_id' => intval($row['product_id'] ?? 0),
             'user_id' => intval($row['user_id'] ?? 0),
             'is_mine' => $currentUserId > 0 && intval($row['user_id'] ?? 0) === $currentUserId,
             'user_name' => $isAnonymous ? mask_anonymous_name_display($rawName) : $rawName,
