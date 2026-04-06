@@ -45,9 +45,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'reply') {
         $replyText = trim((string)($_POST['admin_reply'] ?? ''));
+      $focusPid = max(0, intval($_POST['focus_product_id'] ?? 0));
+      $focusRid = max(0, intval($_POST['focus_review_id'] ?? $reviewId));
+      $redirectSearch = trim((string)($_POST['return_search'] ?? ''));
+      $redirectSort = strtolower(trim((string)($_POST['return_sort'] ?? 'newest')));
+      if (!in_array($redirectSort, ['newest', 'oldest'], true)) {
+        $redirectSort = 'newest';
+      }
+      $redirectPage = max(1, intval($_POST['return_page'] ?? 1));
+      $redirectPerPage = intval($_POST['return_per_page'] ?? 0);
+      if (!in_array($redirectPerPage, [4, 10], true)) {
+        $redirectPerPage = 10;
+      }
+      $replyRedirectUrl = 'admin_manage_reviews.php';
+      $replyRedirectQuery = [
+        'page' => $redirectPage,
+        'sort' => $redirectSort,
+        'per_page' => $redirectPerPage
+      ];
+      if ($redirectSearch !== '') {
+        $replyRedirectQuery['search'] = $redirectSearch;
+      }
+      if ($focusPid > 0) {
+        $replyRedirectQuery['focus_product_id'] = $focusPid;
+      }
+      if ($focusRid > 0) {
+        $replyRedirectQuery['focus_review_id'] = $focusRid;
+      }
+      if (!empty($replyRedirectQuery)) {
+        $replyRedirectUrl .= '?' . http_build_query($replyRedirectQuery);
+      }
+
+      if ($replyText === '') {
+        $_SESSION['admin_reviews_flash'] = ['type' => 'error', 'message' => 'Please enter a reply before sending.'];
+        header('Location: ' . $replyRedirectUrl);
+        exit;
+      }
         if (strlen($replyText) > 2000) {
             $_SESSION['admin_reviews_flash'] = ['type' => 'error', 'message' => 'Reply must be 2000 characters or less.'];
-            header('Location: admin_manage_reviews.php');
+        header('Location: ' . $replyRedirectUrl);
             exit;
         }
 
@@ -74,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['admin_reviews_flash'] = ['type' => 'error', 'message' => 'Failed to prepare reply action.'];
         }
 
-        header('Location: admin_manage_reviews.php');
+        header('Location: ' . $replyRedirectUrl);
         exit;
     }
 
@@ -397,55 +433,46 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
     .flash.success { background: #edf8f1; color: #146c2e; border: 1px solid #b7e4c1; }
     .flash.error { background: #fff0f0; color: #8f1414; border: 1px solid #ffc6c6; }
 
-    .local-sweet-overlay {
+    .local-swal-toast {
       position: fixed;
-      inset: 0;
-      background: rgba(10, 16, 26, 0.55);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50000;
-      padding: 14px;
-    }
-    .local-sweet-card {
-      width: 100%;
-      max-width: 380px;
+      top: 88px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-12px);
+      min-width: 240px;
+      max-width: 88vw;
       background: #fff;
-      border: 1px solid #dbe2ea;
-      border-radius: 14px;
-      box-shadow: 0 18px 50px rgba(12, 20, 33, 0.35);
-      padding: 18px;
+      border: 1px solid #e8e8e8;
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.18);
+      padding: 10px 14px;
+      z-index: 35000;
+      opacity: 0;
+      transition: all 0.22s ease;
+      pointer-events: none;
     }
-    .local-sweet-title {
-      font-size: 18px;
+    .local-swal-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .local-swal-toast .toast-title {
+      font-size: 13px;
       font-weight: 700;
-      color: #1f2937;
-      margin-bottom: 8px;
+      color: #222;
+      margin-bottom: 2px;
     }
-    .local-sweet-text {
-      font-size: 14px;
-      color: #4b5563;
-      line-height: 1.45;
-      margin-bottom: 14px;
+    .local-swal-toast .toast-text {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.35;
       white-space: pre-wrap;
       word-break: break-word;
     }
-    .local-sweet-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-    }
-    .local-sweet-btn {
-      border: none;
-      border-radius: 10px;
-      padding: 9px 12px;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .local-sweet-btn.cancel { background: #eef2f7; color: #334155; }
-    .local-sweet-btn.confirm { background: #e22a39; color: #fff; }
-    .local-sweet-btn.ok { background: #1d4ed8; color: #fff; }
+    .local-swal-toast.success { border-color: #d8f2df; }
+    .local-swal-toast.success .toast-title { color: #17863c; }
+    .local-swal-toast.error { border-color: #ffd9de; }
+    .local-swal-toast.error .toast-title { color: #c62839; }
+    .local-swal-toast.warning { border-color: #ffe6bf; }
+    .local-swal-toast.warning .toast-title { color: #b96a00; }
 
     .summary-card {
       background: #fff;
@@ -681,6 +708,10 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
 
     @media (max-width: 768px) {
       .page-container { width: calc(100% - 24px); }
+      .local-swal-toast {
+        top: calc(16px + env(safe-area-inset-top));
+        max-width: calc(100vw - 20px);
+      }
       .reviews-catalog .products-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
       .reviews-catalog .product-card { min-height: 340px; }
       .reviews-catalog .product-image { height: 150px; flex: 0 0 150px; }
@@ -738,6 +769,8 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
         <option value="oldest" <?php echo $sortOrder === 'oldest' ? 'selected' : ''; ?>>Oldest to newest</option>
       </select>
       <input type="hidden" name="per_page" id="reviewsPerPageInput" value="<?php echo intval($perPage); ?>">
+      <input type="hidden" name="focus_product_id" id="reviewsFocusProductInput" value="<?php echo intval($focusProductId); ?>">
+      <input type="hidden" name="focus_review_id" id="reviewsFocusReviewInput" value="<?php echo intval($focusReviewId); ?>">
     </form>
 
     <?php if (empty($pagedProductsWithReviews)): ?>
@@ -797,6 +830,10 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
     const productReviews = <?php echo json_encode($pagedProductsWithReviews, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
     const focusProductId = <?php echo intval($focusProductId); ?>;
     const focusReviewId = <?php echo intval($focusReviewId); ?>;
+    const returnSearch = <?php echo json_encode($searchTerm, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+    const returnSort = <?php echo json_encode($sortOrder, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+    const returnPage = <?php echo intval($currentPage); ?>;
+    const returnPerPage = <?php echo intval($perPage); ?>;
     const productReviewMap = {};
     productReviews.forEach((p) => { productReviewMap[Number(p.product_id)] = p; });
 
@@ -837,6 +874,34 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
       if (!el) return;
       el.style.height = 'auto';
       el.style.height = Math.min(el.scrollHeight, 260) + 'px';
+    }
+
+    function updateReplyButtonState(textarea) {
+      if (!textarea) return;
+      const form = textarea.closest('.reply-form');
+      if (!form) return;
+      const button = form.querySelector('button[type="submit"]');
+      if (!button) return;
+      const hasText = textarea.value.trim().length > 0;
+      button.disabled = !hasText;
+      button.style.opacity = hasText ? '1' : '0.6';
+      button.style.cursor = hasText ? 'pointer' : 'not-allowed';
+    }
+
+    function handleReplyFormSubmit(event) {
+      event.preventDefault();
+      const form = event.target;
+      const textarea = form.querySelector('textarea[name="admin_reply"]');
+      
+      if (!textarea) return;
+
+      const replyText = textarea.value.trim();
+      if (replyText.length === 0) {
+        showLocalSweetAlert('warning', 'Input Required', 'Please enter some text before sending a reply.', 1700);
+        return;
+      }
+
+      form.submit();
     }
 
     function renderReviewItems(reviews) {
@@ -884,9 +949,15 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
             <form method="post" class="reply-form">
               <input type="hidden" name="action" value="reply">
               <input type="hidden" name="review_id" value="${Number(review.review_id)}">
+              <input type="hidden" name="focus_product_id" value="${Number(review.product_id || 0)}">
+              <input type="hidden" name="focus_review_id" value="${Number(review.review_id || 0)}">
+              <input type="hidden" name="return_search" value="${escapeHtml(returnSearch || '')}">
+              <input type="hidden" name="return_sort" value="${escapeHtml(returnSort || 'newest')}">
+              <input type="hidden" name="return_page" value="${Number(returnPage) || 1}">
+              <input type="hidden" name="return_per_page" value="${Number(returnPerPage) || 10}">
               <div class="reply-inline">
                 <textarea name="admin_reply" maxlength="2000" rows="1" class="admin-reply-input" placeholder="Write your admin reply here...">${escapeHtml(review.admin_reply || '')}</textarea>
-                <button type="submit" class="btn btn-save btn-send-inline">Send</button>
+                <button type="submit" class="btn btn-save btn-send-inline" disabled>Send</button>
               </div>
               <div class="reply-meta">${replyMeta}</div>
             </form>
@@ -921,7 +992,13 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
         autoGrowTextarea(textarea);
         textarea.addEventListener('input', function () {
           autoGrowTextarea(this);
+          updateReplyButtonState(this);
         });
+        updateReplyButtonState(textarea);
+      });
+
+      reviewList.querySelectorAll('.reply-form').forEach((form) => {
+        form.addEventListener('submit', handleReplyFormSubmit);
       });
 
       modal.classList.add('show');
@@ -942,79 +1019,116 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
       document.body.style.overflow = '';
     }
 
-    function showLocalSweetAlert(title, text, type) {
-      const overlay = document.createElement('div');
-      overlay.className = 'local-sweet-overlay';
+    let modalBackdropPointerDown = false;
 
-      const buttonClass = type === 'error' ? 'confirm' : 'ok';
-      overlay.innerHTML = `
-        <div class="local-sweet-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
-          <div class="local-sweet-title">${escapeHtml(title)}</div>
-          <div class="local-sweet-text">${escapeHtml(text)}</div>
-          <div class="local-sweet-actions">
-            <button type="button" class="local-sweet-btn ${buttonClass}" id="localSweetOkBtn">OK</button>
-          </div>
-        </div>
-      `;
+    function wireReviewModalBackdropClose() {
+      const modal = document.getElementById('reviewAdminModal');
+      if (!modal) return;
 
-      document.body.appendChild(overlay);
-      const close = () => {
-        overlay.remove();
-      };
-
-      const okBtn = overlay.querySelector('#localSweetOkBtn');
-      if (okBtn) {
-        okBtn.focus();
-        okBtn.addEventListener('click', close);
+      const detail = modal.querySelector('.product-detail');
+      if (detail) {
+        detail.addEventListener('click', (event) => {
+          event.stopPropagation();
+        });
+        detail.addEventListener('pointerdown', (event) => {
+          event.stopPropagation();
+        });
       }
 
-      overlay.addEventListener('click', (event) => {
-        if (event.target === overlay) close();
+      modal.addEventListener('pointerdown', (event) => {
+        modalBackdropPointerDown = event.target === modal;
+      });
+
+      modal.addEventListener('pointerup', (event) => {
+        const isBackdropTap = modalBackdropPointerDown && event.target === modal;
+        modalBackdropPointerDown = false;
+        if (isBackdropTap) {
+          closeReviewModal();
+        }
+      });
+
+      modal.addEventListener('pointercancel', () => {
+        modalBackdropPointerDown = false;
       });
     }
 
-    function showLocalSweetConfirm(title, text) {
+    let activeLocalSwalToast = null;
+    let activeLocalSwalTimer = null;
+
+    function showLocalSweetAlert(type = 'success', title = 'Notice', text = '', duration = 1200) {
+      const normalizedType = String(type || 'success').toLowerCase();
+
+      if (activeLocalSwalTimer) {
+        window.clearTimeout(activeLocalSwalTimer);
+        activeLocalSwalTimer = null;
+      }
+      if (activeLocalSwalToast && activeLocalSwalToast.parentNode) {
+        activeLocalSwalToast.parentNode.removeChild(activeLocalSwalToast);
+        activeLocalSwalToast = null;
+      }
+
+      const toast = document.createElement('div');
+      toast.className = `local-swal-toast ${normalizedType}`;
+      toast.innerHTML = `<div class="toast-title">${escapeHtml(title)}</div><div class="toast-text">${escapeHtml(text)}</div>`;
+      document.body.appendChild(toast);
+      activeLocalSwalToast = toast;
+
+      requestAnimationFrame(() => toast.classList.add('show'));
+
+      activeLocalSwalTimer = window.setTimeout(() => {
+        toast.classList.remove('show');
+        window.setTimeout(() => {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+          if (activeLocalSwalToast === toast) {
+            activeLocalSwalToast = null;
+          }
+        }, 220);
+      }, Number(duration) > 0 ? Number(duration) : 1200);
+    }
+
+    function showLocalConfirmModal(title = 'Confirm', text = '', confirmText = 'Continue', cancelText = 'Cancel') {
       return new Promise((resolve) => {
         const overlay = document.createElement('div');
-        overlay.className = 'local-sweet-overlay';
-        overlay.innerHTML = `
-          <div class="local-sweet-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
-            <div class="local-sweet-title">${escapeHtml(title)}</div>
-            <div class="local-sweet-text">${escapeHtml(text)}</div>
-            <div class="local-sweet-actions">
-              <button type="button" class="local-sweet-btn cancel" id="localSweetCancelBtn">Cancel</button>
-              <button type="button" class="local-sweet-btn confirm" id="localSweetConfirmBtn">Delete</button>
-            </div>
+        overlay.className = 'local-confirm-overlay';
+
+        const card = document.createElement('div');
+        card.className = 'local-confirm-card';
+        card.innerHTML = `
+          <div class="local-confirm-title">${escapeHtml(title)}</div>
+          <div class="local-confirm-text">${escapeHtml(text)}</div>
+          <div class="local-confirm-actions">
+            <button type="button" data-role="cancel" class="local-confirm-btn local-confirm-cancel">${escapeHtml(cancelText)}</button>
+            <button type="button" data-role="confirm" class="local-confirm-btn local-confirm-submit">${escapeHtml(confirmText)}</button>
           </div>
         `;
 
-        document.body.appendChild(overlay);
-
-        const close = (result) => {
-          overlay.remove();
+        const cleanup = (result) => {
+          if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+          }
           resolve(result);
         };
 
-        const cancelBtn = overlay.querySelector('#localSweetCancelBtn');
-        const confirmBtn = overlay.querySelector('#localSweetConfirmBtn');
-
+        const cancelBtn = card.querySelector('[data-role="cancel"]');
+        const confirmBtn = card.querySelector('[data-role="confirm"]');
+        if (cancelBtn) cancelBtn.onclick = () => cleanup(false);
         if (confirmBtn) {
           confirmBtn.focus();
-          confirmBtn.addEventListener('click', () => close(true));
-        }
-        if (cancelBtn) {
-          cancelBtn.addEventListener('click', () => close(false));
+          confirmBtn.onclick = () => cleanup(true);
         }
 
-        overlay.addEventListener('click', (event) => {
-          if (event.target === overlay) close(false);
-        });
+        overlay.onclick = (event) => {
+          if (event.target === overlay) cleanup(false);
+        };
+
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
       });
     }
 
     function confirmDeleteReview(event, formEl) {
       event.preventDefault();
-      showLocalSweetConfirm('Delete Review', 'Delete this review permanently? This action cannot be undone.')
+      showLocalConfirmModal('Delete Review', 'Delete this review permanently? This action cannot be undone.', 'Delete', 'Cancel')
         .then((ok) => {
           if (ok && formEl) {
             formEl.submit();
@@ -1022,14 +1136,6 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
         });
       return false;
     }
-
-    document.addEventListener('click', (event) => {
-      const modal = document.getElementById('reviewAdminModal');
-      if (!modal) return;
-      if (event.target === modal) {
-        closeReviewModal();
-      }
-    });
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
@@ -1042,10 +1148,22 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
       const searchInput = document.getElementById('reviewsSearchInput');
       const sortSelect = document.getElementById('reviewsSortSelect');
       const perPageInput = document.getElementById('reviewsPerPageInput');
+      const focusProductInput = document.getElementById('reviewsFocusProductInput');
+      const focusReviewInput = document.getElementById('reviewsFocusReviewInput');
       if (!form || !searchInput) return;
+
+      const syncFocusInputs = () => {
+        if (focusProductInput) {
+          focusProductInput.value = String(Number(focusProductId) || 0);
+        }
+        if (focusReviewInput) {
+          focusReviewInput.value = String(Number(focusReviewId) || 0);
+        }
+      };
 
       const preferredPerPage = window.innerWidth >= 992 ? 10 : 4;
       if (perPageInput && Number(perPageInput.value) !== preferredPerPage) {
+        syncFocusInputs();
         perPageInput.value = String(preferredPerPage);
         form.submit();
         return;
@@ -1053,12 +1171,14 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
 
       searchInput.addEventListener('input', () => {
         if (searchInput.value.trim() === '') {
+          syncFocusInputs();
           form.submit();
         }
       });
 
       if (sortSelect) {
         sortSelect.addEventListener('change', () => {
+          syncFocusInputs();
           form.submit();
         });
       }
@@ -1067,6 +1187,7 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
     window.openReviewModal = openReviewModal;
     window.closeReviewModal = closeReviewModal;
     window.confirmDeleteReview = confirmDeleteReview;
+    wireReviewModalBackdropClose();
     if (window.DashboardReusableUI && typeof window.DashboardReusableUI.renderReviewMediaNode === 'function') {
       // no-op: forces reusable UI load path for media interactions
     }
@@ -1078,7 +1199,8 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
       const message = String(flashNode.getAttribute('data-message') || '').trim();
       if (!message) return;
       const title = type === 'error' ? 'Action Failed' : 'Action Successful';
-      showLocalSweetAlert(title, message, type);
+      const duration = type === 'error' ? 2000 : 1300;
+      showLocalSweetAlert(type, title, message, duration);
     })();
 
     (function autoOpenFocusedReview() {

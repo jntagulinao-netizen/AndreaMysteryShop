@@ -838,10 +838,12 @@ if ($currentView === 'archived') {
       color: #fff;
       font-size: 12px;
       padding: 8px 10px;
+      text-decoration: none;
     }
     .review-manage-btn:hover {
       background: #1f56bf;
       border-color: #1f56bf;
+      text-decoration: none;
     }
     .reviews-empty,
     .reviews-loading {
@@ -1662,14 +1664,16 @@ if ($currentView === 'archived') {
     }
 
     function goToManageSpecificReview(reviewId, productId) {
-      const params = new URLSearchParams();
-      if (productId) {
-        params.set('focus_product_id', String(productId));
+      const normalizedProductId = Number(productId) || 0;
+      const normalizedReviewId = Number(reviewId) || 0;
+      let target = 'admin_manage_reviews.php';
+      if (normalizedProductId > 0) {
+        target += '?focus_product_id=' + encodeURIComponent(String(normalizedProductId));
+        if (normalizedReviewId > 0) {
+          target += '&focus_review_id=' + encodeURIComponent(String(normalizedReviewId));
+        }
       }
-      if (reviewId) {
-        params.set('focus_review_id', String(reviewId));
-      }
-      window.location.href = `admin_manage_reviews.php?${params.toString()}`;
+      window.location.href = target;
     }
 
     function renderReusableReviewMediaNode(media, variantClass = '') {
@@ -1806,6 +1810,9 @@ if ($currentView === 'archived') {
         content.innerHTML = reviews.map((review) => {
           const mediaFiles = Array.isArray(review.media_files) ? review.media_files : [];
           const displayName = (String(review.user_name || '').trim()) || (review.is_anonymous ? 'an***s' : 'User');
+          const reviewId = Number(review.review_id) || 0;
+          const targetProductId = Number(review.product_id || productId) || Number(productId) || 0;
+          const manageReviewHref = `admin_manage_reviews.php?focus_product_id=${encodeURIComponent(String(targetProductId))}${reviewId > 0 ? `&focus_review_id=${encodeURIComponent(String(reviewId))}` : ''}`;
           let mediaNode = '';
 
           if (mediaFiles.length > 0) {
@@ -1846,7 +1853,7 @@ if ($currentView === 'archived') {
               <div class="review-text">${escapeHtml(review.review_text || '')}</div>
               ${mediaNode ? `<div class="modal-media-wrap">${mediaNode}</div>` : ''}
               <div class="review-manage-actions">
-                <button type="button" class="edit-btn review-manage-btn" onclick="goToManageSpecificReview(${Number(review.review_id) || 0}, ${Number(review.product_id || productId) || Number(productId) || 0})">Manage This Review</button>
+                <a class="edit-btn review-manage-btn" href="${manageReviewHref}">Manage This Review</a>
               </div>
             </div>
           `;

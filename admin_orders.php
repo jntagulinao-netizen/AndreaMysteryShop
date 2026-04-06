@@ -1174,7 +1174,7 @@ $statusDisplay = [
             </div>
             <div class="action-buttons">
               <?php if (strtolower((string)$status) === 'reviewed' && $firstProductId > 0): ?>
-                <a class="action-btn primary" href="admin_manage_reviews.php?focus_product_id=<?php echo intval($firstProductId); ?><?php echo $targetReviewId > 0 ? '&focus_review_id=' . intval($targetReviewId) : ''; ?>">Open Reviews</a>
+                <a class="action-btn primary" href="admin_manage_reviews.php?focus_product_id=<?php echo intval($firstProductId); ?><?php echo $targetReviewId > 0 ? '&focus_review_id=' . intval($targetReviewId) : ''; ?>">Open this Review</a>
               <?php endif; ?>
               <?php if ($nextStatus): ?>
                 <form method="POST" class="order-action-form" style="display:inline;" data-confirm-type="warning" data-confirm-title="Change Order Status" data-confirm-message="Move this order to <?php echo htmlspecialchars($statusLabels[$nextStatus]); ?>?">
@@ -1819,14 +1819,16 @@ $statusDisplay = [
     }
 
     function goToManageSpecificReview(reviewId, productId) {
-      const params = new URLSearchParams();
-      if (productId) {
-        params.set('focus_product_id', String(productId));
+      const normalizedProductId = Number(productId) || 0;
+      const normalizedReviewId = Number(reviewId) || 0;
+      let target = 'admin_manage_reviews.php';
+      if (normalizedProductId > 0) {
+        target += '?focus_product_id=' + encodeURIComponent(String(normalizedProductId));
+        if (normalizedReviewId > 0) {
+          target += '&focus_review_id=' + encodeURIComponent(String(normalizedReviewId));
+        }
       }
-      if (reviewId) {
-        params.set('focus_review_id', String(reviewId));
-      }
-      window.location.href = `admin_manage_reviews.php?${params.toString()}`;
+      window.location.href = target;
     }
 
     async function loadReviewedOrderReviews(status, productId) {
