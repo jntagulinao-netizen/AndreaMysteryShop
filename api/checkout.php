@@ -79,9 +79,9 @@ if (!$recipientId) {
     exit;
 }
 
-if (!$paymentMethod || !in_array($paymentMethod, ['cash', 'gcash'])) {
+if (!$paymentMethod || !in_array($paymentMethod, ['cash'], true)) {
     http_response_code(400);
-    echo json_encode(['error' => 'Valid payment method is required (cash or gcash)']);
+    echo json_encode(['error' => 'Valid payment method is required (cash only)']);
     exit;
 }
 

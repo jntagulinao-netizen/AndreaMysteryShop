@@ -458,7 +458,7 @@ function format_peso_display($amount) {
           <a href="admin_product_drafts.php">Product Drafts</a>
           <a href="admin_my_products.php?view=archived">Archived Products</a>
           <a href="admin_manage_reviews.php">Manage Reviews</a>
-        
+          <a href="admin_profile.php">Admin Profile</a>
           <a href="logout.php">Logout</a>
         </div>
       </div>
@@ -538,9 +538,9 @@ function format_peso_display($amount) {
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
         <span>Messages</span>
       </a>
-      <a href="admin_add_product.php">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14"></path><path d="M5 12h14"></path><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-        <span>Add</span>
+      <a href="admin_profile.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.5 0 4.5-2 4.5-4.5S14.5 3 12 3 7.5 5 7.5 7.5 9.5 12 12 12z"></path><path d="M4 21c0-4.5 4-8 8-8s8 3.5 8 8"></path></svg>
+        <span>Profile</span>
       </a>
     </div>
   </nav>

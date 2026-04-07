@@ -64,3 +64,14 @@ Insert result: true
 }
 Insert result: true
 
+2026-04-07T01:39:08+02:00
+{
+    "mediaPublicPath": "message_media\/images\/msg_20260407_013908_36b7e4c2.jpg",
+    "mediaType": "image",
+    "mediaMime": "image\/jpeg",
+    "mediaSize": 204584,
+    "mediaOriginalName": "ca3c79d7-df44-437b-bd8f-54544944b9e6.jpg",
+    "finalMessageText": "[CHAT_MEDIA]message_media\/images\/msg_20260407_013908_36b7e4c2.jpg|image[\/CHAT_MEDIA]"
+}
+Insert result: true
+

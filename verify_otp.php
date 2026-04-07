@@ -1,5 +1,8 @@
 <?php
 session_start();
+$isOwnerReset = !empty($_SESSION['owner_reset_mode']);
+$backHref = $isOwnerReset ? 'owner_admin_access.php' : 'LogIn.php';
+$backLabel = $isOwnerReset ? 'Back to Pin Code' : 'Back to Login';
 ?>
 
 <!DOCTYPE html>
@@ -34,8 +37,10 @@ session_start();
     <div>
       <h2>Andrea Mystery Shop</h2>
       <div class="lead"><?php
-            if (isset($_SESSION['reset_email'])) {
-                echo 'Enter the one-time code we sent to your email to reset your password';
+            if ($isOwnerReset) {
+              echo 'Enter the one-time code we sent to your email to continue';
+            } elseif (isset($_SESSION['reset_email'])) {
+              echo 'Enter the one-time code we sent to your email to reset your password';
             } else {
                 echo 'Enter the one-time code we sent to your email';
             }
@@ -67,7 +72,7 @@ session_start();
     <button id="verifyBtn" type="submit" class="btn btn-primary w-100 mb-2">Verify Code</button>
 
     <div class="d-flex justify-content-between align-items-center">
-      <a class="muted-link" href="LogIn.php">Back to Login</a>
+      <a class="muted-link" href="<?php echo htmlspecialchars($backHref); ?>"><?php echo htmlspecialchars($backLabel); ?></a>
       <a class="muted-link" href="#" id="resendLink">Resend code</a>
     </div>
   </form>
@@ -122,7 +127,7 @@ session_start();
   document.getElementById('resendLink').addEventListener('click', function(e){
     e.preventDefault();
     Swal.fire({title: 'Resending...', didOpen: () => {Swal.showLoading();}});
-    fetch('resend_otp.php', {method: 'POST', credentials: 'same-origin'})
+      fetch(<?= json_encode($isOwnerReset ? 'owner_resend_reset_otp.php' : 'resend_otp.php') ?>, {method: 'POST', credentials: 'same-origin'})
       .then(r => r.json())
       .then(data => {
         if(data.status === 'ok'){

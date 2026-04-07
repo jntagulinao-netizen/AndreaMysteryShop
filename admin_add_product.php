@@ -42,10 +42,14 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         var(--bg);
     }
 
-    .screen { width: calc(100% - 48px); max-width: none; margin: 0 auto; min-height: 100vh; padding-bottom: 168px; }
+    .screen { width: calc(100% - 48px); max-width: none; margin: 0 auto; min-height: 100vh; padding-top: 74px; padding-bottom: 168px; }
     .topbar {
-      position: sticky;
+      position: fixed;
       top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 48px);
+      max-width: none;
       z-index: 20;
       background: rgba(238, 242, 245, 0.9);
       backdrop-filter: blur(8px);
@@ -92,17 +96,6 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       cursor: pointer;
     }
     .topbar-link-btn:hover { background: #e8effc; }
-
-    .hero {
-      margin: 14px;
-      background: linear-gradient(130deg, #1f3e8a 0%, #2f5dd7 54%, #4f78eb 100%);
-      color: #fff;
-      border-radius: 14px;
-      padding: 18px;
-      box-shadow: 0 12px 30px rgba(34, 72, 176, 0.3);
-    }
-    .hero h1 { font-size: 22px; margin-bottom: 6px; }
-    .hero p { font-size: 14px; opacity: 0.94; }
 
     .card {
       margin: 14px;
@@ -459,10 +452,9 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
 
     @media (max-width: 700px) {
       .screen { width: calc(100% - 24px); }
+      .topbar { width: calc(100% - 24px); }
       .footer-actions { width: calc(100% - 24px); }
       .topbar-title { font-size: 20px; }
-      .hero h1 { font-size: 18px; }
-      .hero p { font-size: 13px; }
       .main-images-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .field-label { font-size: 16px; }
       .dual-row { grid-template-columns: 1fr; }
@@ -479,12 +471,6 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         <button class="topbar-link-btn" type="button" onclick="window.location.href='admin_product_drafts.php'">Drafts</button>
       </div>
 </div>
-
-    <div class="hero">
-      <h1>Create a Product Listing</h1>
-      <p>Upload media, organize category, and publish a polished product entry in one flow.</p>
-    </div>
-
     <form id="addProductForm" enctype="multipart/form-data" novalidate>
       <div class="card">
         <div class="row">

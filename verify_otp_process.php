@@ -5,9 +5,14 @@ include 'dbConnection.php';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $enteredOtp = trim($_POST['otp']);
 
+    $isOwnerReset = !empty($_SESSION['owner_reset_mode']);
+
     // decide which flow we're in (registration vs reset)
     $isReset = false;
-    if (isset($_SESSION['reset_otp'])) {
+    if ($isOwnerReset && isset($_SESSION['reset_otp'])) {
+        $expectedOtp = $_SESSION['reset_otp'];
+        $isReset = true;
+    } elseif (isset($_SESSION['reset_otp'])) {
         $expectedOtp = $_SESSION['reset_otp'];
         $isReset = true;
     } elseif (isset($_SESSION['otp'])) {
@@ -18,12 +23,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     if (!$expectedOtp) {
         $redirect = 'verify_otp.php?error=' . urlencode('OTP expired. Please start over.');
-        if ($isReset) $redirect = 'LogIn.php?error=' . urlencode('OTP expired. Please try again.');
+        if ($isOwnerReset) {
+            $redirect = 'verify_otp.php?error=' . urlencode('OTP expired. Please request a new code.');
+        } elseif ($isReset) {
+            $redirect = 'LogIn.php?error=' . urlencode('OTP expired. Please try again.');
+        }
         header("Location: $redirect");
         exit();
     }
 
     if ($enteredOtp == $expectedOtp) {
+        if ($isOwnerReset) {
+            unset($_SESSION['reset_otp']);
+            $_SESSION['owner_reset_verified'] = true;
+            header('Location: owner_new_pin.php');
+            exit();
+        }
+
         if ($isReset) {
             unset($_SESSION['reset_otp']);
             $_SESSION['reset_verified'] = true;

@@ -1717,6 +1717,70 @@
         let recipients = [];
         let selectedRecipientId = null;
 
+        function setCheckoutTermsAccepted(accepted) {
+            const isAccepted = !!accepted;
+            const checkboxMain = document.getElementById('checkoutTermsCheckbox');
+            const checkboxModal = document.getElementById('checkoutTermsCheckboxModal');
+            if (checkboxMain) checkboxMain.checked = isAccepted;
+            if (checkboxModal) checkboxModal.checked = isAccepted;
+        }
+
+        function isCheckoutTermsAccepted() {
+            return !!document.getElementById('checkoutTermsCheckbox')?.checked;
+        }
+
+        function openCheckoutTermsModal() {
+            const modal = document.getElementById('checkoutTermsModal');
+            if (!modal) return;
+            modal.classList.add('show');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeCheckoutTermsModal() {
+            const modal = document.getElementById('checkoutTermsModal');
+            if (!modal) return;
+            modal.classList.remove('show');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function initCheckoutTermsControls() {
+            const openBtn = document.getElementById('openCheckoutTermsBtn');
+            const closeBtn = document.getElementById('closeCheckoutTermsBtn');
+            const doneBtn = document.getElementById('checkoutTermsDoneBtn');
+            const modal = document.getElementById('checkoutTermsModal');
+            const checkboxMain = document.getElementById('checkoutTermsCheckbox');
+            const checkboxModal = document.getElementById('checkoutTermsCheckboxModal');
+
+            if (openBtn && !openBtn.dataset.boundTerms) {
+                openBtn.dataset.boundTerms = '1';
+                openBtn.addEventListener('click', openCheckoutTermsModal);
+            }
+            if (closeBtn && !closeBtn.dataset.boundTerms) {
+                closeBtn.dataset.boundTerms = '1';
+                closeBtn.addEventListener('click', closeCheckoutTermsModal);
+            }
+            if (doneBtn && !doneBtn.dataset.boundTerms) {
+                doneBtn.dataset.boundTerms = '1';
+                doneBtn.addEventListener('click', closeCheckoutTermsModal);
+            }
+            if (checkboxMain && !checkboxMain.dataset.boundTerms) {
+                checkboxMain.dataset.boundTerms = '1';
+                checkboxMain.addEventListener('change', () => setCheckoutTermsAccepted(checkboxMain.checked));
+            }
+            if (checkboxModal && !checkboxModal.dataset.boundTerms) {
+                checkboxModal.dataset.boundTerms = '1';
+                checkboxModal.addEventListener('change', () => setCheckoutTermsAccepted(checkboxModal.checked));
+            }
+            if (modal && !modal.dataset.boundTerms) {
+                modal.dataset.boundTerms = '1';
+                modal.addEventListener('click', (event) => {
+                    if (event.target === modal) {
+                        closeCheckoutTermsModal();
+                    }
+                });
+            }
+        }
+
         async function openCheckout() {
             console.log('openCheckout() called, selectedItems before:', Array.from(selectedItems));
             
@@ -1738,20 +1802,16 @@
             
             // Update button state
             updateCheckoutButtonState();
+
+            initCheckoutTermsControls();
+            setCheckoutTermsAccepted(false);
             
             console.log('Checkout modal opened with selected items:', Array.from(selectedItems));
-            
-            // Setup payment method listener
-            document.querySelectorAll('input[name="paymentMethod"]').forEach(radio => {
-                radio.addEventListener('change', (e) => {
-                    const gcashDetails = document.getElementById('gcashDetails');
-                    gcashDetails.style.display = e.target.value === 'gcash' ? 'block' : 'none';
-                });
-            });
         }
 
         function closeCheckout() {
             document.getElementById('checkoutModal').classList.remove('show');
+            closeCheckoutTermsModal();
             document.body.style.overflow = '';
             refreshOverlayState();
             // Clear Buy Now items and selection when closing checkout
@@ -1881,6 +1941,12 @@
             if (itemsInCheckout.length === 0) {
                 showToast('Selected items are not found!', 'error');
                 console.error('Selected items not found:', selectedItems, itemsSource);
+                return;
+            }
+
+            if (!isCheckoutTermsAccepted()) {
+                await showLocalSweetAlert('warning', 'Terms & Conditions', 'Please agree to the Terms & Conditions before placing your order.', 1700);
+                openCheckoutTermsModal();
                 return;
             }
             
@@ -2036,6 +2102,9 @@
         function closeSuccessModal() {
             document.getElementById('successModal').classList.remove('show');
         }
+
+        window.openCheckoutTermsModal = openCheckoutTermsModal;
+        window.closeCheckoutTermsModal = closeCheckoutTermsModal;
 
         function filterProducts(query) { filteredProducts = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) || p.category.includes(query.toLowerCase())); renderProducts(); }
 

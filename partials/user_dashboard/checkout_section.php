@@ -108,20 +108,6 @@
                 <span class="payment-label">Cash on Delivery</span>
               </div>
             </label>
-
-            <label class="payment-option">
-              <input type="radio" name="paymentMethod" value="gcash">
-              <div class="payment-option-content">
-                <span class="payment-icon">📱</span>
-                <span class="payment-label">GCash</span>
-              </div>
-            </label>
-          </div>
-
-          <!-- GCash Details (shown when selected) -->
-          <div id="gcashDetails" class="payment-details hidden-inline">
-            <p class="payment-info">For GCash payment, our team will send you instructions via SMS/Email after order confirmation.</p>
-            <p class="payment-info payment-info-muted">Reference number will be provided with your order.</p>
           </div>
         </div>
 
@@ -146,7 +132,13 @@
             </div>
           </div>
 
-          <p class="order-terms">By placing your order, you agree to our Terms & Conditions</p>
+          <div class="checkout-terms-consent">
+            <label class="checkout-terms-label" for="checkoutTermsCheckbox">
+              <input type="checkbox" id="checkoutTermsCheckbox" class="checkout-terms-checkbox">
+              <span>I agree to the</span>
+            </label>
+            <button type="button" id="openCheckoutTermsBtn" class="checkout-terms-link">Terms &amp; Conditions</button>
+          </div>
         </div>
       </form>
     </div>
@@ -158,6 +150,27 @@
         <span class="btn-icon">✓</span>
         Place Order
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Terms and Conditions Modal (inside checkout flow) -->
+<div class="checkout-terms-modal" id="checkoutTermsModal" aria-hidden="true">
+  <div class="checkout-terms-card" role="dialog" aria-modal="true" aria-labelledby="checkoutTermsTitle">
+    <button type="button" class="checkout-terms-close" id="closeCheckoutTermsBtn" aria-label="Close terms">×</button>
+    <h2 id="checkoutTermsTitle">Terms &amp; Conditions</h2>
+    <div class="checkout-terms-body">
+      <p>By placing an order, you confirm that all shipping details provided are accurate and complete.</p>
+      <p>Orders are subject to confirmation and stock availability. Delivery timelines may vary depending on location and courier conditions.</p>
+      <p>Cash on Delivery orders may be canceled if delivery attempts fail or contact details are unreachable.</p>
+      <p>For concerns regarding damaged or incorrect items, contact support promptly with your order details for assistance.</p>
+    </div>
+    <label class="checkout-terms-modal-consent" for="checkoutTermsCheckboxModal">
+      <input type="checkbox" id="checkoutTermsCheckboxModal" class="checkout-terms-checkbox">
+      <span>I have read and agree to the Terms &amp; Conditions</span>
+    </label>
+    <div class="checkout-terms-actions">
+      <button type="button" class="checkout-terms-done" id="checkoutTermsDoneBtn">Done</button>
     </div>
   </div>
 </div>

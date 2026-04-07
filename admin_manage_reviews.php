@@ -738,6 +738,7 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
           <a href="admin_product_drafts.php">Product Drafts</a>
           <a href="admin_my_products.php?view=archived">Archived Products</a>
           <a href="admin_manage_reviews.php">Manage Reviews</a>
+          <a href="admin_profile.php">Admin Profile</a>
           <a href="logout.php">Logout</a>
         </div>
       </div>
@@ -888,6 +889,39 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
       button.style.cursor = hasText ? 'pointer' : 'not-allowed';
     }
 
+    function wireInlineReviewMediaClicks(scope) {
+      if (!scope) return;
+      const mediaNodes = scope.querySelectorAll('.js-review-media-open');
+      mediaNodes.forEach((node) => {
+        if (node.dataset.mediaClickBound === '1') return;
+        node.dataset.mediaClickBound = '1';
+
+        const openMedia = (event) => {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          const mediaUrl = String(node.getAttribute('data-review-media-url') || '').trim();
+          const mediaType = String(node.getAttribute('data-review-media-type') || '').trim();
+          if (!mediaUrl) return;
+
+          if (typeof window.openReviewMediaLightbox === 'function') {
+            window.openReviewMediaLightbox(mediaUrl, mediaType);
+            return;
+          }
+
+          window.open(mediaUrl, '_blank', 'noopener,noreferrer');
+        };
+
+        node.addEventListener('click', openMedia);
+        node.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            openMedia(event);
+          }
+        });
+      });
+    }
+
     function handleReplyFormSubmit(event) {
       event.preventDefault();
       const form = event.target;
@@ -987,6 +1021,8 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
       reviewMeta.textContent = 'Product ID: ' + product.product_id + ' | Reviews: ' + Number(product.review_count);
       reviewRating.textContent = 'Average: ' + Number(product.avg_rating).toFixed(1) + '/5';
       reviewList.innerHTML = renderReviewItems(product.reviews || []);
+
+      wireInlineReviewMediaClicks(reviewList);
 
       reviewList.querySelectorAll('.admin-reply-input').forEach((textarea) => {
         autoGrowTextarea(textarea);

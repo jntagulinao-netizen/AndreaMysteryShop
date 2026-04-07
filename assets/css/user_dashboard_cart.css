@@ -21,6 +21,8 @@
 
 .cart-seller-section { background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 12px; }
 .seller-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.seller-identity { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.seller-logo { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid #f0d6d2; background: #fff; }
 .seller-name { font-size: 14px; color: #333; font-weight: 700; }
 .seller-status { background: #ff7043; color: #fff; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-right: 8px; }
 
@@ -109,6 +111,10 @@
     .seller-header {
         flex-wrap: wrap;
         gap: 8px;
+    }
+    .seller-logo {
+        width: 30px;
+        height: 30px;
     }
     .cart-item-row {
         display: grid;

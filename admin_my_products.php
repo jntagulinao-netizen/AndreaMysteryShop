@@ -1155,7 +1155,7 @@ if ($currentView === 'archived') {
           <a href="admin_product_drafts.php">Product Drafts</a>
           <a href="admin_my_products.php?view=archived">Archived Products</a>
           <a href="admin_manage_reviews.php">Manage Reviews</a>
-         
+          <a href="admin_profile.php">Admin Profile</a>
           <a href="logout.php">Logout</a>
         </div>
       </div>

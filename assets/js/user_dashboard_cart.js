@@ -86,20 +86,23 @@ function renderCartPage() {
         : '<button onclick="selectAll()" class="cart-select-all-btn">Select All</button>';
 
     const byStore = filteredCart.reduce((acc, item) => {
-        const store = item.seller || 'Your Shop';
-        if (!acc[store]) acc[store] = [];
-        acc[store].push(item);
+        const sellerName = String(item.seller || '').trim();
+        const storeKey = sellerName || 'Andrea Mystery Shop';
+        if (!acc[storeKey]) acc[storeKey] = [];
+        acc[storeKey].push(item);
         return acc;
     }, {});
 
-    const cartItemsHTML = Object.entries(byStore).map(([store, items]) => `
+    const cartItemsHTML = Object.entries(byStore).map(([storeKey, items]) => {
+        const storeName = storeKey;
+        const showDefaultStoreLogo = storeName.toLowerCase() === 'andrea mystery shop';
+        return `
         <div class="cart-seller-section">
             <div class="seller-header">
-                <div>
-                    <span class="seller-status">Preferred</span>
-                    <span class="seller-name">${store}</span>
+                <div class="seller-identity">
+                    ${showDefaultStoreLogo ? '<img src="logo-removebg-preview.png" alt="Andrea Mystery Shop" class="seller-logo">' : ''}
+                    ${storeName ? `<span class="seller-name">${storeName}</span>` : ''}
                 </div>
-                <span class="seller-edit-label">Edit</span>
             </div>
             ${items.map(item => `
                 <div class="cart-item-card ${selectedItems.has(item.id) ? 'selected' : ''}">
@@ -122,7 +125,8 @@ function renderCartPage() {
                 </div>
             `).join('')}
         </div>
-    `).join('');
+    `;
+    }).join('');
 
     cartPageItems.innerHTML = '<div class="cart-select-bar"><strong>Select items to checkout:</strong>' + selectAllBtn + '</div>' + cartItemsHTML;
 
