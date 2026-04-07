@@ -195,7 +195,7 @@ if ($isOwnerStmt) {
   }
   $isOwnerStmt->close();
 }
-$showEditForm = ($updateMessage !== '' || $updateError !== '');
+$showEditForm = ($updateError !== '');
 ?>
 <!doctype html>
 <html>
@@ -547,6 +547,19 @@ $showEditForm = ($updateMessage !== '' || $updateError !== '');
       if (dropdown && toggleButton && card) {
         card.classList.toggle('expanded', dropdown.classList.contains('show'));
         toggleButton.textContent = dropdown.classList.contains('show') ? 'Hide Edit Form' : 'Edit Profile';
+      }
+
+      const successAlert = document.querySelector('.alert-success');
+      if (successAlert) {
+        window.setTimeout(function () {
+          successAlert.style.transition = 'opacity 0.3s ease';
+          successAlert.style.opacity = '0';
+          window.setTimeout(function () {
+            if (successAlert.parentNode) {
+              successAlert.parentNode.removeChild(successAlert);
+            }
+          }, 320);
+        }, 2500);
       }
     });
 
