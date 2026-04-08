@@ -44,25 +44,6 @@ $userRes = $userStmt->get_result();
 $user = $userRes ? ($userRes->fetch_assoc() ?: ['full_name' => 'Owner', 'email' => '']) : ['full_name' => 'Owner', 'email' => ''];
 $userStmt->close();
 
-$createOwnerSecuritySql = "CREATE TABLE IF NOT EXISTS `admin_owner_security` (
-  `user_id` int(11) NOT NULL,
-  `access_code_hash` varchar(255) DEFAULT NULL,
-  `reset_otp` varchar(6) DEFAULT NULL,
-  `reset_otp_expires` datetime DEFAULT NULL,
-  `reset_otp_verified` tinyint(1) NOT NULL DEFAULT 0,
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`user_id`),
-  CONSTRAINT `fk_admin_owner_security_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
-$conn->query($createOwnerSecuritySql);
-
-$seedStmt = $conn->prepare('INSERT IGNORE INTO admin_owner_security (user_id) VALUES (?)');
-if ($seedStmt) {
-    $seedStmt->bind_param('i', $userId);
-    $seedStmt->execute();
-    $seedStmt->close();
-}
-
 $otp = (string)random_int(100000, 999999);
 $expiresAt = date('Y-m-d H:i:s', time() + 300);
 
