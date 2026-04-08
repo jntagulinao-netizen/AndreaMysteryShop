@@ -205,6 +205,7 @@ function format_peso_display($amount) {
     .icon-orders { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
     .icon-products { background: linear-gradient(135deg, #f59e0b, #f97316); }
     .icon-drafts { background: linear-gradient(135deg, #10b981, #0ea5a5); }
+    .icon-auction-live { background: linear-gradient(135deg, #ef4444, #f59e0b); }
     .icon-archived { background: linear-gradient(135deg, #64748b, #475569); }
     .icon-reviews { background: linear-gradient(135deg, #06b6d4, #0e7490); }
     .icon-add { background: linear-gradient(135deg, #ef4444, #e11d48); }
@@ -456,6 +457,9 @@ function format_peso_display($amount) {
           <a href="admin_orders.php">Admin Orders</a>
           <a href="admin_my_products.php">My Products</a>
           <a href="admin_product_drafts.php">Product Drafts</a>
+          <a href="admin_auction_drafts.php">Auction Drafts</a>
+          <a href="admin_live_auctions.php">Live Auctions</a>
+          <a href="admin_add_auction.php">Add Auction Item</a>
           <a href="admin_my_products.php?view=archived">Archived Products</a>
           <a href="admin_manage_reviews.php">Manage Reviews</a>
           <a href="admin_profile.php">Admin Profile</a>
@@ -497,6 +501,18 @@ function format_peso_display($amount) {
             <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
           </span>
           <span class="function-label">Product Drafts</span>
+        </a>
+        <a class="function-tile" href="admin_auction_drafts.php" title="Auction Drafts">
+          <span class="function-icon icon-orders">
+            <svg viewBox="0 0 24 24"><path d="M12 3l2.9 5.9 6.5.9-4.7 4.5 1.1 6.4-5.8-3.1-5.8 3.1 1.1-6.4-4.7-4.5 6.5-.9z"></path></svg>
+          </span>
+          <span class="function-label">Auction Drafts</span>
+        </a>
+        <a class="function-tile" href="admin_live_auctions.php" title="Live Auctions">
+          <span class="function-icon icon-auction-live">
+            <svg viewBox="0 0 24 24"><path d="M14.5 5.5l4 4"></path><path d="M5.5 14.5l4 4"></path><path d="M4 20l6.5-6.5"></path><path d="M9.5 10.5l6-6 4 4-6 6"></path><path d="M12 7l5 5"></path><path d="M2 22h8"></path></svg>
+          </span>
+          <span class="function-label">Live Auctions</span>
         </a>
         <a class="function-tile" href="admin_my_products.php?view=archived" title="Archived Products">
           <span class="function-icon icon-archived">

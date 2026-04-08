@@ -16,6 +16,9 @@
     </div>
   </div>
   <div class="action-icons">
+    <button class="icon-btn" onclick="openAuctions()" aria-label="Auctions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5l4 4"></path><path d="M5.5 14.5l4 4"></path><path d="M4 20l6.5-6.5"></path><path d="M9.5 10.5l6-6 4 4-6 6"></path><path d="M12 7l5 5"></path><path d="M2 22h8"></path></svg>
+    </button>
     <button class="icon-btn" onclick="openMessages()" aria-label="Messages">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="14" y2="13"/></svg>
       <span class="message-badge" id="messageBadge">0</span>
@@ -29,6 +32,7 @@
       <div class="menu-dropdown" id="menuDropdown">
         <div class="menu-dropdown-item" onclick="window.location.href='user_dashboard.php'">Home</div>
         <div class="menu-dropdown-item" onclick="window.location.href='category_products.php'">Categories</div>
+        <div class="menu-dropdown-item" onclick="openAuctions()">Auctions</div>
         <div class="menu-dropdown-item" onclick="goToAccount()">Account</div>
         <div class="menu-dropdown-item" onclick="logoutUser()">Logout</div>
       </div>

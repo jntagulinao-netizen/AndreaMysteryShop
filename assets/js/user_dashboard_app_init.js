@@ -138,4 +138,9 @@
             window.location.href = 'messages.php';
         }
 
+        function openAuctions() {
+            closeMenuDropdown();
+            window.location.href = 'auction.php';
+        }
+
         function showNotification(msg){ console.log(msg); }
