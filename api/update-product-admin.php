@@ -510,6 +510,108 @@ if (!$categoryExists) {
     exit;
 }
 
+$familyLookupStmt = $conn->prepare('SELECT product_id, parent_product_id, product_stock FROM products WHERE product_id = ? LIMIT 1');
+if (!$familyLookupStmt) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Failed to validate product family']);
+    exit;
+}
+$familyLookupStmt->bind_param('i', $productId);
+$familyLookupStmt->execute();
+$familyLookupRes = $familyLookupStmt->get_result();
+$familyRow = $familyLookupRes ? $familyLookupRes->fetch_assoc() : null;
+$familyLookupStmt->close();
+
+if (!$familyRow) {
+    http_response_code(404);
+    echo json_encode(['success' => false, 'error' => 'Product not found']);
+    exit;
+}
+
+$mainFamilyProductId = (int)($familyRow['parent_product_id'] ?? 0);
+if ($mainFamilyProductId <= 0) {
+    $mainFamilyProductId = (int)$familyRow['product_id'];
+}
+
+$hasOrderLinkTable = false;
+$orderLinkTableCheck = $conn->query("SHOW TABLES LIKE 'auction_order_links'");
+if ($orderLinkTableCheck && $orderLinkTableCheck->num_rows > 0) {
+    $hasOrderLinkTable = true;
+}
+
+$auctionLockSql = 'SELECT l.auction_id FROM auction_listings l';
+if ($hasOrderLinkTable) {
+    $auctionLockSql .= ' LEFT JOIN auction_order_links aol ON aol.auction_id = l.auction_id';
+}
+$auctionLockSql .= ' WHERE l.auction_product_id IN (SELECT product_id FROM products WHERE product_id = ? OR parent_product_id = ?)';
+$auctionLockSql .= $hasOrderLinkTable
+    ? ' AND (l.auction_status = \'sold\' OR aol.order_id IS NOT NULL)'
+    : ' AND l.auction_status = \'sold\'';
+$auctionLockSql .= ' LIMIT 1';
+
+$auctionLockStmt = $conn->prepare($auctionLockSql);
+if (!$auctionLockStmt) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Failed to validate auction linkage']);
+    exit;
+}
+$auctionLockStmt->bind_param('ii', $mainFamilyProductId, $mainFamilyProductId);
+$auctionLockStmt->execute();
+$auctionLockRes = $auctionLockStmt->get_result();
+$isAuctionLockedFamily = $auctionLockRes && $auctionLockRes->num_rows > 0;
+$auctionLockStmt->close();
+
+if ($isAuctionLockedFamily) {
+    $currentMainStock = (int)($familyRow['product_stock'] ?? 0);
+    $stockMutationDetected = ($stock !== $currentMainStock);
+
+    if (!$stockMutationDetected && count($variants) > 0) {
+        $variantStockStmt = $conn->prepare('SELECT product_stock FROM products WHERE product_id = ? LIMIT 1');
+        if (!$variantStockStmt) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to validate variant stock']);
+            exit;
+        }
+
+        foreach ($variants as $variant) {
+            $variantId = (int)($variant['id'] ?? 0);
+            if ($variantId <= 0) {
+                continue;
+            }
+
+            $variantStockStmt->bind_param('i', $variantId);
+            $variantStockStmt->execute();
+            $variantStockRes = $variantStockStmt->get_result();
+            $variantStockRow = $variantStockRes ? $variantStockRes->fetch_assoc() : null;
+
+            if ($variantStockRow && (int)($variant['stock'] ?? 0) !== (int)$variantStockRow['product_stock']) {
+                $stockMutationDetected = true;
+                break;
+            }
+        }
+
+        $variantStockStmt->close();
+    }
+
+    if (!$stockMutationDetected && count($newVariants) > 0) {
+        foreach ($newVariants as $newVariant) {
+            if ((int)($newVariant['stock'] ?? 0) !== 0) {
+                $stockMutationDetected = true;
+                break;
+            }
+        }
+    }
+
+    if ($stockMutationDetected) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Stock changes are locked for product families already sold through auction checkout.'
+        ]);
+        exit;
+    }
+}
+
 $conn->begin_transaction();
 
 $uploadDirAbsolute = realpath(__DIR__ . '/..') . DIRECTORY_SEPARATOR . 'product_media';

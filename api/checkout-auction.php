@@ -62,6 +62,12 @@ try {
         $hasOrderLinkTable = true;
     }
 
+    $hasAuctionOrderItemsTable = false;
+    $orderItemsTableCheck = $conn->query("SHOW TABLES LIKE 'auction_order_items'");
+    if ($orderItemsTableCheck && $orderItemsTableCheck->num_rows > 0) {
+        $hasAuctionOrderItemsTable = true;
+    }
+
     if (!$hasProductColumn || !$hasOrderLinkTable) {
         throw new Exception('Auction checkout update is not installed. Run docs/AUCTION_WINNER_CHECKOUT_UPDATES.sql first.');
     }
@@ -242,7 +248,34 @@ try {
     }
     $itemStmt->bind_param('iid', $orderId, $auctionProductId, $orderPrice);
     $itemStmt->execute();
+    $orderItemId = (int)$conn->insert_id;
     $itemStmt->close();
+
+    if ($orderItemId <= 0) {
+        throw new Exception('Failed to create order item');
+    }
+
+    if ($hasAuctionOrderItemsTable) {
+        $insertAuctionOrderItemStmt = $conn->prepare(
+            'INSERT INTO auction_order_items (auction_id, order_id, order_item_id, item_name, item_description, category_id, final_price, quantity, source_product_id) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)'
+        );
+        if (!$insertAuctionOrderItemStmt) {
+            throw new Exception('Failed to create auction order snapshot');
+        }
+        $insertAuctionOrderItemStmt->bind_param(
+            'iiissidi',
+            $auctionId,
+            $orderId,
+            $orderItemId,
+            $itemName,
+            $itemDescription,
+            $categoryId,
+            $orderPrice,
+            $auctionProductId
+        );
+        $insertAuctionOrderItemStmt->execute();
+        $insertAuctionOrderItemStmt->close();
+    }
 
     $decrementStmt = $conn->prepare('UPDATE products SET product_stock = product_stock - 1, order_count = order_count + 1 WHERE product_id = ? AND product_stock >= 1');
     if (!$decrementStmt) {

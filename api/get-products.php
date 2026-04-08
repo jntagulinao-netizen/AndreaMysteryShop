@@ -29,7 +29,33 @@ if ($favoritesTableReady) {
 
 $includeArchived = isset($_GET['include_archived']) && $_GET['include_archived'] === '1' && (($_SESSION['user_role'] ?? '') === 'admin');
 
-$archiveFilter = $includeArchived ? '' : 'WHERE p.archived = 0';
+$hasOrderLinkTable = false;
+$orderLinkTableCheck = $conn->query("SHOW TABLES LIKE 'auction_order_links'");
+if ($orderLinkTableCheck && $orderLinkTableCheck->num_rows > 0) {
+    $hasOrderLinkTable = true;
+}
+
+$lockedAuctionFilter = "NOT EXISTS (
+    SELECT 1
+    FROM auction_listings l";
+if ($hasOrderLinkTable) {
+    $lockedAuctionFilter .= "
+    LEFT JOIN auction_order_links aol ON aol.auction_id = l.auction_id";
+}
+$lockedAuctionFilter .= "
+    WHERE (l.auction_product_id = p.product_id OR l.auction_product_id = p.parent_product_id)
+      AND ";
+$lockedAuctionFilter .= $hasOrderLinkTable
+    ? "(l.auction_status = 'sold' OR aol.order_id IS NOT NULL)"
+    : "l.auction_status = 'sold'";
+$lockedAuctionFilter .= "
+)";
+
+$whereClauses = [$lockedAuctionFilter];
+if (!$includeArchived) {
+    $whereClauses[] = 'p.archived = 0';
+}
+$archiveFilter = 'WHERE ' . implode(' AND ', $whereClauses);
 
 $sql = "SELECT p.product_id, p.product_name, p.product_description, p.price, p.product_stock, p.category_id, c.category_name, p.parent_product_id, p.archived, p.featured,
                      (SELECT IFNULL(SUM(oi.quantity), 0)

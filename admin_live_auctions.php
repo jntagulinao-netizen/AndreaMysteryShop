@@ -65,7 +65,7 @@ if ($role !== 'admin') {
     .page {
       position: relative;
       z-index: 1;
-      width: min(1320px, calc(100% - 40px));
+      width: calc(100% - 40px);
       margin: 0 auto;
       padding: 96px 0 28px;
     }
@@ -83,7 +83,7 @@ if ($role !== 'admin') {
     }
 
     .topbar-inner {
-      width: min(1320px, calc(100% - 40px));
+      width: calc(100% - 40px);
       margin: 0 auto;
       display: flex;
       gap: 10px;
@@ -194,6 +194,11 @@ if ($role !== 'admin') {
 
     .search::placeholder {
       color: rgba(255,255,255,0.52);
+    }
+
+    .status-filter option {
+      color: #111;
+      background: #fff;
     }
 
     .search {
@@ -515,6 +520,10 @@ if ($role !== 'admin') {
         width: calc(100% - 24px);
       }
 
+      .list {
+        grid-template-columns: 1fr;
+      }
+
       .card {
         grid-template-columns: 1fr;
       }
@@ -537,6 +546,90 @@ if ($role !== 'admin') {
 
       .title {
         font-size: 18px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .page,
+      .topbar-inner {
+        width: calc(100% - 28px);
+      }
+
+      .page {
+        padding-top: 126px;
+      }
+
+      .topbar-inner {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .back-btn {
+        order: 1;
+        margin-right: auto;
+      }
+
+      .new-btn {
+        order: 1;
+        margin-left: auto;
+      }
+
+      .title {
+        order: 2;
+        width: 100%;
+        text-align: center;
+        font-size: 17px;
+      }
+
+      .toolbar {
+        justify-content: center;
+        align-items: center;
+        padding: 12px;
+        gap: 12px;
+      }
+
+      .view-tabs {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .search {
+        flex: 0 0 auto;
+        width: 100%;
+        min-width: 0;
+        text-align: center;
+      }
+
+      .status-filter {
+        width: 100%;
+        text-align: center;
+        text-align-last: center;
+      }
+
+      .note {
+        text-align: center;
+      }
+
+      .modal-overlay {
+        align-items: flex-start;
+        padding: 12px 10px;
+      }
+
+      .modal-shell {
+        width: 100%;
+        max-height: calc(100vh - 24px);
+        border-radius: 16px;
+      }
+
+      .modal-body {
+        padding: 12px;
+      }
+
+      .detail-timer {
+        font-size: 30px;
       }
     }
   </style>

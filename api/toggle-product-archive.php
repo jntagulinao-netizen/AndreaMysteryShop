@@ -43,6 +43,40 @@ try {
 
     $mainProductId = !empty($selected['parent_product_id']) ? (int)$selected['parent_product_id'] : (int)$selected['product_id'];
 
+    if ($archive === 0) {
+        $hasOrderLinkTable = false;
+        $orderLinkTableCheck = $conn->query("SHOW TABLES LIKE 'auction_order_links'");
+        if ($orderLinkTableCheck && $orderLinkTableCheck->num_rows > 0) {
+            $hasOrderLinkTable = true;
+        }
+
+        $lockSql = 'SELECT l.auction_id FROM auction_listings l';
+        if ($hasOrderLinkTable) {
+            $lockSql .= ' LEFT JOIN auction_order_links aol ON aol.auction_id = l.auction_id';
+        }
+        $lockSql .= ' WHERE l.auction_product_id IN (SELECT product_id FROM products WHERE product_id = ? OR parent_product_id = ?)';
+        $lockSql .= $hasOrderLinkTable
+            ? ' AND (l.auction_status = \'sold\' OR aol.order_id IS NOT NULL)'
+            : ' AND l.auction_status = \'sold\'';
+        $lockSql .= ' LIMIT 1';
+
+        $lockStmt = $conn->prepare($lockSql);
+        if (!$lockStmt) {
+            throw new Exception('Failed to validate auction linkage state');
+        }
+        $lockStmt->bind_param('ii', $mainProductId, $mainProductId);
+        if (!$lockStmt->execute()) {
+            throw new Exception('Failed to validate auction linkage state');
+        }
+        $lockRes = $lockStmt->get_result();
+        $lockedAuction = $lockRes ? $lockRes->fetch_assoc() : null;
+        $lockStmt->close();
+
+        if ($lockedAuction) {
+            throw new Exception('This product family came from a completed auction and cannot be unarchived.');
+        }
+    }
+
     $featuredValue = $archive === 1 ? 0 : null;
     $updateSql = $archive === 1
         ? 'UPDATE products SET archived = ?, featured = ? WHERE product_id = ? OR parent_product_id = ?'
