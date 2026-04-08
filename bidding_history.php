@@ -311,6 +311,7 @@ if ($role !== 'user') {
     let bidRows = [];
     let recipients = [];
     let selectedAuction = null;
+    let selectedAuctionBidId = 0;
     const pageSize = 5;
     let currentPage = 1;
 
@@ -405,6 +406,7 @@ if ($role !== 'user') {
 
     async function beginCheckout(row) {
       selectedAuction = row;
+      selectedAuctionBidId = Number(row.bid_id || 0);
       const amount = row.sold_price !== null && row.sold_price !== undefined
         ? Number(row.sold_price)
         : Number(row.current_bid !== null ? row.current_bid : row.bid_amount);
@@ -437,6 +439,7 @@ if ($role !== 'user') {
       try {
         const payload = new URLSearchParams();
         payload.set('auction_id', String(selectedAuction.auction_id));
+        payload.set('bid_id', String(selectedAuctionBidId || 0));
         payload.set('recipient_id', String(recipientId));
         payload.set('payment_method', 'cash');
 
@@ -542,11 +545,12 @@ if ($role !== 'user') {
 
         const middle = document.createElement('div');
         const statusClass = String(row.auction_status || '').toLowerCase();
+        const isHighestBidRow = Boolean(row.is_highest_bid_record || row.is_current_highest);
         middle.innerHTML = `
           <div>
             <span class="pill ${statusClass}">${String(row.auction_status || 'scheduled')}</span>
             <span class="pill">${String(row.bid_status || 'valid')}</span>
-            ${row.is_current_highest ? '<span class="pill highest">Highest Bid</span>' : ''}
+            ${isHighestBidRow ? '<span class="pill highest">Highest Bid</span>' : ''}
           </div>
           <h3 class="meta-title">${String(row.item_name || 'Auction Item')}</h3>
           <div class="meta-line">Category: ${String(row.category_name || 'No Category')}</div>
@@ -564,7 +568,7 @@ if ($role !== 'user') {
           : `Current ${formatMoney(row.current_bid !== null ? row.current_bid : row.bid_amount)}`;
         right.appendChild(amount);
 
-        if (row.auction_status === 'sold' && row.is_winner && !row.checked_out) {
+        if (row.auction_status === 'sold' && row.is_winner && isHighestBidRow && !row.checked_out) {
           const checkoutBtn = document.createElement('button');
           checkoutBtn.className = 'btn checkout';
           checkoutBtn.textContent = 'Checkout Win';

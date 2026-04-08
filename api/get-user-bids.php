@@ -48,11 +48,13 @@ $res = $stmt->get_result();
 
 $rows = [];
 $topBidderByAuction = [];
+$topBidIdByAuction = [];
 while ($row = $res->fetch_assoc()) {
     $auctionId = (int)($row['auction_id'] ?? 0);
     $coverImage = auction_cover_image($conn, $auctionId);
     if (!array_key_exists($auctionId, $topBidderByAuction)) {
         $topBidderByAuction[$auctionId] = 0;
+        $topBidIdByAuction[$auctionId] = 0;
         $topStmt = $conn->prepare('SELECT user_id FROM auction_bids WHERE auction_id = ? ORDER BY bid_amount DESC, bid_id DESC LIMIT 1');
         if ($topStmt) {
             $topStmt->bind_param('i', $auctionId);
@@ -62,10 +64,21 @@ while ($row = $res->fetch_assoc()) {
             $topBidderByAuction[$auctionId] = (int)($topRow['user_id'] ?? 0);
             $topStmt->close();
         }
+
+        $topBidStmt = $conn->prepare('SELECT bid_id FROM auction_bids WHERE auction_id = ? ORDER BY bid_amount DESC, bid_id DESC LIMIT 1');
+        if ($topBidStmt) {
+            $topBidStmt->bind_param('i', $auctionId);
+            $topBidStmt->execute();
+            $topBidRes = $topBidStmt->get_result();
+            $topBidRow = $topBidRes ? $topBidRes->fetch_assoc() : null;
+            $topBidIdByAuction[$auctionId] = (int)($topBidRow['bid_id'] ?? 0);
+            $topBidStmt->close();
+        }
     }
 
     $auctionStatus = (string)($row['auction_status'] ?? 'scheduled');
     $isCurrentHighest = $auctionStatus === 'active' && $topBidderByAuction[$auctionId] === $userId;
+    $isHighestBidRecord = $topBidIdByAuction[$auctionId] === (int)($row['bid_id'] ?? 0);
 
     $rows[] = [
         'bid_id' => (int)($row['bid_id'] ?? 0),
@@ -83,6 +96,7 @@ while ($row = $res->fetch_assoc()) {
         'winner_user_id' => $row['winner_user_id'] !== null ? (int)$row['winner_user_id'] : null,
         'is_winner' => $row['winner_user_id'] !== null && (int)$row['winner_user_id'] === $userId,
         'is_current_highest' => $isCurrentHighest,
+        'is_highest_bid_record' => $isHighestBidRecord,
         'checked_out' => $row['order_id'] !== null,
         'order_id' => $row['order_id'] !== null ? (int)$row['order_id'] : null,
         'cover_image' => $coverImage

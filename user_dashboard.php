@@ -28,7 +28,7 @@ unset($_SESSION['login_success']);
     <link rel="stylesheet" href="assets/css/user_dashboard_search.css?v=20260331-1">
     <link rel="stylesheet" href="assets/css/user_dashboard_cart.css?v=20260407-3">
     <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260407-1">
-    <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260404-6">
+    <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260409-2">
 </head>
 <body>
     <?php if ($showLoginSplash): ?>
@@ -85,8 +85,8 @@ unset($_SESSION['login_success']);
     <script src="assets/js/user_dashboard_helpers.js?v=20260401-2"></script>
     <script src="assets/js/user_dashboard_recipients.js?v=20260401-2"></script>
     <script src="assets/js/user_dashboard_search.js"></script>
-    <script src="assets/js/user_dashboard_app.js?v=20260407-1"></script>
-    <script src="assets/js/user_dashboard_app_init.js"></script>
+    <script src="assets/js/user_dashboard_app.js?v=20260409-2"></script>
+    <script src="assets/js/user_dashboard_app_init.js?v=20260409-2"></script>
     <?php if ($showLoginSplash): ?>
     <script>
       (function () {

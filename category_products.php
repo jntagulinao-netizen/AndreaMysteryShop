@@ -25,7 +25,7 @@ if ($role !== 'user') {
     <link rel="stylesheet" href="assets/css/user_dashboard_search.css?v=20260331-1">
     <link rel="stylesheet" href="assets/css/user_dashboard_cart.css?v=20260407-3">
     <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260407-1">
-  <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260404-6">
+  <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260409-2">
     <link rel="stylesheet" href="assets/css/category_products_custom_display.css?v=20260402-5">
 </head>
 <body>
@@ -67,8 +67,8 @@ if ($role !== 'user') {
     <script src="assets/js/user_dashboard_helpers.js?v=20260401-2"></script>
     <script src="assets/js/user_dashboard_recipients.js?v=20260401-2"></script>
     <script src="assets/js/user_dashboard_search.js"></script>
-    <script src="assets/js/user_dashboard_app.js?v=20260407-1"></script>
-    <script src="assets/js/user_dashboard_app_init.js"></script>
+    <script src="assets/js/user_dashboard_app.js?v=20260409-2"></script>
+    <script src="assets/js/user_dashboard_app_init.js?v=20260409-2"></script>
     <script src="assets/js/category_products_custom_display.js?v=20260402-3"></script>
 
 

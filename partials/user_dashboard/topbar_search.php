@@ -16,6 +16,10 @@
     </div>
   </div>
   <div class="action-icons">
+    <a href="auction.php" class="live-auction-bubble hidden-inline" id="liveAuctionBubble" aria-label="Go to live auction">
+      <img src="logo.jpg" alt="Live auction" class="live-auction-bubble-thumb" id="liveAuctionBubbleThumb" loading="lazy" decoding="async">
+      <span class="live-auction-bubble-text">Live bidding</span>
+    </a>
     <button class="icon-btn" onclick="openAuctions()" aria-label="Auctions">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5l4 4"></path><path d="M5.5 14.5l4 4"></path><path d="M4 20l6.5-6.5"></path><path d="M9.5 10.5l6-6 4 4-6 6"></path><path d="M12 7l5 5"></path><path d="M2 22h8"></path></svg>
     </button>

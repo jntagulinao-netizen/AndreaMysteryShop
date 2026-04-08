@@ -5,6 +5,8 @@
             loadProducts();
             loadCart();
             loadMessageUnreadCount();
+            initLiveAuctionBubbleDrag();
+            loadLiveAuctionBubble();
             
             // Initialize Place Order button as enabled
             const placeOrderBtn = document.getElementById('placeOrderBtn');
@@ -42,6 +44,8 @@
             document.getElementById('searchPage')?.classList.add('full-page-search');
             
             document.querySelectorAll('.filter-btn').forEach(btn=>btn.addEventListener('click', ()=>{ const cat = btn.dataset.category; if (!cat || cat === 'more') return; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); filteredProducts = cat==='all'? [...products] : products.filter(p=>p.category===cat); renderProducts(); }));
+
+            window.setInterval(loadLiveAuctionBubble, 45000);
         });
 
         function handleGlobalClick(event) {

@@ -27,6 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $userId = (int)$_SESSION['user_id'];
 $auctionId = (int)($_POST['auction_id'] ?? 0);
+$bidId = (int)($_POST['bid_id'] ?? 0);
 $recipientId = (int)($_POST['recipient_id'] ?? 0);
 $paymentMethod = trim((string)($_POST['payment_method'] ?? ''));
 
@@ -101,6 +102,22 @@ try {
 
     if ((int)($auction['winner_user_id'] ?? 0) !== $userId) {
         throw new Exception('Only the winning bidder can checkout this auction');
+    }
+
+    if ($bidId > 0) {
+        $winningBidStmt = $conn->prepare('SELECT bid_id, user_id FROM auction_bids WHERE auction_id = ? ORDER BY bid_amount DESC, bid_id DESC LIMIT 1');
+        if (!$winningBidStmt) {
+            throw new Exception('Failed to validate winning bid');
+        }
+        $winningBidStmt->bind_param('i', $auctionId);
+        $winningBidStmt->execute();
+        $winningBidRes = $winningBidStmt->get_result();
+        $winningBidRow = $winningBidRes ? $winningBidRes->fetch_assoc() : null;
+        $winningBidStmt->close();
+
+        if (!$winningBidRow || (int)($winningBidRow['bid_id'] ?? 0) !== $bidId || (int)($winningBidRow['user_id'] ?? 0) !== $userId) {
+            throw new Exception('Checkout is only available from your highest bid entry');
+        }
     }
 
     $existingStmt = $conn->prepare('SELECT order_id FROM auction_order_links WHERE auction_id = ? LIMIT 1 FOR UPDATE');

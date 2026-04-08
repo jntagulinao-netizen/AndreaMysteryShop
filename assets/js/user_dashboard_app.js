@@ -1714,6 +1714,201 @@
             }
         }
 
+        async function loadLiveAuctionBubble() {
+            const bubble = document.getElementById('liveAuctionBubble');
+            const bubbleThumb = document.getElementById('liveAuctionBubbleThumb');
+            if (!bubble) return;
+
+            try {
+                const params = new URLSearchParams();
+                params.set('status', 'live');
+                params.set('limit', '20');
+
+                const res = await fetch('api/get-auction-listings.php?' + params.toString(), { cache: 'no-store' });
+                const data = await res.json();
+                if (!res.ok || !data.success || !Array.isArray(data.listings)) {
+                    bubble.classList.add('hidden-inline');
+                    bubble.classList.remove('show-inline');
+                    return;
+                }
+
+                const activeCount = data.listings.filter((item) => String(item.auction_status || '').toLowerCase() === 'active').length;
+                const scheduledCount = data.listings.filter((item) => String(item.auction_status || '').toLowerCase() === 'scheduled').length;
+                const hasLiveAuction = activeCount > 0;
+                const activeListing = data.listings.find((item) => String(item.auction_status || '').toLowerCase() === 'active') || null;
+                const thumbSource = String(activeListing?.cover_image || activeListing?.cover_video || 'logo.jpg');
+
+                if (hasLiveAuction) {
+                    bubble.classList.remove('hidden-inline');
+                    bubble.classList.add('show-inline');
+                    bubble.title = `${activeCount} active auction${activeCount === 1 ? '' : 's'}${scheduledCount > 0 ? `, ${scheduledCount} scheduled` : ''}`;
+                    bubble.setAttribute('aria-label', bubble.title);
+                    if (bubbleThumb) {
+                        bubbleThumb.src = thumbSource || 'logo.jpg';
+                        bubbleThumb.alt = activeListing?.item_name ? `${activeListing.item_name} live auction` : 'Live auction';
+                        bubbleThumb.onerror = () => {
+                            bubbleThumb.src = 'logo.jpg';
+                        };
+                    }
+                    applyLiveAuctionBubblePosition(bubble);
+                } else {
+                    bubble.classList.add('hidden-inline');
+                    bubble.classList.remove('show-inline');
+                }
+            } catch (err) {
+                bubble.classList.add('hidden-inline');
+                bubble.classList.remove('show-inline');
+            }
+        }
+
+        function getLiveAuctionBubbleStorageKey() {
+            return 'liveAuctionBubblePosition';
+        }
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function parseLiveAuctionBubblePosition() {
+            try {
+                const raw = window.localStorage.getItem(getLiveAuctionBubbleStorageKey());
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                if (!parsed || typeof parsed !== 'object') return null;
+                const left = Number(parsed.left);
+                const top = Number(parsed.top);
+                if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+                return { left, top };
+            } catch (err) {
+                return null;
+            }
+        }
+
+        function saveLiveAuctionBubblePosition(left, top) {
+            try {
+                window.localStorage.setItem(getLiveAuctionBubbleStorageKey(), JSON.stringify({ left, top }));
+            } catch (err) {
+                // Ignore storage failures.
+            }
+        }
+
+        function applyLiveAuctionBubblePosition(bubble) {
+            if (!bubble) return;
+
+            const saved = parseLiveAuctionBubblePosition();
+            const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+            const rect = bubble.getBoundingClientRect();
+            const bubbleWidth = rect.width || 180;
+            const bubbleHeight = rect.height || 44;
+            const minLeft = 12;
+            const minTop = 12;
+            const maxLeft = Math.max(minLeft, viewportWidth - bubbleWidth - 12);
+            const maxTop = Math.max(minTop, viewportHeight - bubbleHeight - 12);
+            const defaultLeft = Math.max(minLeft, viewportWidth - bubbleWidth - 18);
+            const defaultTop = Math.max(minTop, 110);
+            const nextLeft = clamp(saved ? saved.left : defaultLeft, minLeft, maxLeft);
+            const nextTop = clamp(saved ? saved.top : defaultTop, minTop, maxTop);
+
+            bubble.style.left = `${nextLeft}px`;
+            bubble.style.top = `${nextTop}px`;
+            bubble.style.right = 'auto';
+            bubble.style.bottom = 'auto';
+        }
+
+        function initLiveAuctionBubbleDrag() {
+            const bubble = document.getElementById('liveAuctionBubble');
+            if (!bubble || bubble.dataset.dragBound === '1') return;
+
+            bubble.dataset.dragBound = '1';
+
+            let pointerId = null;
+            let startX = 0;
+            let startY = 0;
+            let originLeft = 0;
+            let originTop = 0;
+            let dragged = false;
+
+            const finishDrag = () => {
+                if (pointerId !== null && bubble.hasPointerCapture && bubble.hasPointerCapture(pointerId)) {
+                    bubble.releasePointerCapture(pointerId);
+                }
+                bubble.classList.remove('is-dragging');
+                bubble.classList.remove('dragging-ready');
+                if (dragged) {
+                    bubble.dataset.dragged = '1';
+                    window.setTimeout(() => {
+                        delete bubble.dataset.dragged;
+                    }, 0);
+                }
+                pointerId = null;
+                dragged = false;
+            };
+
+            bubble.addEventListener('pointerdown', (event) => {
+                if (event.button !== undefined && event.button !== 0) return;
+                if (bubble.classList.contains('hidden-inline')) return;
+                const rect = bubble.getBoundingClientRect();
+                pointerId = event.pointerId;
+                startX = event.clientX;
+                startY = event.clientY;
+                originLeft = rect.left;
+                originTop = rect.top;
+                dragged = false;
+                bubble.classList.add('dragging-ready');
+                bubble.setPointerCapture(pointerId);
+            });
+
+            bubble.addEventListener('pointermove', (event) => {
+                if (pointerId === null || event.pointerId !== pointerId) return;
+                const dx = event.clientX - startX;
+                const dy = event.clientY - startY;
+                if (!dragged && Math.hypot(dx, dy) > 5) {
+                    dragged = true;
+                    bubble.classList.add('is-dragging');
+                }
+                if (!dragged) return;
+
+                const bubbleRect = bubble.getBoundingClientRect();
+                const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+                const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+                const minLeft = 12;
+                const minTop = 12;
+                const maxLeft = Math.max(minLeft, viewportWidth - bubbleRect.width - 12);
+                const maxTop = Math.max(minTop, viewportHeight - bubbleRect.height - 12);
+                const nextLeft = clamp(originLeft + dx, minLeft, maxLeft);
+                const nextTop = clamp(originTop + dy, minTop, maxTop);
+
+                bubble.style.left = `${nextLeft}px`;
+                bubble.style.top = `${nextTop}px`;
+                bubble.style.right = 'auto';
+                bubble.style.bottom = 'auto';
+            });
+
+            bubble.addEventListener('pointerup', () => {
+                if (pointerId === null) return;
+                if (dragged) {
+                    const left = parseFloat(String(bubble.style.left || '0')) || 0;
+                    const top = parseFloat(String(bubble.style.top || '0')) || 0;
+                    saveLiveAuctionBubblePosition(left, top);
+                }
+                finishDrag();
+            });
+
+            bubble.addEventListener('pointercancel', finishDrag);
+            bubble.addEventListener('click', (event) => {
+                if (bubble.dataset.dragged === '1') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                if (!bubble.classList.contains('show-inline')) return;
+                applyLiveAuctionBubblePosition(bubble);
+            });
+        }
+
         let recipients = [];
         let selectedRecipientId = null;
 

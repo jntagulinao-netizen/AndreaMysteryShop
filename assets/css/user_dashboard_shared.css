@@ -153,6 +153,105 @@
       }
     }
 
+    .action-icons {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .live-auction-bubble {
+      position: fixed;
+      top: 110px;
+      right: 18px;
+      left: auto;
+      z-index: 42000;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(226, 42, 57, 0.22);
+      background: linear-gradient(135deg, rgba(226, 42, 57, 0.16), rgba(255, 255, 255, 0.08));
+      color: #b91c1c;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      box-shadow: 0 12px 24px rgba(226, 42, 57, 0.16);
+      animation: liveAuctionBubbleFloat 2.2s ease-in-out infinite;
+      white-space: nowrap;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .live-auction-bubble.is-dragging {
+      animation: none;
+      cursor: grabbing;
+      box-shadow: 0 18px 32px rgba(226, 42, 57, 0.24);
+    }
+
+    .live-auction-bubble:hover {
+      transform: translateY(-1px) scale(1.01);
+      border-color: rgba(226, 42, 57, 0.38);
+      background: linear-gradient(135deg, rgba(226, 42, 57, 0.22), rgba(255, 255, 255, 0.08));
+    }
+
+    .live-auction-bubble-thumb {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      flex: 0 0 auto;
+      background: rgba(255, 255, 255, 0.7);
+      pointer-events: none;
+      animation: liveAuctionBubbleThumbPulse 1.4s ease-in-out infinite;
+    }
+
+    @keyframes liveAuctionBubbleFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+
+    @keyframes liveAuctionBubbleThumbPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
+      50% { transform: scale(1.16); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    }
+
+    .live-auction-bubble.hidden-inline {
+      display: none;
+    }
+
+    .live-auction-bubble.show-inline {
+      display: inline-flex;
+    }
+
+    .live-auction-bubble.dragging-ready {
+      transition: none;
+    }
+
+    @media (max-width: 560px) {
+      .live-auction-bubble {
+        top: 96px;
+        right: 12px;
+        padding: 9px 11px;
+        font-size: 12px;
+        max-width: calc(100vw - 24px);
+      }
+
+      .live-auction-bubble-text {
+        max-width: 84px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
     /* Integrated Product Details & Reviews Layout */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; color: #333; }
