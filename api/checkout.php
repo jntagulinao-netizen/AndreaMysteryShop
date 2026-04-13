@@ -25,6 +25,76 @@ $userId = (int)$_SESSION['user_id'];
 $recipientId = (int)($_POST['recipient_id'] ?? 0);
 $paymentMethod = trim($_POST['payment_method'] ?? '');
 
+// Get scheduling parameters
+$deliveryType = trim($_POST['delivery_type'] ?? 'delivery');
+$scheduleDate = trim($_POST['schedule_date'] ?? '');
+$scheduleSlot = trim($_POST['schedule_slot'] ?? '');
+
+// Validate delivery type
+if (!in_array($deliveryType, ['delivery', 'pickup'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid delivery type']);
+    exit;
+}
+
+// Validate schedule date and slot for delivery
+if ($deliveryType === 'delivery') {
+    if (empty($scheduleDate) || empty($scheduleSlot)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Schedule date and time slot are required for delivery']);
+        exit;
+    }
+
+    // Validate date format and future date
+    $scheduleDateTime = DateTime::createFromFormat('Y-m-d', $scheduleDate);
+    if (!$scheduleDateTime) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid schedule date format']);
+        exit;
+    }
+
+    $today = new DateTime();
+    $today->setTime(0, 0, 0);
+    if ($scheduleDateTime < $today) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Schedule date must be today or in the future']);
+        exit;
+    }
+
+    // Validate time slot format
+    if (!preg_match('/^\d{2}:\d{2}(-\d{2}:\d{2})?$/', $scheduleSlot)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid time slot format']);
+        exit;
+    }
+
+    // Ensure the selected slot is still available
+    $slotStmt = $conn->prepare('SELECT slot_id, max_orders, current_orders FROM delivery_slots WHERE slot_date = ? AND slot_time = ? AND is_active = 1 FOR UPDATE');
+    if (!$slotStmt) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Slot validation failed']);
+        exit;
+    }
+    $slotStmt->bind_param('ss', $scheduleDate, $scheduleSlot);
+    $slotStmt->execute();
+    $slotRes = $slotStmt->get_result();
+    $slot = $slotRes->fetch_assoc();
+    if (!$slot) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Selected delivery slot is not available']);
+        exit;
+    }
+    if ((int)$slot['current_orders'] >= (int)$slot['max_orders']) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Selected delivery slot is fully booked. Please choose another time.']);
+        exit;
+    }
+    $selectedSlotId = (int)$slot['slot_id'];
+    $slotStmt->close();
+}
+
+// Get selected items with quantities (JSON format)
+
 // Get selected items with quantities (JSON format)
 $selectedItemsStr = trim($_POST['selected_items'] ?? '');
 $selectedItemsData = [];
@@ -242,17 +312,24 @@ try {
         $total += $itemData['price'] * $itemData['quantity'];
     }
 
+    // Add delivery fee if delivery is selected
+    $deliveryFee = 0;
+    if ($deliveryType === 'delivery') {
+        $deliveryFee = 38.00;
+        $total += $deliveryFee;
+    }
+
     if (empty($items)) {
         throw new Exception('No valid items selected for checkout');
     }
 
     // Create order
     $status = 'pending';
-    $orderStmt = $conn->prepare('INSERT INTO orders (user_id, recipient_id, payment_method, status, total_amount, order_date) VALUES (?, ?, ?, ?, ?, NOW())');
+    $orderStmt = $conn->prepare('INSERT INTO orders (user_id, recipient_id, payment_method, status, total_amount, order_date, delivery_type, schedule_date, schedule_slot) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?)');
     if (!$orderStmt) {
         throw new Exception('Failed to prepare order insert: ' . $conn->error);
     }
-    $orderStmt->bind_param('iissd', $userId, $recipientId, $paymentMethod, $status, $total);
+    $orderStmt->bind_param('iissdsss', $userId, $recipientId, $paymentMethod, $status, $total, $deliveryType, $scheduleDate, $scheduleSlot);
     if (!$orderStmt->execute()) {
         throw new Exception('Failed to insert order: ' . $orderStmt->error);
     }
@@ -261,6 +338,20 @@ try {
     }
     $orderId = $conn->insert_id;
     error_log('Checkout: created order ' . $orderId . ' for user ' . $userId . ' total ' . $total);
+
+    if ($deliveryType === 'delivery' && !empty($selectedSlotId)) {
+        $slotUpdateStmt = $conn->prepare('UPDATE delivery_slots SET current_orders = current_orders + 1 WHERE slot_id = ?');
+        if (!$slotUpdateStmt) {
+            throw new Exception('Failed to prepare slot update: ' . $conn->error);
+        }
+        $slotUpdateStmt->bind_param('i', $selectedSlotId);
+        if (!$slotUpdateStmt->execute()) {
+            throw new Exception('Failed to update delivery slot order count: ' . $slotUpdateStmt->error);
+        }
+        if ($slotUpdateStmt->affected_rows === 0) {
+            throw new Exception('Failed to increment delivery slot count; slot not found or inactive');
+        }
+    }
 
     // Create order items and update stock for selected items
     foreach ($items as $item) {
@@ -356,6 +447,8 @@ try {
             . "Order Date: " . date('Y-m-d H:i:s') . "\n"
             . "Status: Pending\n"
             . "Payment: " . strtoupper($paymentMethod) . "\n"
+            . "Delivery Type: " . ucfirst($deliveryType) . "\n"
+            . ($deliveryType === 'delivery' ? "Scheduled Date: " . $scheduleDate . "\nScheduled Time: " . $scheduleSlot . "\nDelivery Fee: PHP " . number_format($deliveryFee, 2) . "\n" : "")
             . "Recipient: " . $recipientName . "\n"
             . "Phone: " . $recipientPhone . "\n"
             . "Address: " . $recipientAddress . "\n"
@@ -377,6 +470,10 @@ try {
         'order_id' => $orderId,
         'total' => $total,
         'payment_method' => $paymentMethod,
+        'delivery_type' => $deliveryType,
+        'schedule_date' => $scheduleDate,
+        'schedule_slot' => $scheduleSlot,
+        'delivery_fee' => $deliveryFee,
         'message' => 'Order placed successfully'
     ]);
     

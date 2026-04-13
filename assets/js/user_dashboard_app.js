@@ -256,6 +256,153 @@
             return amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
         }
 
+        function formatTime12Hour(value) {
+            if (!value || typeof value !== 'string') return value;
+            const parts = value.split(':');
+            if (parts.length < 2) return value;
+            let hour = parseInt(parts[0], 10);
+            const minute = parts[1].padStart(2, '0');
+            if (!Number.isFinite(hour)) return value;
+            const suffix = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12;
+            if (hour === 0) hour = 12;
+            return minute === '00' ? `${hour} ${suffix}` : `${hour}:${minute} ${suffix}`;
+        }
+
+        function formatDeliveryDateLabel(dateString) {
+            if (!dateString || typeof dateString !== 'string') return dateString;
+            const date = new Date(dateString + 'T00:00:00');
+            if (Number.isNaN(date.getTime())) return dateString;
+            const options = { weekday: 'short', month: 'short', day: 'numeric' };
+            return date.toLocaleDateString('en-US', options);
+        }
+
+        function setActiveScheduleDate(dateValue) {
+            const buttons = document.querySelectorAll('.available-date-button');
+            buttons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.date === dateValue);
+            });
+            const dateDropdown = document.getElementById('availableDateDropdown');
+            if (dateDropdown) {
+                dateDropdown.value = dateValue || '';
+            }
+        }
+
+        let availableDeliveryDates = []; // Store available dates for Flatpickr
+
+        async function loadAvailableDeliveryDates() {
+            const buttonsContainer = document.getElementById('availableDateButtons');
+            const dropdown = document.getElementById('availableDateDropdown');
+            const dateNote = document.getElementById('scheduleDateNote');
+            const dateInput = document.getElementById('scheduleDate');
+            if (!buttonsContainer || !dropdown || !dateNote || !dateInput) return;
+
+            buttonsContainer.innerHTML = '';
+            buttonsContainer.style.display = 'flex';
+            dropdown.innerHTML = '<option value="">Loading dates...</option>';
+            dropdown.hidden = true;
+            dateNote.textContent = 'Loading available delivery dates...';
+            console.log('loadAvailableDeliveryDates: fetching available dates');
+
+            try {
+                const res = await fetch('api/get-delivery-dates.php');
+                if (!res.ok) throw new Error('Failed to load available dates');
+                const data = await res.json();
+                const availableDates = Array.isArray(data.dates) ? data.dates : [];
+                console.log('loadAvailableDeliveryDates: received dates', availableDates);
+
+                if (availableDates.length === 0) {
+                    buttonsContainer.innerHTML = '<div class="available-date-empty">No available dates</div>';
+                    buttonsContainer.style.display = 'block';
+                    dateNote.textContent = 'No delivery dates are currently available. Please try again later.';
+                    dropdown.innerHTML = '<option value="">No available dates</option>';
+                    dropdown.hidden = false;
+                    return;
+                }
+
+                dateNote.textContent = `Choose from ${availableDates.length} available delivery date${availableDates.length === 1 ? '' : 's'}.`;
+
+                const currentValue = dateInput.value;
+                const firstDate = availableDates[0].date;
+                const isCurrentValid = currentValue && availableDates.some((d) => d.date === currentValue);
+                if (!isCurrentValid) {
+                    dateInput.value = firstDate;
+                }
+                dateInput.min = firstDate;
+                dateInput.max = availableDates[availableDates.length - 1].date;
+                setActiveScheduleDate(dateInput.value);
+
+                // Store available dates for Flatpickr
+                availableDeliveryDates = availableDates.map(d => d.date);
+
+                // Initialize or update Flatpickr
+                if (window.flatpickrInstance) {
+                    window.flatpickrInstance.destroy();
+                }
+                window.flatpickrInstance = flatpickr(dateInput, {
+                    enable: availableDeliveryDates,
+                    dateFormat: "Y-m-d",
+                    minDate: firstDate,
+                    maxDate: availableDates[availableDates.length - 1].date,
+                    defaultDate: dateInput.value,
+                    onChange: function(selectedDates, dateStr, instance) {
+                        setActiveScheduleDate(dateStr);
+                        loadAvailableSlots(dateStr);
+                    }
+                });
+
+                if (availableDates.length > 7) {
+                    buttonsContainer.innerHTML = '';
+                    dropdown.hidden = false;
+                    dropdown.innerHTML = '<option value="">Select a delivery date</option>';
+                    availableDates.forEach(slotDate => {
+                        const option = document.createElement('option');
+                        option.value = slotDate.date;
+                        option.textContent = `${formatDeliveryDateLabel(slotDate.date)} (${slotDate.open_slots} open)`;
+                        dropdown.appendChild(option);
+                    });
+                    dropdown.value = dateInput.value;
+                    dropdown.onchange = (event) => {
+                        const selectedDate = event.target.value;
+                        if (!selectedDate) return;
+                        dateInput.value = selectedDate;
+                        window.flatpickrInstance.setDate(selectedDate);
+                        setActiveScheduleDate(selectedDate);
+                        loadAvailableSlots(selectedDate);
+                    };
+                } else {
+                    dropdown.hidden = true;
+                    buttonsContainer.innerHTML = '';
+                    buttonsContainer.style.display = 'flex';
+                    availableDates.forEach(slotDate => {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'available-date-button';
+                        button.textContent = `${formatDeliveryDateLabel(slotDate.date)} (${slotDate.open_slots} open)`;
+                        button.dataset.date = slotDate.date;
+                        button.disabled = slotDate.open_slots <= 0;
+                        if (dateInput.value === slotDate.date) {
+                            button.classList.add('active');
+                        }
+                        button.addEventListener('click', () => {
+                            dateInput.value = slotDate.date;
+                            window.flatpickrInstance.setDate(slotDate.date);
+                            setActiveScheduleDate(slotDate.date);
+                            loadAvailableSlots(slotDate.date);
+                        });
+                        buttonsContainer.appendChild(button);
+                    });
+                }
+
+                loadAvailableSlots(dateInput.value);
+            } catch (err) {
+                console.error('loadAvailableDeliveryDates error:', err);
+                dateNote.textContent = 'Unable to load delivery dates. Please refresh or try again later.';
+                dropdown.innerHTML = '<option value="">Error loading dates</option>';
+                dropdown.hidden = false;
+            }
+        }
+
         function resolveItemImage(item) {
             const fallback = 'https://via.placeholder.com/160x160?text=No+Image';
             if (!item || typeof item !== 'object') return fallback;
@@ -1911,6 +2058,9 @@
 
         let recipients = [];
         let selectedRecipientId = null;
+        let checkoutDeliveryType = 'delivery';
+        let checkoutDeliveryFee = 38;
+        let checkoutScheduleSlots = [];
 
         function setCheckoutTermsAccepted(accepted) {
             const isAccepted = !!accepted;
@@ -1999,6 +2149,8 @@
             updateCheckoutButtonState();
 
             initCheckoutTermsControls();
+            initCheckoutScheduleControls();
+            initCheckoutDeliveryControls();
             setCheckoutTermsAccepted(false);
             
             console.log('Checkout modal opened with selected items:', Array.from(selectedItems));
@@ -2027,7 +2179,7 @@
             // Calculate totals
             const updateTotals = () => {
                 const subtotal = itemsToShow.reduce((sum, item) => sum + item.price * item.quantity, 0);
-                const shipping = 0;
+                const shipping = checkoutDeliveryType === 'delivery' ? checkoutDeliveryFee : 0;
                 const total = subtotal + shipping;
                 
                 document.getElementById('checkoutSubtotal').textContent = `₱${formatPeso(subtotal)}`;
@@ -2089,7 +2241,7 @@
             // Recalculate totals
             const itemsToShow = itemsSource.filter(item => selectedItems.has(item.id));
             const subtotal = itemsToShow.reduce((sum, item) => sum + item.price * item.quantity, 0);
-            const shipping = 0;
+            const shipping = checkoutDeliveryType === 'delivery' ? checkoutDeliveryFee : 0;
             const total = subtotal + shipping;
             
             // Update the subtotal section to show new price for this item
@@ -2152,6 +2304,27 @@
             }
             const paymentMethod = paymentMethodRadio.value;
             console.log('Payment Method:', paymentMethod);
+
+            // Validate delivery type and schedule
+            const deliveryTypeRadio = document.querySelector('input[name="deliveryType"]:checked');
+            if (!deliveryTypeRadio) {
+                showToast('Please select pickup or delivery', 'error');
+                return;
+            }
+            const deliveryType = deliveryTypeRadio.value;
+            console.log('Delivery Type:', deliveryType);
+
+            const scheduleDate = document.getElementById('scheduleDate').value;
+            const scheduleSlot = document.getElementById('scheduleSlot').value;
+            if (!scheduleDate) {
+                showToast('Please select a delivery/pickup date', 'error');
+                return;
+            }
+            if (!scheduleSlot) {
+                showToast('Please select a time slot', 'error');
+                return;
+            }
+            console.log('Schedule:', { date: scheduleDate, slot: scheduleSlot });
             let recipientId = selectedRecipientId;
             console.log('Recipient ID:', recipientId);
             
@@ -2232,11 +2405,17 @@
                 const body = new URLSearchParams();
                 body.append('recipient_id', recipientId);
                 body.append('payment_method', paymentMethod);
+                body.append('delivery_type', deliveryType);
+                body.append('schedule_date', scheduleDate);
+                body.append('schedule_slot', scheduleSlot);
                 body.append('selected_items', JSON.stringify(selectedItemsWithQty));
                 
                 console.log('Sending checkout request with:', {
                     recipient_id: recipientId,
                     payment_method: paymentMethod,
+                    delivery_type: deliveryType,
+                    schedule_date: scheduleDate,
+                    schedule_slot: scheduleSlot,
                     selected_items: selectedItemsWithQty
                 });
                 
@@ -2298,10 +2477,101 @@
             document.getElementById('successModal').classList.remove('show');
         }
 
-        window.openCheckoutTermsModal = openCheckoutTermsModal;
-        window.closeCheckoutTermsModal = closeCheckoutTermsModal;
+        function initCheckoutScheduleControls() {
+            const dateInput = document.getElementById('scheduleDate');
+            const slotSelect = document.getElementById('scheduleSlot');
+            const slotNote = document.getElementById('scheduleSlotNote');
 
-        function filterProducts(query) { filteredProducts = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) || p.category.includes(query.toLowerCase())); renderProducts(); }
+            if (!dateInput || !slotSelect) return;
+
+            // Set minimum date to today
+            const today = new Date();
+            const minDate = today.toISOString().split('T')[0];
+            dateInput.min = minDate;
+
+            // Set default to tomorrow
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            dateInput.value = tomorrow.toISOString().split('T')[0];
+
+            loadAvailableDeliveryDates();
+
+            dateInput.addEventListener('change', (e) => {
+                const selectedDate = e.target.value;
+                setActiveScheduleDate(selectedDate);
+                if (selectedDate) {
+                    loadAvailableSlots(selectedDate);
+                } else {
+                    slotSelect.disabled = true;
+                    slotSelect.innerHTML = '<option value="">Select Date First</option>';
+                    slotNote.textContent = 'Select a date to see available time slots.';
+                }
+            });
+        }
+
+        async function loadAvailableSlots(date) {
+            const slotSelect = document.getElementById('scheduleSlot');
+            const slotNote = document.getElementById('scheduleSlotNote');
+
+            try {
+                slotSelect.disabled = true;
+                slotSelect.innerHTML = '<option value="">Loading...</option>';
+
+                const res = await fetch(`api/get-delivery-slots.php?date=${encodeURIComponent(date)}`);
+                if (!res.ok) throw new Error('Failed to load slots');
+
+                const data = await res.json();
+                console.log('get-delivery-slots response', data);
+                checkoutScheduleSlots = data.slots || [];
+
+                if (checkoutScheduleSlots.length === 0) {
+                    slotSelect.innerHTML = '<option value="">No slots available</option>';
+                    slotNote.textContent = 'No time slots available for this date. Please select another date.';
+                    slotSelect.disabled = true;
+                } else {
+                    slotSelect.innerHTML = '<option value="">Select Time Slot</option>';
+                    checkoutScheduleSlots.forEach(slot => {
+                        const option = document.createElement('option');
+                        option.value = slot.time;
+                        option.textContent = `${formatTime12Hour(slot.time)} (${slot.available}/${slot.capacity} available)`;
+                        option.disabled = slot.available <= 0;
+                        slotSelect.appendChild(option);
+                    });
+                    slotSelect.disabled = false;
+                    slotNote.textContent = `Found ${checkoutScheduleSlots.filter(s => s.available > 0).length} available time slots.`;
+                }
+            } catch (err) {
+                console.error('loadAvailableSlots error:', err);
+                slotSelect.innerHTML = '<option value="">Error loading slots</option>';
+                slotNote.textContent = 'Error loading time slots. Please try again.';
+                slotSelect.disabled = true;
+            }
+        }
+
+        function initCheckoutDeliveryControls() {
+            const deliveryRadios = document.querySelectorAll('input[name="deliveryType"]');
+            deliveryRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    checkoutDeliveryType = e.target.value;
+                    updateDeliveryFee();
+                    // Reload slots when delivery type changes
+                    const dateInput = document.getElementById('scheduleDate');
+                    if (dateInput && dateInput.value) {
+                        loadAvailableSlots(dateInput.value);
+                    }
+                });
+            });
+        }
+
+        function updateDeliveryFee() {
+            const subtotal = parseFloat(document.getElementById('checkoutSubtotal').textContent.replace(/[^0-9.]/g, '')) || 0;
+            const shipping = checkoutDeliveryType === 'delivery' ? checkoutDeliveryFee : 0;
+            const total = subtotal + shipping;
+
+            document.getElementById('checkoutShipping').textContent = shipping === 0 ? 'FREE' : `₱${formatPeso(shipping)}`;
+            document.getElementById('checkoutTotal').textContent = `₱${formatPeso(total)}`;
+        }
+
 
         function sortProducts(mode) {
             if (mode === 'price-low') filteredProducts.sort((a,b)=>a.price-b.price);

@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Fetch orders with items
-$query = 'SELECT o.order_id, o.recipient_id, o.order_date, o.status, o.payment_method, o.total_amount, o.archived, 
+$query = 'SELECT o.order_id, o.recipient_id, o.order_date, o.status, o.payment_method, o.total_amount, o.archived, o.delivery_type, o.schedule_date, o.schedule_slot,
                  oi.order_item_id, oi.product_id, oi.quantity, oi.price, 
                                  p.product_name, p.product_description,
                                  (SELECT pi.image_url
@@ -84,6 +84,10 @@ while ($row = $result->fetch_assoc()) {
             'total_amount' => $row['total_amount'],
             'recipient_id' => $row['recipient_id'],
             'archived' => intval($row['archived'] ?? 0),
+            'delivery_type' => $row['delivery_type'] ?? 'pickup',
+            'schedule_date' => $row['schedule_date'] ?? null,
+            'schedule_slot' => $row['schedule_slot'] ?? null,
+            'seller_address' => '123 Mystery Shop Street, Manila, Philippines', // Mock seller address
             'items' => []
         ];
     }
@@ -130,6 +134,8 @@ foreach ($orders as $order) {
 $statusDisplay = [
     'pending' => 'To Pay',
     'processing' => 'To Ship',
+    'pickup' => 'Ready for Pickup',
+    'pickedup' => 'Picked Up',
     'shipped' => 'To Receive',
     'delivered' => 'Order Delivered',
     'received' => 'To Review',
@@ -319,6 +325,21 @@ $statusDisplay = [
         .delivery-info-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px; }
         .delivery-address { font-size: 13px; color: #666; line-height: 1.5; }
         .delivery-phone { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px; }
+        .delivery-details { margin-top: 12px; border: 1px solid #eceff4; border-radius: 10px; background: #fafbfd; padding: 0; }
+        .delivery-details summary { cursor: pointer; padding: 12px 14px; font-size: 13px; font-weight: 600; color: #1f2937; list-style: none; }
+        .delivery-details[open] summary { background: #eef4ff; }
+        .delivery-details summary::-webkit-details-marker { display: none; }
+        .delivery-details summary::before { content: '▾'; display: inline-block; margin-right: 8px; transform: translateY(-1px); }
+        .delivery-details[open] summary::before { content: '▴'; }
+        .delivery-details .delivery-type,
+        .delivery-details .schedule-info,
+        .delivery-details .seller-address {
+            padding: 10px 14px;
+            font-size: 13px;
+            color: #555;
+            border-top: 1px solid #eceff4;
+        }
+        .delivery-details .delivery-type { padding-top: 14px; }
         
         .order-detail-item { padding: 16px; background: #fff; margin: 8px 16px 0; border-radius: 8px; }
         .detail-store-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #eee; }
@@ -832,6 +853,7 @@ $statusDisplay = [
             <button class="tab active" data-status="all" onclick="filterByStatus('all')">All</button>
             <button class="tab" data-status="pending" onclick="filterByStatus('pending')">To pay</button>
             <button class="tab" data-status="processing" onclick="filterByStatus('processing')">To ship</button>
+            <button class="tab" data-status="pickup" onclick="filterByStatus('pickup')">Pickups</button>
             <button class="tab" data-status="shipped" onclick="filterByStatus('shipped')">To receive</button>
             <button class="tab" data-status="delivered" onclick="filterByStatus('delivered')">Completed</button>
             <button class="tab" data-status="delivered-unreviewed" onclick="filterByStatus('delivered-unreviewed')">To review</button>
@@ -877,7 +899,7 @@ $statusDisplay = [
                                 $recipientAddress = htmlspecialchars(implode(', ', $parts));
                             }
                         ?>
-                            <div class="order-item" onclick="openOrderDetail(this)" data-order-id="<?php echo $order['order_id']; ?>" data-item-id="<?php echo $item['order_item_id']; ?>" data-product-id="<?php echo $item['product_id']; ?>" data-order-status="<?php echo htmlspecialchars($order['status']); ?>" data-store-name="Andrea Mystery Shop" data-recipient-id="<?php echo htmlspecialchars($order['recipient_id']); ?>" data-recipient-name="<?php echo $recipientName; ?>" data-recipient-phone="<?php echo $recipientPhone; ?>" data-recipient-address="<?php echo $recipientAddress; ?>">
+                            <div class="order-item" onclick="openOrderDetail(this)" data-order-id="<?php echo $order['order_id']; ?>" data-item-id="<?php echo $item['order_item_id']; ?>" data-product-id="<?php echo $item['product_id']; ?>" data-order-status="<?php echo htmlspecialchars($order['status']); ?>" data-store-name="Andrea Mystery Shop" data-recipient-id="<?php echo htmlspecialchars($order['recipient_id']); ?>" data-recipient-name="<?php echo $recipientName; ?>" data-recipient-phone="<?php echo $recipientPhone; ?>" data-recipient-address="<?php echo $recipientAddress; ?>" data-delivery-type="<?php echo htmlspecialchars($order['delivery_type'] ?? ''); ?>" data-schedule-date="<?php echo htmlspecialchars($order['schedule_date'] ?? ''); ?>" data-schedule-slot="<?php echo htmlspecialchars($order['schedule_slot'] ?? ''); ?>">
                                 <div class="item-image">
                                     <img src="<?php echo $itemImage; ?>" alt="Product">
                                 </div>
@@ -949,6 +971,12 @@ $statusDisplay = [
                 </div>
                 <div id="recipientPhone" class="delivery-phone"></div>
                 <div id="recipientAddress" class="delivery-address"></div>
+                <details class="delivery-details">
+                    <summary>Delivery details</summary>
+                    <div id="deliveryType" class="delivery-type"></div>
+                    <div id="scheduleInfo" class="schedule-info"></div>
+                    <div id="sellerAddress" class="seller-address"></div>
+                </details>
             </div>
 
             <!-- Order Item Detail -->
@@ -986,7 +1014,7 @@ $statusDisplay = [
                 </div>
                 <div class="total-row">
                     <span class="total-label">Shipping</span>
-                    <span class="total-value">₱0.00</span>
+                    <span class="total-value" id="shippingAmount">₱0.00</span>
                 </div>
                 <div class="total-final">
                     <span class="total-final-label">Total</span>
@@ -1489,8 +1517,8 @@ $statusDisplay = [
                             // "All" shows all non-archived orders
                             shouldShow = true;
                         } else if (currentStatus === 'delivered') {
-                            // "Completed" shows delivered orders only
-                            shouldShow = status === 'delivered';
+                            // "Completed" shows delivered orders plus pickups that are already picked up.
+                            shouldShow = status === 'delivered' || status === 'pickedup';
                         } else if (currentStatus === 'delivered-unreviewed') {
                             // "To review" shows orders that are already confirmed as received.
                             shouldShow = status === 'received';
@@ -1596,6 +1624,29 @@ $statusDisplay = [
             applyPagination();
         }
 
+        function parsePesoValue(value) {
+            if (!value) return 0;
+            return Number(String(value).replace(/[^0-9.-]+/g, '')) || 0;
+        }
+
+        function formatPesoValue(value) {
+            const amount = Number(value) || 0;
+            return amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatTimeSlot(value) {
+            if (!value) return '';
+            const parts = value.split('-');
+            const first = parts[0].trim();
+            const [hour, minute] = first.split(':').map(Number);
+            if (Number.isNaN(hour) || Number.isNaN(minute)) {
+                return value;
+            }
+            const suffix = hour >= 12 ? 'pm' : 'am';
+            const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+            return `${hour12}${minute === 0 ? '' : ':' + String(minute).padStart(2, '0')}${suffix}`;
+        }
+
         // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
             const filterBtn = document.querySelector('.filter-btn');
@@ -1620,6 +1671,20 @@ $statusDisplay = [
                 message: 'Your order is being prepared for shipment.',
                 titleText: 'Processing',
                 actions: ['Contact Seller']
+            },
+            'pickup': {
+                title: 'Ready for Pickup',
+                icon: '●',
+                message: 'Your order is ready for pickup at the scheduled time.',
+                titleText: 'Ready for Pickup',
+                actions: ['Confirm Picked Up']
+            },
+            'pickedup': {
+                title: 'Picked Up',
+                icon: '●',
+                message: 'You have picked up your order. Please confirm receipt.',
+                titleText: 'Picked Up',
+                actions: ['Confirm Received']
             },
             'shipped': {
                 title: 'To Receive',
@@ -1667,6 +1732,9 @@ $statusDisplay = [
             const recipientName = element.dataset.recipientName;
             const recipientPhone = element.dataset.recipientPhone;
             const recipientAddress = element.dataset.recipientAddress;
+            const deliveryType = element.dataset.deliveryType;
+            const scheduleDate = element.dataset.scheduleDate;
+            const scheduleSlot = element.dataset.scheduleSlot;
 
             // Get item details from the DOM
             const itemName = element.querySelector('.item-name').textContent;
@@ -1677,7 +1745,6 @@ $statusDisplay = [
             // Get parent order group for additional info
             const orderGroup = element.closest('.order-group');
             currentOrderGroup = orderGroup;
-            const totalAmount = orderGroup.querySelector('.item-price').closest('.order-group').textContent;
 
             // Update modal content
             document.getElementById('detailItemName').textContent = itemName;
@@ -1686,7 +1753,23 @@ $statusDisplay = [
             document.getElementById('detailItemImage').src = itemImage;
             document.getElementById('detailStoreName').textContent = storeName;
             document.getElementById('orderNumber').textContent = orderId;
-            document.getElementById('subtotal').textContent = itemPrice;
+
+            // Calculate subtotal and shipping using all items in the order
+            let orderSubtotal = 0;
+            orderGroup.querySelectorAll('.order-item').forEach(itemEl => {
+                const priceText = itemEl.querySelector('.item-price')?.textContent || '';
+                const qtyText = itemEl.querySelector('.item-qty')?.textContent || '';
+                const itemPriceValue = parsePesoValue(priceText);
+                const itemQtyValue = parseInt(qtyText.replace(/\D/g, ''), 10) || 1;
+                orderSubtotal += itemPriceValue * itemQtyValue;
+            });
+
+            const totalAmountText = orderGroup.querySelector('.actions-row div[style*="font-size: 16px"]')?.textContent || '';
+            const totalAmountValue = parsePesoValue(totalAmountText);
+
+            document.getElementById('subtotal').textContent = `₱${formatPesoValue(orderSubtotal)}`;
+            document.getElementById('shippingAmount').textContent = `₱${formatPesoValue(Math.max(0, totalAmountValue - orderSubtotal))}`;
+            document.getElementById('totalAmount').textContent = `₱${formatPesoValue(totalAmountValue)}`;
             
             // Store product ID for review modal
             const productId = element.dataset.productId || itemId;
@@ -1723,6 +1806,8 @@ $statusDisplay = [
                     recipientLabelEl.textContent = 'Cancelled By';
                 } else if (status === 'delivered' || status === 'received') {
                     recipientLabelEl.textContent = 'Received By';
+                } else if (status === 'pickedup') {
+                    recipientLabelEl.textContent = 'Pick up by';
                 } else {
                     recipientLabelEl.textContent = 'Delivering To';
                 }
@@ -1732,6 +1817,35 @@ $statusDisplay = [
             document.getElementById('recipientName').textContent = recipientName || 'Recipient';
             document.getElementById('recipientPhone').textContent = recipientPhone || '(+63) 000000000';
             document.getElementById('recipientAddress').textContent = recipientAddress || 'Address not available';
+
+            // Update delivery info
+            const deliveryTypeEl = document.getElementById('deliveryType');
+            const scheduleInfoEl = document.getElementById('scheduleInfo');
+            const sellerAddressEl = document.getElementById('sellerAddress');
+
+            if (deliveryType) {
+                deliveryTypeEl.textContent = `Delivery Type: ${deliveryType.charAt(0).toUpperCase() + deliveryType.slice(1)}`;
+                deliveryTypeEl.style.display = 'block';
+            } else {
+                deliveryTypeEl.style.display = 'none';
+            }
+
+            if (scheduleDate && scheduleSlot) {
+                const formattedDate = new Date(scheduleDate).toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                scheduleInfoEl.textContent = `Scheduled for: ${formattedDate} at ${formatTimeSlot(scheduleSlot)}`;
+                scheduleInfoEl.style.display = 'block';
+            } else {
+                scheduleInfoEl.style.display = 'none';
+            }
+
+            // Mock seller address
+            sellerAddressEl.textContent = 'Seller Address: 123 Mystery Lane, Enigma City, Philippines';
+            sellerAddressEl.style.display = 'block';
 
             // Update timeline information
             const orderDate = new Date();
@@ -2224,6 +2338,58 @@ $statusDisplay = [
                         }
                         const query = params.toString();
                         window.location.href = query ? (`messages.php?${query}`) : 'messages.php';
+                    }
+                    break;
+                case 'Confirm Picked Up':
+                    {
+                    const confirmed = await localConfirm('Confirm Pickup', 'Confirm that you have picked up this order?', 'Yes, Confirm', 'Not Yet');
+                    if (confirmed) {
+                        // Disable the button to prevent double-clicks
+                        const button = event.target;
+                        if (button) {
+                            button.disabled = true;
+                            button.textContent = 'Confirming...';
+                        }
+                        
+                        fetch('api/confirm-delivery.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ order_id: orderId })
+                        })
+                        .then(response => {
+                            console.log('Response status:', response.status);
+                            console.log('Response ok:', response.ok);
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                            }
+                            return response.json();
+                        })
+                        .then(async data => {
+                            console.log('API response:', data);
+                            if (data.success) {
+                                closeOrderDetail();
+                                await localAlert('success', 'Pickup Confirmed', 'Order confirmed as picked up. Please confirm receipt when you get home.');
+                                // Immediate reload instead of delayed
+                                location.reload();
+                            } else {
+                                // Re-enable button on error
+                                if (button) {
+                                    button.disabled = false;
+                                    button.textContent = 'Confirm Picked Up';
+                                }
+                                await localAlert('error', 'Confirmation Failed', data.message || 'Failed to confirm pickup');
+                            }
+                        })
+                        .catch(async error => {
+                            console.error('Error confirming pickup:', error);
+                            // Re-enable button on error
+                            if (button) {
+                                button.disabled = false;
+                                button.textContent = 'Confirm Picked Up';
+                            }
+                            await localAlert('error', 'Request Failed', `Error confirming pickup: ${error.message}`);
+                        });
+                    }
                     }
                     break;
                 case 'Confirm Received':

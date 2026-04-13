@@ -17,6 +17,8 @@ require_once 'message_helpers.php';
 $statusLabels = [
   'pending' => 'Pending',
   'processing' => 'Processing',
+  'pickup' => 'Ready for Pickup',
+  'pickedup' => 'Picked Up',
   'shipped' => 'Shipped',
   'delivered' => 'Delivered',
   'received' => 'Received',
@@ -24,19 +26,12 @@ $statusLabels = [
   'cancelled' => 'Cancelled'
 ];
 
-$linearFlow = ['pending', 'processing', 'shipped', 'delivered'];
-$nextStatusMap = [
-  'pending' => 'processing',
-  'processing' => 'shipped',
-  'shipped' => 'delivered'
-];
-
 function setAdminFlash($type, $message) {
   $_SESSION['admin_flash'] = ['type' => $type, 'message' => $message];
 }
 
 function getOrderMeta(mysqli $conn, int $orderId): ?array {
-  $stmt = $conn->prepare('SELECT user_id, status, archived, binned FROM orders WHERE order_id = ? LIMIT 1');
+  $stmt = $conn->prepare('SELECT user_id, status, archived, binned, delivery_type FROM orders WHERE order_id = ? LIMIT 1');
   if (!$stmt) {
     return null;
   }
@@ -153,6 +148,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       exit;
     }
 
+    // Get delivery type to determine the correct flow
+    $deliveryType = $orderMeta['delivery_type'] ?? 'delivery';
+    
+    // Define next status maps based on delivery type
+    $deliveryNextStatusMap = [
+      'pending' => 'processing',
+      'processing' => 'shipped',
+      'shipped' => 'delivered'
+    ];
+    
+    $pickupNextStatusMap = [
+      'pending' => 'processing', 
+      'processing' => 'pickup',
+      'pickup' => 'pickedup',
+      'pickedup' => 'received'
+    ];
+    
+    $nextStatusMap = ($deliveryType === 'pickup') ? $pickupNextStatusMap : $deliveryNextStatusMap;
+
     if (!isset($nextStatusMap[$currentStatus])) {
       setAdminFlash('error', 'This order cannot be advanced further in the admin flow.');
       header('Location: admin_orders.php');
@@ -175,6 +189,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $primaryProductName = getPrimaryOrderProductName($conn, $orderId);
       $statusMessages = [
         'processing' => 'Great news! Your order for ' . $primaryProductName . ' is now Processing. We are preparing your items for shipment.',
+        'pickup' => 'Your order for ' . $primaryProductName . ' is now Ready for Pickup. Please come to our store at your scheduled time.',
+        'pickedup' => 'Your order for ' . $primaryProductName . ' has been picked up. Please confirm receipt.',
         'shipped' => 'Update: Your order for ' . $primaryProductName . ' has been Shipped and is now on the way.',
         'delivered' => 'Your order for ' . $primaryProductName . ' is marked Delivered. Please confirm once received.'
       ];
@@ -365,6 +381,9 @@ $orderSql = 'SELECT
   o.binned,
   o.payment_method,
   o.total_amount,
+  o.delivery_type,
+  o.schedule_date,
+  o.schedule_slot,
   u.full_name AS customer_name,
   oi.order_item_id,
   oi.product_id,
@@ -399,6 +418,9 @@ if ($orderResult) {
         'binned' => intval($row['binned'] ?? 0),
         'payment_method' => $row['payment_method'],
         'total_amount' => (float)($row['total_amount'] ?? 0),
+        'delivery_type' => $row['delivery_type'],
+        'schedule_date' => $row['schedule_date'],
+        'schedule_slot' => $row['schedule_slot'],
         'customer_name' => $row['customer_name'] ?: 'Unknown',
         'items' => []
       ];
@@ -1023,6 +1045,7 @@ $statusDisplay = [
         <button class="tab active" data-status="all" onclick="filterByStatus('all')">All</button>
         <button class="tab" data-status="pending" onclick="filterByStatus('pending')">To process</button>
         <button class="tab" data-status="processing" onclick="filterByStatus('processing')">To ship</button>
+        <button class="tab" data-status="pickup" onclick="filterByStatus('pickup')">Pickups</button>
         <button class="tab" data-status="shipped" onclick="filterByStatus('shipped')">To receive</button>
         <button class="tab" data-status="delivered" onclick="filterByStatus('delivered')">Delivered</button>
         <button class="tab" data-status="reviewed" onclick="filterByStatus('reviewed')">Reviews</button>
@@ -1039,7 +1062,32 @@ $statusDisplay = [
         <?php foreach ($orders as $order): ?>
         <?php
           $status = $order['status'];
-          $nextStatus = $nextStatusMap[$status] ?? null;
+          $deliveryType = $order['delivery_type'] ?? 'delivery';
+          
+          // Define next status maps based on delivery type
+          $deliveryNextStatusMap = [
+            'pending' => 'processing',
+            'processing' => 'shipped',
+            'shipped' => 'delivered'
+          ];
+          
+          $pickupNextStatusMap = [
+            'pending' => 'processing', 
+            'processing' => 'pickup',
+            'pickup' => 'pickedup',
+            'pickedup' => 'received'
+          ];
+          
+          $statusMap = ($deliveryType === 'pickup') ? $pickupNextStatusMap : $deliveryNextStatusMap;
+          $nextStatus = $statusMap[$status] ?? null;
+          
+          // Create linear flow for timeline based on delivery type
+          $linearFlow = ($deliveryType === 'pickup') ? 
+            ['pending', 'processing', 'pickup', 'pickedup'] : 
+            ['pending', 'processing', 'shipped', 'delivered'];
+          
+          $timelineIndex = array_search($status, $linearFlow, true);
+          
           $isArchived = intval($order['archived'] ?? 0) === 1;
           $isBinned = intval($order['binned'] ?? 0) === 1;
           if ($isArchived || $isBinned) {
@@ -1052,10 +1100,6 @@ $statusDisplay = [
           $canArchive = in_array(strtolower((string)$status), ['reviewed', 'cancelled', 'canceled'], true) && !$isArchived && !$isBinned;
           $canMoveToBin = in_array(strtolower((string)$status), ['reviewed', 'cancelled', 'canceled'], true) && $isArchived && !$isBinned;
           $canUnarchive = in_array(strtolower((string)$status), ['reviewed', 'cancelled', 'canceled'], true) && $isBinned;
-          $firstProductId = (!empty($order['items']) && isset($order['items'][0]['product_id'])) ? intval($order['items'][0]['product_id']) : 0;
-          $targetReviewKey = intval($order['user_id'] ?? 0) . ':' . $firstProductId;
-          $targetReviewId = intval($latestReviewByUserProduct[$targetReviewKey] ?? 0);
-          $timelineIndex = array_search($status, $linearFlow, true);
           $statusText = $isBinned ? 'Binned' : ($isArchived ? 'Archived' : ($statusDisplay[$status] ?? ucfirst($status)));
           $recipient = isset($recipientData[$order['recipient_id']]) ? $recipientData[$order['recipient_id']] : null;
           $recipientName = $recipient['recipient_name'] ?? 'Recipient';
@@ -1095,6 +1139,9 @@ $statusDisplay = [
                 data-recipient-name="<?php echo htmlspecialchars($recipientName); ?>"
                 data-recipient-phone="<?php echo htmlspecialchars($recipientPhone); ?>"
                 data-recipient-address="<?php echo htmlspecialchars($recipientAddress); ?>"
+                data-delivery-type="<?php echo htmlspecialchars($order['delivery_type'] ?? ''); ?>"
+                data-schedule-date="<?php echo htmlspecialchars($order['schedule_date'] ?? ''); ?>"
+                data-schedule-slot="<?php echo htmlspecialchars($order['schedule_slot'] ?? ''); ?>"
                 data-customer-name="<?php echo htmlspecialchars($order['customer_name']); ?>"
                 data-payment-method="<?php echo htmlspecialchars($order['payment_method'] ?: 'N/A'); ?>"
                 data-order-date="<?php echo htmlspecialchars((string)$order['order_date']); ?>"
@@ -1130,6 +1177,9 @@ $statusDisplay = [
               data-recipient-name="<?php echo htmlspecialchars($recipientName); ?>"
               data-recipient-phone="<?php echo htmlspecialchars($recipientPhone); ?>"
               data-recipient-address="<?php echo htmlspecialchars($recipientAddress); ?>"
+              data-delivery-type="<?php echo htmlspecialchars($order['delivery_type'] ?? ''); ?>"
+              data-schedule-date="<?php echo htmlspecialchars($order['schedule_date'] ?? ''); ?>"
+              data-schedule-slot="<?php echo htmlspecialchars($order['schedule_slot'] ?? ''); ?>"
               data-customer-name="<?php echo htmlspecialchars($order['customer_name']); ?>"
               data-payment-method="<?php echo htmlspecialchars($order['payment_method'] ?: 'N/A'); ?>"
               data-order-date="<?php echo htmlspecialchars((string)$order['order_date']); ?>"
@@ -1239,6 +1289,9 @@ $statusDisplay = [
         <div class="delivery-info-title">📍 <span id="recipientLabel">Delivering To</span> <span id="recipientName">Recipient</span></div>
         <div id="recipientPhone" class="delivery-phone"></div>
         <div id="recipientAddress" class="delivery-address"></div>
+        <div id="deliveryType" class="delivery-type" style="margin-top: 8px; font-size: 13px; color: #666;"></div>
+        <div id="scheduleInfo" class="schedule-info" style="margin-top: 4px; font-size: 13px; color: #666;"></div>
+        <div id="sellerAddress" class="seller-address" style="margin-top: 8px; font-size: 13px; color: #666;"></div>
       </div>
 
       <div class="order-detail-item">
@@ -1385,6 +1438,16 @@ $statusDisplay = [
         title: 'To Ship',
         titleText: 'Processing',
         message: 'This order is being prepared for shipment.'
+      },
+      pickup: {
+        title: 'Ready for Pickup',
+        titleText: 'Ready for Pickup',
+        message: 'This order is ready for customer pickup at the scheduled time.'
+      },
+      pickedup: {
+        title: 'Picked Up',
+        titleText: 'Picked Up',
+        message: 'Customer has picked up this order.'
       },
       shipped: {
         title: 'To Receive',
@@ -1941,6 +2004,9 @@ $statusDisplay = [
       const itemCount = parseInt(element.dataset.itemCount || '0', 10);
       const totalAmount = element.dataset.totalAmount || '0.00';
       const nextStatus = element.dataset.nextStatus || '';
+      const deliveryType = element.dataset.deliveryType || '';
+      const scheduleDate = element.dataset.scheduleDate || '';
+      const scheduleSlot = element.dataset.scheduleSlot || '';
 
       const itemName = element.querySelector('.item-name')?.textContent || `Order #${orderId}`;
       const itemPrice = element.querySelector('.item-price')?.textContent || `₱${formatPeso(totalAmount)}`;
@@ -1978,6 +2044,35 @@ $statusDisplay = [
       document.getElementById('recipientName').textContent = element.dataset.recipientName || 'Recipient';
       document.getElementById('recipientPhone').textContent = element.dataset.recipientPhone || '(+63) 000000000';
       document.getElementById('recipientAddress').textContent = element.dataset.recipientAddress || 'Address not available';
+
+      // Update delivery info
+      const deliveryTypeEl = document.getElementById('deliveryType');
+      const scheduleInfoEl = document.getElementById('scheduleInfo');
+      const sellerAddressEl = document.getElementById('sellerAddress');
+
+      if (deliveryType) {
+        deliveryTypeEl.textContent = `Delivery Type: ${deliveryType.charAt(0).toUpperCase() + deliveryType.slice(1)}`;
+        deliveryTypeEl.style.display = 'block';
+      } else {
+        deliveryTypeEl.style.display = 'none';
+      }
+
+      if (scheduleDate && scheduleSlot) {
+        const formattedDate = new Date(scheduleDate).toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+        scheduleInfoEl.textContent = `Scheduled for: ${formattedDate} at ${scheduleSlot}`;
+        scheduleInfoEl.style.display = 'block';
+      } else {
+        scheduleInfoEl.style.display = 'none';
+      }
+
+      // Mock seller address
+      sellerAddressEl.textContent = 'Seller Address: 123 Mystery Lane, Enigma City, Philippines';
+      sellerAddressEl.style.display = 'block';
       loadReviewedOrderReviews(status, productId);
 
       const orderDateValue = element.dataset.orderDate || '';

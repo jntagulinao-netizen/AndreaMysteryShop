@@ -1,4 +1,7 @@
 <div class="checkout-modal" id="checkoutModal">
+  <!-- Flatpickr CSS and JS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <div class="checkout-container">
     <!-- Header with Back Arrow -->
     <div class="checkout-header">
@@ -84,16 +87,51 @@
           </div>
         </div>
 
-        <!-- Shipping Option Section -->
+        <!-- Delivery Method Section -->
         <div class="form-section">
-          <h2 class="section-title">🚚 Shipping Option</h2>
-          <label class="payment-option">
-            <input type="radio" name="shippingMethod" value="standard" checked>
-            <div class="payment-option-content">
-              <span>Standard Local Shipping</span>
-              <span class="shipping-free-label">FREE</span>
+          <h2 class="section-title">🚚 Pickup or Delivery</h2>
+          <div class="payment-options">
+            <label class="payment-option">
+              <input type="radio" name="deliveryType" value="delivery" checked>
+              <div class="payment-option-content">
+                <span>Delivery</span>
+                <span class="shipping-fee-label">₱38</span>
+              </div>
+            </label>
+            <label class="payment-option">
+              <input type="radio" name="deliveryType" value="pickup">
+              <div class="payment-option-content">
+                <span>Pick-up</span>
+                <span class="shipping-free-label">FREE</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Schedule Section -->
+        <div class="form-section">
+          <h2 class="section-title">📅 Schedule Your Order</h2>
+          <div class="form-group">
+            <label for="scheduleDate">Preferred Date *</label>
+            <input type="date" id="scheduleDate" name="scheduleDate" required>
+          </div>
+          <div class="form-group">
+            <label>Available Delivery Dates</label>
+            <div id="availableDateList" class="available-date-list">
+              <div id="availableDateButtons" class="available-date-buttons"></div>
+              <select id="availableDateDropdown" class="available-date-dropdown" hidden>
+                <option value="">Select a delivery date</option>
+              </select>
             </div>
-          </label>
+            <div id="scheduleDateNote" class="schedule-date-note">Choose a date from the list or picker.</div>
+          </div>
+          <div class="form-group">
+            <label for="scheduleSlot">Available Time Slot *</label>
+            <select id="scheduleSlot" name="scheduleSlot" required disabled>
+              <option value="">Select Date First</option>
+            </select>
+          </div>
+          <div id="scheduleSlotNote" class="schedule-slot-note">Select a date to see available time slots.</div>
         </div>
 
         <!-- Payment Method Section -->

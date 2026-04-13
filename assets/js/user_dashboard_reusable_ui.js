@@ -226,12 +226,14 @@
                 <div class="product-image product-image-relative">
                     <img src="${productImage}" alt="${product.name}" class="main-img"/>
                     ${variantCount > 0 ? `<span class="product-variant-badge">${variantCount} options</span>` : ''}
+                    <span class="product-delivery-badge">🚚 Free Delivery</span>
                     ${isOutOfStock ? '<div class="product-stock-overlay"><span class="product-stock-overlay-text">Out of Stock</span></div>' : ''}
                 </div>
                 <div class="product-info">
                     <div class="product-name">${product.name}</div>
                     <div class="product-rating">★ ${avgRating} <span class="product-reviews-meta">(${product.reviewCount} reviews)</span></div>
                     <div class="product-price">${priceDisplay}</div>
+                    <div class="product-shipping-info">🚚 Delivery: ₱38 (Pickup: FREE)</div>
                     <div class="product-stock-meta ${isOutOfStock ? 'out' : 'in'}">Stock: ${product.groupStock}</div>
                     <div class="product-orders-meta">Orders: ${Number(product.groupOrderCount || 0)}</div>
                 </div>
