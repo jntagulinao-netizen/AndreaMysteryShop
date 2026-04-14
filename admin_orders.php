@@ -840,7 +840,25 @@ $statusDisplay = [
     .status-badge-content h3 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 4px; }
     .status-badge-content p { font-size: 13px; color: #666; }
 
-    .delivery-info { padding: 16px; background: #fff; margin: 8px 16px 0; border-radius: 8px; }
+     .delivery-info { padding: 16px; background: #fff; margin: 8px 16px 0; border-radius: 8px; }
+        .delivery-info-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px; }
+        .delivery-address { font-size: 13px; color: #666; line-height: 1.5; }
+        .delivery-phone { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px; }
+        .delivery-details { margin-top: 12px; border: 1px solid #eceff4; border-radius: 10px; background: #fafbfd; padding: 0; }
+        .delivery-details summary { cursor: pointer; padding: 12px 14px; font-size: 13px; font-weight: 600; color: #1f2937; list-style: none; }
+        .delivery-details[open] summary { background: #eef4ff; }
+        .delivery-details summary::-webkit-details-marker { display: none; }
+        .delivery-details summary::before { content: '▾'; display: inline-block; margin-right: 8px; transform: translateY(-1px); }
+        .delivery-details[open] summary::before { content: '▴'; }
+        .delivery-details .delivery-type,
+        .delivery-details .schedule-info,
+        .delivery-details .seller-address {
+            padding: 10px 14px;
+            font-size: 13px;
+            color: #555;
+            border-top: 1px solid #eceff4;
+        }
+        .delivery-details .delivery-type { padding-top: 14px; }
     .delivery-info-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px; }
     .delivery-address { font-size: 13px; color: #666; line-height: 1.5; }
     .delivery-phone { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px; }
@@ -1289,9 +1307,12 @@ $statusDisplay = [
         <div class="delivery-info-title">📍 <span id="recipientLabel">Delivering To</span> <span id="recipientName">Recipient</span></div>
         <div id="recipientPhone" class="delivery-phone"></div>
         <div id="recipientAddress" class="delivery-address"></div>
-        <div id="deliveryType" class="delivery-type" style="margin-top: 8px; font-size: 13px; color: #666;"></div>
-        <div id="scheduleInfo" class="schedule-info" style="margin-top: 4px; font-size: 13px; color: #666;"></div>
-        <div id="sellerAddress" class="seller-address" style="margin-top: 8px; font-size: 13px; color: #666;"></div>
+        <details class="delivery-details">
+          <summary>Delivery details</summary>
+          <div id="deliveryType" class="delivery-type"></div>
+          <div id="scheduleInfo" class="schedule-info"></div>
+          <div id="sellerAddress" class="seller-address"></div>
+        </details>
       </div>
 
       <div class="order-detail-item">
@@ -2064,7 +2085,19 @@ $statusDisplay = [
           month: 'long', 
           day: 'numeric' 
         });
-        scheduleInfoEl.textContent = `Scheduled for: ${formattedDate} at ${scheduleSlot}`;
+        function formatTimeSlot(value) {
+          if (!value) return '';
+          const parts = value.split('-');
+          const first = parts[0].trim();
+          const [hour, minute] = first.split(':').map(Number);
+          if (Number.isNaN(hour) || Number.isNaN(minute)) {
+            return value;
+          }
+          const suffix = hour >= 12 ? 'pm' : 'am';
+          const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+          return `${hour12}${minute === 0 ? '' : ':' + String(minute).padStart(2, '0')}${suffix}`;
+        }
+        scheduleInfoEl.textContent = `Scheduled for: ${formattedDate} at ${formatTimeSlot(scheduleSlot)}`;
         scheduleInfoEl.style.display = 'block';
       } else {
         scheduleInfoEl.style.display = 'none';

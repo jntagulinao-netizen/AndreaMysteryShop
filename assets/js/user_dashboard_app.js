@@ -317,6 +317,7 @@
                     dateNote.textContent = 'No delivery dates are currently available. Please try again later.';
                     dropdown.innerHTML = '<option value="">No available dates</option>';
                     dropdown.hidden = false;
+                    await checkoutLocalAlert('warning', 'No Available Delivery Dates', 'There are no available delivery dates at this time. Please try again later.');
                     return;
                 }
 
@@ -325,8 +326,9 @@
                 const currentValue = dateInput.value;
                 const firstDate = availableDates[0].date;
                 const isCurrentValid = currentValue && availableDates.some((d) => d.date === currentValue);
+                // Do not auto-select a date; leave blank until user selects
                 if (!isCurrentValid) {
-                    dateInput.value = firstDate;
+                    dateInput.value = '';
                 }
                 dateInput.min = firstDate;
                 dateInput.max = availableDates[availableDates.length - 1].date;
@@ -351,17 +353,42 @@
                     }
                 });
 
-                if (availableDates.length > 7) {
-                    buttonsContainer.innerHTML = '';
+                // Show first 3 as buttons, rest in dropdown
+                buttonsContainer.innerHTML = '';
+                buttonsContainer.style.display = 'flex';
+                dropdown.innerHTML = '<option value="">Select a delivery date</option>';
+                let showDropdown = availableDates.length > 3;
+                // First 3 as buttons
+                availableDates.slice(0, 3).forEach(slotDate => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'available-date-button';
+                    button.textContent = `${formatDeliveryDateLabel(slotDate.date)} (${slotDate.open_slots} open)`;
+                    button.dataset.date = slotDate.date;
+                    button.disabled = slotDate.open_slots <= 0;
+                    if (dateInput.value === slotDate.date) {
+                        button.classList.add('active');
+                    }
+                    button.addEventListener('click', () => {
+                        dateInput.value = slotDate.date;
+                        window.flatpickrInstance.setDate(slotDate.date);
+                        setActiveScheduleDate(slotDate.date);
+                        loadAvailableSlots(slotDate.date);
+                    });
+                    buttonsContainer.appendChild(button);
+                });
+
+                // Rest in dropdown
+                if (showDropdown) {
                     dropdown.hidden = false;
-                    dropdown.innerHTML = '<option value="">Select a delivery date</option>';
-                    availableDates.forEach(slotDate => {
+                    availableDates.slice(3).forEach(slotDate => {
                         const option = document.createElement('option');
                         option.value = slotDate.date;
                         option.textContent = `${formatDeliveryDateLabel(slotDate.date)} (${slotDate.open_slots} open)`;
                         dropdown.appendChild(option);
                     });
-                    dropdown.value = dateInput.value;
+                    // Always default to empty ("Select a delivery date")
+                    dropdown.value = '';
                     dropdown.onchange = (event) => {
                         const selectedDate = event.target.value;
                         if (!selectedDate) return;
@@ -372,26 +399,6 @@
                     };
                 } else {
                     dropdown.hidden = true;
-                    buttonsContainer.innerHTML = '';
-                    buttonsContainer.style.display = 'flex';
-                    availableDates.forEach(slotDate => {
-                        const button = document.createElement('button');
-                        button.type = 'button';
-                        button.className = 'available-date-button';
-                        button.textContent = `${formatDeliveryDateLabel(slotDate.date)} (${slotDate.open_slots} open)`;
-                        button.dataset.date = slotDate.date;
-                        button.disabled = slotDate.open_slots <= 0;
-                        if (dateInput.value === slotDate.date) {
-                            button.classList.add('active');
-                        }
-                        button.addEventListener('click', () => {
-                            dateInput.value = slotDate.date;
-                            window.flatpickrInstance.setDate(slotDate.date);
-                            setActiveScheduleDate(slotDate.date);
-                            loadAvailableSlots(slotDate.date);
-                        });
-                        buttonsContainer.appendChild(button);
-                    });
                 }
 
                 loadAvailableSlots(dateInput.value);
@@ -2317,11 +2324,11 @@
             const scheduleDate = document.getElementById('scheduleDate').value;
             const scheduleSlot = document.getElementById('scheduleSlot').value;
             if (!scheduleDate) {
-                showToast('Please select a delivery/pickup date', 'error');
+                await checkoutLocalAlert('warning', 'No Date Selected', 'Please select a delivery/pickup date from the available options.');
                 return;
             }
             if (!scheduleSlot) {
-                showToast('Please select a time slot', 'error');
+                await checkoutLocalAlert('warning', 'No Time Slot Selected', 'Please select a time slot for your order.');
                 return;
             }
             console.log('Schedule:', { date: scheduleDate, slot: scheduleSlot });
@@ -2528,6 +2535,7 @@
                     slotSelect.innerHTML = '<option value="">No slots available</option>';
                     slotNote.textContent = 'No time slots available for this date. Please select another date.';
                     slotSelect.disabled = true;
+                    await checkoutLocalAlert('warning', 'No Available Time Slots', 'There are no available time slots for the selected date. Please choose a different date.');
                 } else {
                     slotSelect.innerHTML = '<option value="">Select Time Slot</option>';
                     checkoutScheduleSlots.forEach(slot => {
@@ -2572,6 +2580,74 @@
             document.getElementById('checkoutTotal').textContent = `₱${formatPeso(total)}`;
         }
 
+        function showCheckoutLocalSweetAlert(options) {
+          const overlay = document.getElementById('checkoutLocalSwal');
+          const icon = document.getElementById('checkoutLocalSwalIcon');
+          const titleEl = document.getElementById('checkoutLocalSwalTitle');
+          const textEl = document.getElementById('checkoutLocalSwalText');
+          const actions = document.getElementById('checkoutLocalSwalActions');
+          const confirmBtn = document.getElementById('checkoutLocalSwalConfirm');
+          const cancelBtn = document.getElementById('checkoutLocalSwalCancel');
+          if (!overlay || !icon || !titleEl || !textEl || !actions || !confirmBtn || !cancelBtn) {
+            return;
+          }
+
+          const type = options.type || 'success';
+          const hasCancel = !!options.showCancel;
+
+          icon.className = `swal-icon ${type}`;
+          icon.textContent = type === 'error' ? '!' : (type === 'warning' ? '⚠' : '✓');
+          titleEl.textContent = options.title || 'Notice';
+          textEl.textContent = options.text || '';
+
+          confirmBtn.textContent = options.confirmText || 'OK';
+          cancelBtn.textContent = options.cancelText || 'Cancel';
+          cancelBtn.style.display = hasCancel ? 'block' : 'none';
+          actions.style.gridTemplateColumns = hasCancel ? '1fr 1fr' : 'auto';
+
+          confirmBtn.onclick = () => {
+            overlay.classList.remove('show');
+            if (typeof options.onConfirm === 'function') {
+              options.onConfirm();
+            }
+          };
+
+          cancelBtn.onclick = () => {
+            overlay.classList.remove('show');
+            if (typeof options.onCancel === 'function') {
+              options.onCancel();
+            }
+          };
+
+          overlay.classList.add('show');
+        }
+
+        function checkoutLocalAlert(type, title, text) {
+            return new Promise((resolve) => {
+                showCheckoutLocalSweetAlert({
+                    type,
+                    title,
+                    text,
+                    confirmText: 'OK',
+                    onConfirm: () => resolve(true)
+                });
+            });
+        }
+
+        function checkoutLocalConfirm(title, text, confirmText = 'Yes', cancelText = 'Cancel') {
+            return new Promise((resolve) => {
+                showCheckoutLocalSweetAlert({
+                    type: 'warning',
+                    title,
+                    text,
+                    showCancel: true,
+                    confirmText,
+                    cancelText,
+                    onConfirm: () => resolve(true),
+                    onCancel: () => resolve(false)
+                });
+            });
+        }
 
         function sortProducts(mode) {
             if (mode === 'price-low') filteredProducts.sort((a,b)=>a.price-b.price);

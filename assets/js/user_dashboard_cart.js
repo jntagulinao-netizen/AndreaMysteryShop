@@ -260,17 +260,37 @@ async function updateQuantity(id, change) {
     }
 }
 
-async function removeFromCart(id) {
+async function removeFromCart(id, confirmRemoval = true) {
+    const item = cart.find(i => i.id === id || i.cart_item_id === id);
+    const itemName = item ? item.name || 'this item' : 'this item';
+    const removePrompt = `Remove ${itemName} from your cart?`;
+
+    if (confirmRemoval) {
+        const confirmRemove = typeof window.localSwalConfirm === 'function'
+            ? await window.localSwalConfirm('Remove Item', removePrompt, 'Remove')
+            : confirm(removePrompt);
+
+        if (!confirmRemove) {
+            return;
+        }
+    }
+
     try {
         const body = new URLSearchParams();
         body.append('cart_item_id', id);
-        const item = cart.find(i => i.id === id || i.cart_item_id === id);
         if (item && item.product_id) body.append('product_id', item.product_id);
         const res = await fetch('api/remove-from-cart.php', { method: 'POST', body });
         if (!res.ok) throw new Error('Could not remove item');
         await loadCart();
+        if (typeof window.localSwalAlert === 'function') {
+            await window.localSwalAlert('success', 'Removed', `${itemName} has been removed from your cart.`);
+        }
     } catch (err) {
-        alert(err.message);
+        if (typeof window.localSwalAlert === 'function') {
+            await window.localSwalAlert('error', 'Remove Failed', err.message || 'Unable to remove item.');
+        } else {
+            alert(err.message);
+        }
     }
 }
 
@@ -279,7 +299,11 @@ async function clearCartItems() {
     const selectedCount = selectedItems.size;
 
     if (selectedCount === 0) {
-        alert('Please select cart items to remove.');
+        if (typeof window.localSwalAlert === 'function') {
+            await window.localSwalAlert('warning', 'No Items Selected', 'Please select cart items to remove.');
+        } else {
+            alert('Please select cart items to remove.');
+        }
         return;
     }
 
@@ -288,14 +312,17 @@ async function clearCartItems() {
         ? 'Remove all items from your cart?'
         : `Remove ${selectedCount} selected item${selectedCount > 1 ? 's' : ''} from your cart?`;
 
-    if (!confirm(confirmMessage)) {
+    const confirmed = typeof window.localSwalConfirm === 'function'
+        ? await window.localSwalConfirm('Confirm Removal', confirmMessage, 'Remove')
+        : confirm(confirmMessage);
+
+    if (!confirmed) {
         return;
     }
 
-    // Remove selected items only; if all selected, this removes all.
     const itemIdsToRemove = Array.from(selectedItems);
     for (const itemId of itemIdsToRemove) {
-        await removeFromCart(itemId);
+        await removeFromCart(itemId, false);
     }
 
     selectedItems.clear();

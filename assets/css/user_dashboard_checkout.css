@@ -12,7 +12,63 @@
 .order-id-display { background: #f0f0f0; padding: 12px 16px; border-radius: 8px; margin: 16px 0; font-family: monospace; font-weight: 600; color: #e22a39; }
 .success-modal-btn { background: #e22a39; color: white; border: none; padding: 12px 32px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 24px; font-size: 14px; }
 .success-modal-btn:hover { background: #c20000; }
-
+/* Sweet Alert overlay */
+.swal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 30002;
+    padding: 20px;
+}
+.swal-overlay.show { display: flex; }
+.swal-card {
+    width: 100%;
+    max-width: 360px;
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #dde5ee;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+    text-align: center;
+    padding: 20px 18px 16px;
+    animation: swalIn .16s ease-out;
+}
+@keyframes swalIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.swal-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    margin: 0 auto 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 700;
+}
+.swal-icon.success { background: #e9f9ef; color: #0c8f3f; }
+.swal-icon.warning { background: #fff6e5; color: #bb6a00; }
+.swal-icon.error { background: #fee2e2; color: #dc2626; }
+.swal-title { font-size: 20px; font-weight: 700; color: #152033; margin-bottom: 8px; }
+.swal-text { font-size: 14px; color: #5f6d7f; margin-bottom: 14px; line-height: 1.45; }
+.swal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.swal-btn {
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    width: 100%;
+    height: 42px;
+    cursor: pointer;
+}
+.swal-btn.primary { background: #2d68d8; color: #fff; }
+.swal-btn.primary:hover { background: #1f56bf; }
+.swal-btn.secondary { background: #f2f5fb; color: #44546a; border: 1px solid #d5deea; }
+.swal-btn.secondary:hover { background: #e9eef7; }
 /* Loading spinner */
 .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

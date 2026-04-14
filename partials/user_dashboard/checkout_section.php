@@ -224,3 +224,16 @@
     <button class="success-modal-btn" onclick="closeSuccessModal()">Continue Shopping</button>
   </div>
 </div>
+
+<!-- Checkout Local Sweet Alert -->
+<div id="checkoutLocalSwal" class="swal-overlay" role="dialog" aria-modal="true" aria-live="polite">
+  <div class="swal-card">
+    <div id="checkoutLocalSwalIcon" class="swal-icon success">✓</div>
+    <div id="checkoutLocalSwalTitle" class="swal-title">Notice</div>
+    <div id="checkoutLocalSwalText" class="swal-text"></div>
+    <div id="checkoutLocalSwalActions" class="swal-actions">
+      <button id="checkoutLocalSwalCancel" type="button" class="swal-btn secondary" style="display:none;">Cancel</button>
+      <button id="checkoutLocalSwalConfirm" type="button" class="swal-btn primary">OK</button>
+    </div>
+  </div>
+</div>
