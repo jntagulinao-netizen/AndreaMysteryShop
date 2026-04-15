@@ -59,8 +59,8 @@ if ($role !== 'admin') {
 		}
 
 		.back-btn {
-			border: 1px solid #d5ddea;
-			background: #fff;
+			border: none;
+			background: transparent;
 			width: 36px;
 			height: 36px;
 			border-radius: 10px;
@@ -923,7 +923,7 @@ if ($role !== 'admin') {
 	<div class="page">
 		<div class="topbar">
 			<div class="topbar-inner">
-				<button class="back-btn" type="button" onclick="window.location.href='admin_dashboard.php'">←</button>
+				<button class="back-btn" type="button" onclick="window.location.href='admin_dashboard.php'">‹</button>
 				<div class="title">Product Drafts</div>
 				<button class="new-btn" type="button" onclick="window.location.href='admin_add_product.php'">+ New Draft</button>
 			</div>

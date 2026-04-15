@@ -42,48 +42,27 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         var(--bg);
     }
 
-    .screen { width: calc(100% - 48px); max-width: none; margin: 0 auto; min-height: 100vh; padding-top: 74px; padding-bottom: 168px; }
-    .topbar {
+    .screen { width: calc(100% - 32px); max-width: none; margin: 0 auto; min-height: 100vh; padding: 110px 0 24px; }
+    .page-header {
       position: fixed;
-      top: 0;
+      top: 16px;
       left: 50%;
       transform: translateX(-50%);
-      width: calc(100% - 48px);
+      width: calc(100% - 32px);
       max-width: none;
-      z-index: 20;
-      background: rgba(238, 242, 245, 0.9);
-      backdrop-filter: blur(8px);
+      background: #ffffff;
+      z-index: 120;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 14px 14px 12px;
-      border-bottom: 1px solid var(--line);
+      gap: 14px;
+      padding: 14px 20px;
+      border-radius: 18px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 14px 50px rgba(15, 23, 42, 0.08);
     }
-    .topbar-title {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 28px;
-      font-weight: 700;
-      color: #111;
-      letter-spacing: 0.2px;
-    }
-    .topbar-btn {
-      border: 1px solid var(--line);
-      background: #fff;
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-      font-size: 22px;
-      cursor: pointer;
-      color: #333;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .topbar-btn:hover { border-color: #b6c5d5; }
-    .topbar-actions { display: inline-flex; gap: 8px; align-items: center; }
+    .back-arrow { cursor: pointer; font-size: 24px; color: #111827; padding: 6px; line-height: 1; }
+    .header-title { font-size: 20px; font-weight: 700; color: #111827; flex: 1; }
+    .header-actions { display: flex; gap: 8px; align-items: center; margin-left: auto; }
     .topbar-link-btn {
       border: 1px solid #9cb0ca;
       background: #f2f6fc;
@@ -464,13 +443,13 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
 </head>
 <body>
   <div class="screen">
-    <div class="topbar">
-      <button class="topbar-btn" type="button" onclick="window.location.href='admin_dashboard.php'">←</button>
-      <div class="topbar-title">Add Product</div>
-      <div class="topbar-actions">
+    <div class="page-header">
+      <div class="back-arrow" onclick="window.location.href='admin_dashboard.php'">‹</div>
+      <div class="header-title">Add Product</div>
+      <div class="header-actions">
         <button class="topbar-link-btn" type="button" onclick="window.location.href='admin_product_drafts.php'">Drafts</button>
       </div>
-</div>
+    </div>
     <form id="addProductForm" enctype="multipart/form-data" novalidate>
       <div class="card">
         <div class="row">

@@ -56,8 +56,8 @@ if ($role !== 'admin') {
       padding: 10px 12px;
     }
     .back-btn {
-      border: 1px solid #d1d9e5;
-      background: #fff;
+      border: none;
+      background: transparent;
       width: 36px;
       height: 36px;
       border-radius: 9px;

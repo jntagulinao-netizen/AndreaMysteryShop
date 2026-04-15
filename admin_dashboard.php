@@ -209,6 +209,7 @@ function format_peso_display($amount) {
     .icon-archived { background: linear-gradient(135deg, #64748b, #475569); }
     .icon-reviews { background: linear-gradient(135deg, #06b6d4, #0e7490); }
     .icon-add { background: linear-gradient(135deg, #ef4444, #e11d48); }
+    .icon-schedule { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
     .function-label {
       font-size: 12px;
       font-weight: 700;
@@ -455,6 +456,7 @@ function format_peso_display($amount) {
           <a href="admin_dashboard.php">Admin Dashboard</a>
             <a href="messages.php">Messages</a>
           <a href="admin_orders.php">Admin Orders</a>
+          <a href="admin_orders_receive_pickup.php">Receive / Pickup Orders</a>
           <a href="admin_my_products.php">My Products</a>
           <a href="admin_product_drafts.php">Product Drafts</a>
           <a href="admin_auction_drafts.php">Auction Drafts</a>
@@ -463,6 +465,7 @@ function format_peso_display($amount) {
           <a href="admin_my_products.php?view=archived">Archived Products</a>
           <a href="admin_manage_reviews.php">Manage Reviews</a>
           <a href="admin_profile.php">Admin Profile</a>
+          <a href="admin_delivery_slots.php">Delivery Slots</a>
           <a href="logout.php">Logout</a>
         </div>
       </div>
@@ -489,6 +492,12 @@ function format_peso_display($amount) {
             <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="11" rx="2" ry="2"></rect><path d="M3 8V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1"></path><path d="M8 12h8"></path></svg>
           </span>
           <span class="function-label">Admin Orders</span>
+        </a>
+        <a class="function-tile" href="admin_orders_receive_pickup.php" title="Receive & Pickup Orders">
+          <span class="function-icon icon-orders">
+            <svg viewBox="0 0 24 24"><path d="M5 13l3 3 7-7"></path><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"></path></svg>
+          </span>
+          <span class="function-label">Receive / Pickup Orders</span>
         </a>
         <a class="function-tile" href="admin_my_products.php" title="My Products">
           <span class="function-icon icon-products">
@@ -531,6 +540,12 @@ function format_peso_display($amount) {
             <svg viewBox="0 0 24 24"><path d="M12 5v14"></path><path d="M5 12h14"></path><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
           </span>
           <span class="function-label">Add Product</span>
+        </a>
+        <a class="function-tile" href="admin_delivery_slots.php" title="Delivery Slots">
+          <span class="function-icon icon-schedule">
+            <svg viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </span>
+          <span class="function-label">Delivery Slots</span>
         </a>
       </div>
     </section>
