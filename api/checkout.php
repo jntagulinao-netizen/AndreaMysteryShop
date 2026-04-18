@@ -37,11 +37,15 @@ if (!in_array($deliveryType, ['delivery', 'pickup'])) {
     exit;
 }
 
-// Validate schedule date and slot for delivery
-if ($deliveryType === 'delivery') {
+// Initialize slot variable
+$selectedSlotId = null;
+
+// Validate schedule date and slot for delivery and pickup
+if (in_array($deliveryType, ['delivery', 'pickup'])) {
     if (empty($scheduleDate) || empty($scheduleSlot)) {
+        $slotType = ($deliveryType === 'delivery') ? 'delivery' : 'pickup';
         http_response_code(400);
-        echo json_encode(['error' => 'Schedule date and time slot are required for delivery']);
+        echo json_encode(['error' => 'Schedule date and time slot are required for ' . $slotType]);
         exit;
     }
 
@@ -80,13 +84,15 @@ if ($deliveryType === 'delivery') {
     $slotRes = $slotStmt->get_result();
     $slot = $slotRes->fetch_assoc();
     if (!$slot) {
+        $slotType = ($deliveryType === 'delivery') ? 'delivery' : 'pickup';
         http_response_code(400);
-        echo json_encode(['error' => 'Selected delivery slot is not available']);
+        echo json_encode(['error' => 'Selected ' . $slotType . ' slot is not available']);
         exit;
     }
     if ((int)$slot['current_orders'] >= (int)$slot['max_orders']) {
+        $slotType = ($deliveryType === 'delivery') ? 'delivery' : 'pickup';
         http_response_code(400);
-        echo json_encode(['error' => 'Selected delivery slot is fully booked. Please choose another time.']);
+        echo json_encode(['error' => 'Selected ' . $slotType . ' slot is fully booked. Please choose another time.']);
         exit;
     }
     $selectedSlotId = (int)$slot['slot_id'];
@@ -325,11 +331,11 @@ try {
 
     // Create order
     $status = 'pending';
-    $orderStmt = $conn->prepare('INSERT INTO orders (user_id, recipient_id, payment_method, status, total_amount, order_date, delivery_type, schedule_date, schedule_slot) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?)');
+    $orderStmt = $conn->prepare('INSERT INTO orders (user_id, recipient_id, payment_method, status, total_amount, order_date, delivery_type, delivery_slot_id) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)');
     if (!$orderStmt) {
         throw new Exception('Failed to prepare order insert: ' . $conn->error);
     }
-    $orderStmt->bind_param('iissdsss', $userId, $recipientId, $paymentMethod, $status, $total, $deliveryType, $scheduleDate, $scheduleSlot);
+    $orderStmt->bind_param('iissdsi', $userId, $recipientId, $paymentMethod, $status, $total, $deliveryType, $selectedSlotId);
     if (!$orderStmt->execute()) {
         throw new Exception('Failed to insert order: ' . $orderStmt->error);
     }
@@ -339,17 +345,17 @@ try {
     $orderId = $conn->insert_id;
     error_log('Checkout: created order ' . $orderId . ' for user ' . $userId . ' total ' . $total);
 
-    if ($deliveryType === 'delivery' && !empty($selectedSlotId)) {
+    if (!empty($selectedSlotId)) {
         $slotUpdateStmt = $conn->prepare('UPDATE delivery_slots SET current_orders = current_orders + 1 WHERE slot_id = ?');
         if (!$slotUpdateStmt) {
             throw new Exception('Failed to prepare slot update: ' . $conn->error);
         }
         $slotUpdateStmt->bind_param('i', $selectedSlotId);
         if (!$slotUpdateStmt->execute()) {
-            throw new Exception('Failed to update delivery slot order count: ' . $slotUpdateStmt->error);
+            throw new Exception('Failed to update slot order count: ' . $slotUpdateStmt->error);
         }
         if ($slotUpdateStmt->affected_rows === 0) {
-            throw new Exception('Failed to increment delivery slot count; slot not found or inactive');
+            throw new Exception('Failed to increment slot count; slot not found or inactive');
         }
     }
 
@@ -471,8 +477,7 @@ try {
         'total' => $total,
         'payment_method' => $paymentMethod,
         'delivery_type' => $deliveryType,
-        'schedule_date' => $scheduleDate,
-        'schedule_slot' => $scheduleSlot,
+        'delivery_slot_id' => $selectedSlotId,
         'delivery_fee' => $deliveryFee,
         'message' => 'Order placed successfully'
     ]);

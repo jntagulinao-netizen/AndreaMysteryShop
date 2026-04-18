@@ -114,26 +114,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       exit;
     }
 
-    $cancelStmt = $conn->prepare('UPDATE orders SET status = "cancelled" WHERE order_id = ? AND status = "pending"');
-    if (!$cancelStmt) {
-      setAdminFlash('error', 'Failed to prepare cancellation query.');
+    // Get delivery slot info before cancelling
+    $slotQuery = 'SELECT delivery_slot_id FROM orders WHERE order_id = ?';
+    $slotStmt = $conn->prepare($slotQuery);
+    $slotStmt->bind_param('i', $orderId);
+    $slotStmt->execute();
+    $slotResult = $slotStmt->get_result();
+    $slotRow = $slotResult->fetch_assoc();
+    $deliverySlotId = $slotRow['delivery_slot_id'] ?? null;
+    $slotStmt->close();
+
+    // Start transaction
+    $conn->begin_transaction();
+
+    try {
+      $cancelStmt = $conn->prepare('UPDATE orders SET status = "cancelled" WHERE order_id = ? AND status = "pending"');
+      if (!$cancelStmt) {
+        throw new Exception('Failed to prepare cancellation query.');
+      }
+      $cancelStmt->bind_param('i', $orderId);
+      $cancelStmt->execute();
+      $updated = $cancelStmt->affected_rows > 0;
+      $cancelStmt->close();
+
+      if ($updated) {
+        // Restore product stocks from order items
+        $stockRestoreQuery = 'UPDATE products p 
+                             INNER JOIN order_items oi ON p.product_id = oi.product_id 
+                             SET p.product_stock = p.product_stock + oi.quantity, 
+                                 p.order_count = GREATEST(0, p.order_count - oi.quantity)
+                             WHERE oi.order_id = ?';
+        $stockStmt = $conn->prepare($stockRestoreQuery);
+        if (!$stockStmt) {
+            throw new Exception('Failed to prepare stock restore query');
+        }
+        $stockStmt->bind_param('i', $orderId);
+        if (!$stockStmt->execute()) {
+            throw new Exception('Failed to restore product stocks');
+        }
+        $stockStmt->close();
+
+        // If order had a delivery slot, decrement the count
+        if ($deliverySlotId) {
+          $slotUpdateStmt = $conn->prepare('UPDATE delivery_slots SET current_orders = GREATEST(0, current_orders - 1) WHERE slot_id = ?');
+          if (!$slotUpdateStmt) {
+            throw new Exception('Failed to prepare slot update');
+          }
+          $slotUpdateStmt->bind_param('i', $deliverySlotId);
+          if (!$slotUpdateStmt->execute()) {
+            throw new Exception('Failed to update delivery slot count');
+          }
+          $slotUpdateStmt->close();
+        }
+
+        $conn->commit();
+
+        sendOrderStatusNotice(
+          $conn,
+          $adminId,
+          $orderUserId,
+          $orderId,
+          'Hi! Your order #' . $orderId . ' has been cancelled by admin support. Please message us if you need help placing a new order.',
+          'cancelled'
+        );
+      } else {
+        $conn->rollback();
+      }
+
+    } catch (Exception $e) {
+      $conn->rollback();
+      setAdminFlash('error', 'Cancellation failed: ' . $e->getMessage());
       header('Location: admin_orders.php');
       exit;
-    }
-    $cancelStmt->bind_param('i', $orderId);
-    $cancelStmt->execute();
-    $updated = $cancelStmt->affected_rows > 0;
-    $cancelStmt->close();
-
-    if ($updated) {
-      sendOrderStatusNotice(
-        $conn,
-        $adminId,
-        $orderUserId,
-        $orderId,
-        'Hi! Your order #' . $orderId . ' has been cancelled by admin support. Please message us if you need help placing a new order.',
-        'cancelled'
-      );
     }
 
     setAdminFlash($updated ? 'success' : 'error', $updated ? 'Order cancelled successfully.' : 'Order cancellation failed.');
@@ -382,8 +434,8 @@ $orderSql = 'SELECT
   o.payment_method,
   o.total_amount,
   o.delivery_type,
-  o.schedule_date,
-  o.schedule_slot,
+  COALESCE(ds.slot_date, o.order_date) AS schedule_date,
+  DATE_FORMAT(ds.slot_time, "%H:%i") AS schedule_slot,
   u.full_name AS customer_name,
   oi.order_item_id,
   oi.product_id,
@@ -399,6 +451,7 @@ $orderSql = 'SELECT
    LIMIT 1) AS product_image
   FROM orders o
   LEFT JOIN users u ON o.user_id = u.user_id
+  LEFT JOIN delivery_slots ds ON o.delivery_slot_id = ds.slot_id
   LEFT JOIN order_items oi ON o.order_id = oi.order_id
   LEFT JOIN products p ON oi.product_id = p.product_id
   ORDER BY o.order_date DESC, o.order_id DESC, oi.order_item_id ASC';

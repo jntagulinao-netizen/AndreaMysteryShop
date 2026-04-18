@@ -25,8 +25,8 @@ $sql = 'SELECT
     o.order_date,
     o.status,
     o.delivery_type,
-    o.schedule_date,
-    o.schedule_slot,
+    COALESCE(ds.slot_date, o.order_date) AS schedule_date,
+    DATE_FORMAT(ds.slot_time, "%H:%i") AS schedule_slot,
     o.payment_method,
     o.total_amount,
     u.full_name AS customer_name,
@@ -40,6 +40,7 @@ $sql = 'SELECT
     ) AS product_name
   FROM orders o
   LEFT JOIN users u ON o.user_id = u.user_id
+  LEFT JOIN delivery_slots ds ON o.delivery_slot_id = ds.slot_id
   WHERE o.archived = 0
     AND o.binned = 0
     AND o.status IN ("shipped", "pickup")

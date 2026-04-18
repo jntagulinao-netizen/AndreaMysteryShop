@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Fetch orders with items
-$query = 'SELECT o.order_id, o.recipient_id, o.order_date, o.status, o.payment_method, o.total_amount, o.archived, o.delivery_type, o.schedule_date, o.schedule_slot,
+$query = 'SELECT o.order_id, o.recipient_id, o.order_date, o.status, o.payment_method, o.total_amount, o.archived, o.delivery_type, COALESCE(ds.slot_date, o.order_date) AS schedule_date, DATE_FORMAT(ds.slot_time, "%H:%i") AS schedule_slot,
                  oi.order_item_id, oi.product_id, oi.quantity, oi.price, 
                                  p.product_name, p.product_description,
                                  (SELECT pi.image_url
@@ -61,6 +61,7 @@ $query = 'SELECT o.order_id, o.recipient_id, o.order_date, o.status, o.payment_m
                                     ORDER BY pi.is_pinned DESC, pi.image_id ASC
                                     LIMIT 1) AS product_image
           FROM orders o
+          LEFT JOIN delivery_slots ds ON o.delivery_slot_id = ds.slot_id
           LEFT JOIN order_items oi ON o.order_id = oi.order_id
           LEFT JOIN products p ON oi.product_id = p.product_id
           WHERE o.user_id = ? AND o.binned = 0
