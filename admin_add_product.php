@@ -327,20 +327,15 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
     .ok-text { color: var(--success); font-size: 13px; margin-top: 8px; }
 
     .footer-actions {
-      position: fixed;
-      bottom: 50px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: calc(100% - 48px);
-      max-width: none;
-      background: rgba(238, 242, 245, 0.95);
-      border-top: 1px solid var(--line);
-      backdrop-filter: blur(8px);
-      padding: 10px 12px 12px;
+      margin-top: 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
-      z-index: 25;
+      box-shadow: 0 10px 24px rgba(17, 24, 39, 0.06);
     }
     .footer-btn {
       height: 48px;
