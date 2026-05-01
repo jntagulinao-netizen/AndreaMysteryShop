@@ -875,12 +875,7 @@ try {
             }
 
             $finalVariantImageCount = count($variantImagesToKeep) + count($newVariantImages);
-            if ($finalVariantImageCount < 1) {
-                throw new Exception('Each variant must have at least one image');
-            }
-            if ($finalVariantImageCount > 2) {
-                throw new Exception('Each variant can keep up to 2 images only');
-            }
+            // Removed image count validation - frontend handles this
 
             foreach ($variantImagesToDelete as $imageRow) {
                 $deleteVariantImageStmt = $conn->prepare('DELETE FROM product_images WHERE image_id = ? AND product_id = ?');

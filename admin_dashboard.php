@@ -453,11 +453,11 @@ function format_peso_display($amount) {
       <div class="topbar-menu">
         <button type="button" class="menu-trigger" onclick="toggleTopbarMenu(event)">...</button>
         <div class="menu-dropdown" id="topbarMenuDropdown">
-          <a href="admin_dashboard.php">Admin Dashboard</a>
             <a href="messages.php">Messages</a>
           <a href="admin_orders.php">Admin Orders</a>
-          <a href="admin_orders_receive_pickup.php">Receive / Pickup Orders</a>
+          <a href="admin_orders_receive_pickup.php">Calendar</a>
           <a href="admin_my_products.php">My Products</a>
+          <a href="admin_delivery_slots.php">Delivery Slots</a>
           <a href="admin_product_drafts.php">Product Drafts</a>
           <a href="admin_auction_drafts.php">Auction Drafts</a>
           <a href="admin_live_auctions.php">Live Auctions</a>
@@ -465,7 +465,6 @@ function format_peso_display($amount) {
           <a href="admin_my_products.php?view=archived">Archived Products</a>
           <a href="admin_manage_reviews.php">Manage Reviews</a>
           <a href="admin_profile.php">Admin Profile</a>
-          <a href="admin_delivery_slots.php">Delivery Slots</a>
           <a href="logout.php">Logout</a>
         </div>
       </div>
@@ -497,7 +496,7 @@ function format_peso_display($amount) {
           <span class="function-icon icon-orders">
             <svg viewBox="0 0 24 24"><path d="M5 13l3 3 7-7"></path><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"></path></svg>
           </span>
-          <span class="function-label">Receive / Pickup Orders</span>
+          <span class="function-label">Calendar</span>
         </a>
         <a class="function-tile" href="admin_my_products.php" title="My Products">
           <span class="function-icon icon-products">

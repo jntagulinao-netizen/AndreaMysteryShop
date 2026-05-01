@@ -1082,10 +1082,15 @@ $statusDisplay = [
         <button type="button" class="menu-trigger" onclick="toggleTopbarMenu(event)">...</button>
         <div class="menu-dropdown" id="topbarMenuDropdown">
           <a href="admin_dashboard.php">Admin Dashboard</a>
-           <a href="messages.php">Messages</a>
+            <a href="messages.php">Messages</a>
           <a href="admin_orders.php">Admin Orders</a>
+          <a href="admin_orders_receive_pickup.php">Calendar</a>
           <a href="admin_my_products.php">My Products</a>
+          <a href="admin_delivery_slots.php">Delivery Slots</a>
           <a href="admin_product_drafts.php">Product Drafts</a>
+          <a href="admin_auction_drafts.php">Auction Drafts</a>
+          <a href="admin_live_auctions.php">Live Auctions</a>
+          <a href="admin_add_auction.php">Add Auction Item</a>
           <a href="admin_my_products.php?view=archived">Archived Products</a>
           <a href="admin_manage_reviews.php">Manage Reviews</a>
           <a href="admin_profile.php">Admin Profile</a>

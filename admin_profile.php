@@ -272,16 +272,17 @@ $showEditForm = ($updateError !== '');
       left: 50%;
       transform: translateX(-50%);
       width: calc(100% - 48px);
+      max-height: calc(100vh - 170px);
       z-index: 110;
       background: #fff;
       border: 1px solid #eee;
       border-radius: 14px;
       box-shadow: 0 8px 20px rgba(0,0,0,.05);
       padding: 16px;
+      overflow-y: auto;
     }
     .profile-card.expanded {
       bottom: 68px;
-      overflow-y: auto;
     }
 
     .alert { padding: 12px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; }
@@ -405,6 +406,98 @@ $showEditForm = ($updateError !== '');
       .header-meta { display: none; }
       .profile-top { align-items: flex-start; }
     }
+
+    .basic-functions {
+      background: #f1f1f1;
+      border: 1px solid #ececec;
+      border-radius: 16px;
+      padding: 16px 14px 12px;
+      margin-top: 16px;
+    }
+    .basic-functions h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #2f2f2f;
+    }
+    .functions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .function-tile {
+      text-decoration: none;
+      color: #3d4550;
+      border-radius: 12px;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+      transition: transform .18s ease, background .18s ease;
+    }
+    .function-tile:hover {
+      transform: translateY(-2px);
+      background: #ffffff;
+    }
+    .function-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .function-icon svg {
+      width: 24px;
+      height: 24px;
+      stroke: #fff;
+      stroke-width: 1.9;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .icon-message { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .icon-orders { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .icon-products { background: linear-gradient(135deg, #f59e0b, #f97316); }
+    .icon-drafts { background: linear-gradient(135deg, #10b981, #0ea5a5); }
+    .icon-auction-live { background: linear-gradient(135deg, #ef4444, #f59e0b); }
+    .icon-archived { background: linear-gradient(135deg, #64748b, #475569); }
+    .icon-reviews { background: linear-gradient(135deg, #06b6d4, #0e7490); }
+    .icon-add { background: linear-gradient(135deg, #ef4444, #e11d48); }
+    .icon-schedule { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .function-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #4b5563;
+      text-align: center;
+      line-height: 1.25;
+      min-height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .function-msg-badge {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      min-width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: #e22a39;
+      color: #fff;
+      border: 1px solid #fff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      z-index: 2;
+    }
+
   </style>
 </head>
 <body>
@@ -417,10 +510,15 @@ $showEditForm = ($updateError !== '');
         <button type="button" class="menu-trigger" onclick="toggleTopbarMenu(event)">...</button>
         <div class="menu-dropdown" id="topbarMenuDropdown">
           <a href="admin_dashboard.php">Admin Dashboard</a>
-          <a href="messages.php">Messages</a>
+            <a href="messages.php">Messages</a>
           <a href="admin_orders.php">Admin Orders</a>
+          <a href="admin_orders_receive_pickup.php">Calendar</a>
           <a href="admin_my_products.php">My Products</a>
+          <a href="admin_delivery_slots.php">Delivery Slots</a>
           <a href="admin_product_drafts.php">Product Drafts</a>
+          <a href="admin_auction_drafts.php">Auction Drafts</a>
+          <a href="admin_live_auctions.php">Live Auctions</a>
+          <a href="admin_add_auction.php">Add Auction Item</a>
           <a href="admin_my_products.php?view=archived">Archived Products</a>
           <a href="admin_manage_reviews.php">Manage Reviews</a>
           <a href="admin_profile.php">Admin Profile</a>
@@ -497,8 +595,79 @@ $showEditForm = ($updateError !== '');
           </div>
         </form>
       </div>
+
+      <section class="basic-functions">
+        <h2>Basic Function</h2>
+        <div class="functions-grid">
+          <a class="function-tile" id="desktopMessagesTile" href="messages.php" title="Messages">
+            <span class="function-icon icon-message">
+              <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            </span>
+            <span class="function-label">Messages</span>
+          </a>
+          <a class="function-tile" href="admin_orders.php" title="Admin Orders">
+            <span class="function-icon icon-orders">
+              <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="11" rx="2" ry="2"></rect><path d="M3 8V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1"></path><path d="M8 12h8"></path></svg>
+            </span>
+            <span class="function-label">Admin Orders</span>
+          </a>
+          <a class="function-tile" href="admin_orders_receive_pickup.php" title="Receive & Pickup Orders">
+            <span class="function-icon icon-orders">
+              <svg viewBox="0 0 24 24"><path d="M5 13l3 3 7-7"></path><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"></path></svg>
+            </span>
+            <span class="function-label">Calendar</span>
+          </a>
+          <a class="function-tile" href="admin_my_products.php" title="My Products">
+            <span class="function-icon icon-products">
+              <svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4z"></path><path d="M3 12l9 4 9-4"></path><path d="M3 17l9 4 9-4"></path></svg>
+            </span>
+            <span class="function-label">My Products</span>
+          </a>
+          <a class="function-tile" href="admin_product_drafts.php" title="Product Drafts">
+            <span class="function-icon icon-drafts">
+              <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
+            </span>
+            <span class="function-label">Product Drafts</span>
+          </a>
+          <a class="function-tile" href="admin_auction_drafts.php" title="Auction Drafts">
+            <span class="function-icon icon-orders">
+              <svg viewBox="0 0 24 24"><path d="M12 3l2.9 5.9 6.5.9-4.7 4.5 1.1 6.4-5.8-3.1-5.8 3.1 1.1-6.4-4.7-4.5 6.5-.9z"></path></svg>
+            </span>
+            <span class="function-label">Auction Drafts</span>
+          </a>
+          <a class="function-tile" href="admin_live_auctions.php" title="Live Auctions">
+            <span class="function-icon icon-auction-live">
+              <svg viewBox="0 0 24 24"><path d="M14.5 5.5l4 4"></path><path d="M5.5 14.5l4 4"></path><path d="M4 20l6.5-6.5"></path><path d="M9.5 10.5l6-6 4 4-6 6"></path><path d="M12 7l5 5"></path><path d="M2 22h8"></path></svg>
+            </span>
+            <span class="function-label">Live Auctions</span>
+          </a>
+          <a class="function-tile" href="admin_my_products.php?view=archived" title="Archived Products">
+            <span class="function-icon icon-archived">
+              <svg viewBox="0 0 24 24"><path d="M3 7h18"></path><path d="M5 7l1 12h12l1-12"></path><path d="M9 11v5"></path><path d="M15 11v5"></path><path d="M10 7V5h4v2"></path></svg>
+            </span>
+            <span class="function-label">Archived Products</span>
+          </a>
+          <a class="function-tile" href="admin_manage_reviews.php" title="Manage Reviews">
+            <span class="function-icon icon-reviews">
+              <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8 9h8"></path><path d="M8 13h6"></path></svg>
+            </span>
+            <span class="function-label">Manage Reviews</span>
+          </a>
+          <a class="function-tile" href="admin_add_product.php" title="Add Product">
+            <span class="function-icon icon-add">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14"></path><path d="M5 12h14"></path><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+            </span>
+            <span class="function-label">Add Product</span>
+          </a>
+          <a class="function-tile" href="admin_delivery_slots.php" title="Delivery Slots">
+            <span class="function-icon icon-schedule">
+              <svg viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </span>
+            <span class="function-label">Delivery Slots</span>
+          </a>
+        </div>
+      </section>
     </section>
-  </div>
 
   <nav class="mobile-bottom-nav fixed">
     <div class="mobile-nav-inner">

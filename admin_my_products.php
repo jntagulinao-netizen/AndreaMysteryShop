@@ -1148,11 +1148,16 @@ if ($currentView === 'archived') {
       <div class="topbar-menu">
         <button type="button" class="menu-trigger" onclick="toggleTopbarMenu(event)">...</button>
         <div class="menu-dropdown" id="topbarMenuDropdown">
-          <a href="admin_dashboard.php">Admin Dashboard</a>
-           <a href="messages.php">Messages</a>
+         <a href="admin_dashboard.php">Admin Dashboard</a>
+            <a href="messages.php">Messages</a>
           <a href="admin_orders.php">Admin Orders</a>
+          <a href="admin_orders_receive_pickup.php">Calendar</a>
           <a href="admin_my_products.php">My Products</a>
+          <a href="admin_delivery_slots.php">Delivery Slots</a>
           <a href="admin_product_drafts.php">Product Drafts</a>
+          <a href="admin_auction_drafts.php">Auction Drafts</a>
+          <a href="admin_live_auctions.php">Live Auctions</a>
+          <a href="admin_add_auction.php">Add Auction Item</a>
           <a href="admin_my_products.php?view=archived">Archived Products</a>
           <a href="admin_manage_reviews.php">Manage Reviews</a>
           <a href="admin_profile.php">Admin Profile</a>
@@ -1353,6 +1358,7 @@ if ($currentView === 'archived') {
     let videoPreviewPosterToken = 0;
     let newVariantTempCounter = 1;
     let pendingMainVariantSelection = '';
+    let onlySwitchedMainVariant = false;
     let currentPage = 1;
     let itemsPerPage = 12;
     let totalPages = 1;
@@ -2201,6 +2207,7 @@ if ($currentView === 'archived') {
             const selection = String(mainBtn.getAttribute('data-main-selection') || '').trim();
             if (!selection) return;
             pendingMainVariantSelection = pendingMainVariantSelection === selection ? '' : selection;
+            onlySwitchedMainVariant = true;
             renderVariantsEditSectionFromState();
           });
         }
@@ -2221,6 +2228,7 @@ if ($currentView === 'archived') {
 
       section.style.display = 'block';
       pendingMainVariantSelection = '';
+      onlySwitchedMainVariant = false;
       currentEditingVariants = childVariants.map((v) => ({
         id: Number(v.id),
         tempId: Number(v.id),
@@ -2780,12 +2788,12 @@ if ($currentView === 'archived') {
               throw new Error('Variant image state is missing. Please reopen the product modal and try again.');
             }
 
-            const activeVariantImageCount = getVariantActiveImageCount(variantState);
-            if (activeVariantImageCount < 1) {
-              throw new Error('Each variant must have at least one image.');
-            }
-            if (activeVariantImageCount > 2) {
-              throw new Error('Each variant can keep up to 2 images only.');
+            // Skip image validation if only switching main variant
+            if (!onlySwitchedMainVariant) {
+              const activeVariantImageCount = getVariantActiveImageCount(variantState);
+              if (activeVariantImageCount > 2) {
+                throw new Error('Each variant can keep up to 2 images only.');
+              }
             }
 
             const variantPayload = {
@@ -2954,8 +2962,10 @@ if ($currentView === 'archived') {
         closeProductModal();
         await loadProducts();
         filterByCategory(currentCategory);
+        onlySwitchedMainVariant = false;
         await localAlert('success', 'Saved', 'Product updated successfully.');
       } catch (error) {
+        onlySwitchedMainVariant = false;
         await localAlert('error', 'Update Failed', error.message || 'Failed to update product.');
       }
     }
@@ -3110,6 +3120,7 @@ if ($currentView === 'archived') {
       revokeVariantImageUrls();
       currentEditingVariants = [];
       pendingMainVariantSelection = '';
+      onlySwitchedMainVariant = false;
     }
 
     async function loadProducts() {
