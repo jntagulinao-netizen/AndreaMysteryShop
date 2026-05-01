@@ -31,6 +31,80 @@ $bidId = (int)($_POST['bid_id'] ?? 0);
 $recipientId = (int)($_POST['recipient_id'] ?? 0);
 $paymentMethod = trim((string)($_POST['payment_method'] ?? ''));
 
+// Get scheduling parameters
+$deliveryType = trim($_POST['delivery_type'] ?? 'delivery');
+$scheduleDate = trim($_POST['schedule_date'] ?? '');
+$scheduleSlot = trim($_POST['schedule_slot'] ?? '');
+
+// Validate delivery type
+if (!in_array($deliveryType, ['delivery', 'pickup'])) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid delivery type']);
+    exit;
+}
+
+// Initialize slot variable
+$selectedSlotId = null;
+
+// Validate schedule date and slot for delivery and pickup
+if (in_array($deliveryType, ['delivery', 'pickup'])) {
+    if (empty($scheduleDate) || empty($scheduleSlot)) {
+        $slotType = ($deliveryType === 'delivery') ? 'delivery' : 'pickup';
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Schedule date and time slot are required for ' . $slotType]);
+        exit;
+    }
+
+    // Validate date format and future date
+    $scheduleDateTime = DateTime::createFromFormat('Y-m-d', $scheduleDate);
+    if (!$scheduleDateTime) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid schedule date format']);
+        exit;
+    }
+
+    $today = new DateTime();
+    $today->setTime(0, 0, 0);
+    if ($scheduleDateTime < $today) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Schedule date must be today or in the future']);
+        exit;
+    }
+
+    // Validate time slot format
+    if (!preg_match('/^\d{2}:\d{2}(-\d{2}:\d{2})?$/', $scheduleSlot)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid time slot format']);
+        exit;
+    }
+
+    // Ensure the selected slot is still available
+    $slotStmt = $conn->prepare('SELECT slot_id, max_orders, current_orders FROM delivery_slots WHERE slot_date = ? AND slot_time = ? AND is_active = 1 FOR UPDATE');
+    if (!$slotStmt) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Slot validation failed']);
+        exit;
+    }
+    $slotStmt->bind_param('ss', $scheduleDate, $scheduleSlot);
+    $slotStmt->execute();
+    $slotRes = $slotStmt->get_result();
+    $slot = $slotRes->fetch_assoc();
+    if (!$slot) {
+        $slotType = ($deliveryType === 'delivery') ? 'delivery' : 'pickup';
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Selected ' . $slotType . ' slot is not available']);
+        exit;
+    }
+    if ((int)$slot['current_orders'] >= (int)$slot['max_orders']) {
+        $slotType = ($deliveryType === 'delivery') ? 'delivery' : 'pickup';
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Selected ' . $slotType . ' slot is fully booked. Please choose another time.']);
+        exit;
+    }
+    $selectedSlotId = (int)$slot['slot_id'];
+    $slotStmt->close();
+}
+
 if ($auctionId <= 0) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Invalid auction ID']);
@@ -143,10 +217,18 @@ try {
     $soldPrice = $auction['sold_price'] !== null ? (float)$auction['sold_price'] : null;
     $currentBid = $auction['current_bid'] !== null ? (float)$auction['current_bid'] : null;
     $startingBid = (float)($auction['starting_bid'] ?? 0);
-    $orderPrice = $soldPrice !== null ? $soldPrice : ($currentBid !== null ? $currentBid : $startingBid);
+    $basePrice = $soldPrice !== null ? $soldPrice : ($currentBid !== null ? $currentBid : $startingBid);
 
-    if ($orderPrice <= 0) {
+    if ($basePrice <= 0) {
         throw new Exception('Invalid sold price for this auction');
+    }
+
+    // Calculate final order price with delivery fee
+    $orderPrice = $basePrice;
+    $deliveryFee = 0;
+    if ($deliveryType === 'delivery') {
+        $deliveryFee = 38.00;
+        $orderPrice += $deliveryFee;
     }
 
     $auctionProductId = (int)($auction['auction_product_id'] ?? 0);
@@ -174,7 +256,7 @@ try {
         if (!$createProductStmt) {
             throw new Exception('Failed to create product record for auction');
         }
-        $createProductStmt->bind_param('ssdi', $itemName, $itemDescription, $orderPrice, $categoryId);
+        $createProductStmt->bind_param('ssdi', $itemName, $itemDescription, $basePrice, $categoryId);
         $createProductStmt->execute();
         $auctionProductId = (int)$createProductStmt->insert_id;
         $createProductStmt->close();
@@ -235,17 +317,32 @@ try {
     }
 
     $status = 'pending';
-    $orderStmt = $conn->prepare('INSERT INTO orders (user_id, recipient_id, payment_method, status, total_amount, order_date) VALUES (?, ?, ?, ?, ?, NOW())');
+    $orderStmt = $conn->prepare('INSERT INTO orders (user_id, recipient_id, payment_method, status, total_amount, order_date, delivery_type, delivery_slot_id) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)');
     if (!$orderStmt) {
         throw new Exception('Failed to create order');
     }
-    $orderStmt->bind_param('iissd', $userId, $recipientId, $paymentMethod, $status, $orderPrice);
+    $orderStmt->bind_param('iissdsi', $userId, $recipientId, $paymentMethod, $status, $orderPrice, $deliveryType, $selectedSlotId);
     $orderStmt->execute();
     $orderId = (int)$conn->insert_id;
     $orderStmt->close();
 
     if ($orderId <= 0) {
         throw new Exception('Failed to create order');
+    }
+
+    if (!empty($selectedSlotId)) {
+        $slotUpdateStmt = $conn->prepare('UPDATE delivery_slots SET current_orders = current_orders + 1 WHERE slot_id = ?');
+        if (!$slotUpdateStmt) {
+            throw new Exception('Failed to prepare slot update');
+        }
+        $slotUpdateStmt->bind_param('i', $selectedSlotId);
+        if (!$slotUpdateStmt->execute()) {
+            throw new Exception('Failed to update slot order count');
+        }
+        if ($slotUpdateStmt->affected_rows === 0) {
+            throw new Exception('Failed to increment slot count; slot not found or inactive');
+        }
+        $slotUpdateStmt->close();
     }
 
     $itemStmt = $conn->prepare('INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, 1, ?)');

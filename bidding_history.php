@@ -20,9 +20,11 @@ if ($role !== 'user') {
   <link rel="stylesheet" href="main.css">
   <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260501-1">
   <link rel="stylesheet" href="assets/css/local_swal.css">
+
   <link rel="stylesheet" href="assets/css/user_dashboard_search.css?v=20260331-1">
   <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260409-2">
   <script src="assets/js/local_swal.js"></script>
+ 
   <style>
     :root {
       --bg: #06070d;
@@ -200,6 +202,33 @@ if ($role !== 'user') {
       opacity: 0.45;
       cursor: not-allowed;
     }
+    .history-tabs {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .history-tab-btn {
+      flex: 1;
+      min-width: 140px;
+      padding: 12px 16px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--muted);
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .history-tab-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .history-tab-btn.active {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border-color: rgba(245, 158, 11, 0.45);
+      color: #111827;
+    }
     .checkout-modal,
     .checkout-modal .checkout-container,
     .checkout-modal .checkout-header h1,
@@ -245,10 +274,159 @@ if ($role !== 'user') {
     .local-swal-toast {
       z-index: 30020;
     }
+    .card {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .card:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(245, 158, 11, 0.35);
+      transform: translateY(-2px);
+    }
+    .bid-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .bid-modal-overlay.show {
+      display: flex;
+    }
+    .bid-modal-content {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      max-width: 700px;
+      width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .bid-modal-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .bid-modal-header img {
+      width: 100px;
+      height: 100px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 1px solid var(--line);
+    }
+    .bid-modal-header .info {
+      flex: 1;
+    }
+    .bid-modal-header .close-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--line);
+      color: #fff;
+      border-radius: 8px;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .bid-modal-header .close-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    .bid-modal-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+    .bid-modal-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+    .bid-modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
+    .bid-modal-section {
+      border-bottom: 1px solid var(--line);
+    }
+    .bid-modal-section:last-child {
+      border-bottom: none;
+    }
+    .bid-modal-section-title {
+      padding: 16px 20px 12px;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    .bid-history-item {
+      padding: 12px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 16px;
+      align-items: center;
+    }
+    .bid-history-item:last-child {
+      border-bottom: none;
+    }
+    .bid-history-amount {
+      font-weight: 800;
+      font-size: 14px;
+    }
+    .bid-history-time {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .bid-history-status {
+      display: inline-flex;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(16, 185, 129, 0.2);
+      color: #a7f3d0;
+    }
+    .bid-modal-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      gap: 12px;
+    }
+    .bid-modal-footer .btn {
+      flex: 1;
+    }
     @media (max-width: 760px) {
       .card { grid-template-columns: 1fr; }
       .right { justify-items: start; }
       .thumb { width: 100%; height: 180px; }
+      .bid-modal-header {
+        flex-direction: column;
+        text-align: center;
+      }
+      .bid-modal-header img {
+        width: 120px;
+        height: 120px;
+      }
+      .bid-modal-content {
+        background: rgba(255,255,255,0.12);
+      }
     }
   </style>
 </head>
@@ -262,11 +440,49 @@ if ($role !== 'user') {
 
   <main class="wrap">
     <h1 class="title">My Bid History</h1>
-    <div class="subtitle">This page shows your personal bid timeline. Multiple bids per auction are preserved, and won auctions can be checked out here.</div>
-    <div id="historyList" class="list"></div>
+    <div class="subtitle">Click on any bid to see all bids for that auction and checkout if you've won.</div>
+    
+    <div class="history-tabs">
+      <button type="button" class="history-tab-btn active" data-history-tab="not-ordered">Not Ordered <span id="notOrderedTabCount"></span></button>
+      <button type="button" class="history-tab-btn" data-history-tab="ordered">Ordered <span id="orderedTabCount"></span></button>
+    </div>
+    
+    <div id="historyList" class="list" style="margin-top: 28px;"></div>
     <div id="pagination" class="pagination" style="display:none;"></div>
     <div id="emptyState" class="empty" style="display:none;">No bids found yet.</div>
   </main>
+
+  <!-- Bid Details Modal -->
+  <div id="bidModal" class="bid-modal-overlay">
+    <div class="bid-modal-content">
+      <div class="bid-modal-header">
+        <img id="bidModalImage" src="logo.jpg" alt="Auction Item">
+        <div class="info">
+          <h2 class="bid-modal-title" id="bidModalTitle">Auction Item</h2>
+          <div class="bid-modal-meta" id="bidModalMeta">Category · Status</div>
+        </div>
+        <button type="button" class="close-btn" id="bidModalCloseBtn">✕</button>
+      </div>
+      <div class="bid-modal-body">
+        <div class="bid-modal-section">
+          <div class="bid-modal-section-title">Auction Details</div>
+          <div style="padding: 12px 20px; color: var(--muted); font-size: 13px; line-height: 1.6;">
+            <div>Price: <span id="bidModalPrice" style="color: #fff; font-weight: 800;">N/A</span></div>
+            <div>Ends: <span id="bidModalEnds" style="color: #fff;">N/A</span></div>
+            <div style="margin-top: 8px;" id="bidModalCheckoutSection"></div>
+          </div>
+        </div>
+        <div class="bid-modal-section">
+          <div class="bid-modal-section-title">Bid History</div>
+          <div id="bidModalBidList"></div>
+        </div>
+      </div>
+      <div class="bid-modal-footer">
+        <button type="button" class="btn live" id="bidModalBackBtn">Back to Live</button>
+        <button type="button" class="btn checkout" id="bidModalCheckoutBtn" style="display:none;">Checkout Win</button>
+      </div>
+    </div>
+  </div>
 
   <?php include __DIR__ . '/partials/user_dashboard/checkout_section.php'; ?>
   <script src="assets/js/user_dashboard_helpers.js?v=20260401-2"></script>
@@ -287,6 +503,14 @@ if ($role !== 'user') {
     const checkoutDeliveryFee = 38;
     let checkoutScheduleInitDone = false;
     let checkoutSubmitInFlight = false;
+    
+    // Main history tabs state
+    let historyOrderedAuctions = [];
+    let historyNotOrderedAuctions = [];
+    let currentHistoryOrderedPage = 1;
+    let currentHistoryNotOrderedPage = 1;
+    let currentHistoryTab = 'not-ordered';
+    const historyPageSize = 6;
 
     async function readJsonResponse(res) {
       const raw = await res.text();
@@ -920,60 +1144,105 @@ if ($role !== 'user') {
       openCheckout();
     }
 
-    function getPageCount() {
-      return Math.max(1, Math.ceil(bidRows.length / pageSize));
+    function openBidModal(auctionId) {
+      const bidModal = document.getElementById('bidModal');
+      if (bidModal) {
+        bidModal.classList.add('show');
+        loadBidModalData(auctionId);
+      }
     }
 
-    function renderPagination() {
-      const host = document.getElementById('pagination');
-      host.innerHTML = '';
-
-      if (!Array.isArray(bidRows) || bidRows.length === 0) {
-        host.style.display = 'none';
-        return;
+    function closeBidModal() {
+      const bidModal = document.getElementById('bidModal');
+      if (bidModal) {
+        bidModal.classList.remove('show');
       }
+    }
 
-      const totalPages = getPageCount();
-      host.style.display = totalPages > 1 ? 'flex' : 'none';
-      if (totalPages <= 1) return;
-
-      const prevBtn = document.createElement('button');
-      prevBtn.type = 'button';
-      prevBtn.className = 'page-btn';
-      prevBtn.textContent = 'Prev';
-      prevBtn.disabled = currentPage <= 1;
-      prevBtn.addEventListener('click', () => {
-        if (currentPage > 1) {
-          currentPage -= 1;
-          renderHistoryPage();
+    async function loadBidModalData(auctionId) {
+      try {
+        // Find the first bid row for this auction to get basic info
+        const baseBid = bidRows.find(r => Number(r.auction_id) === Number(auctionId));
+        if (!baseBid) {
+          throw new Error('Auction not found');
         }
-      });
-      host.appendChild(prevBtn);
 
-      for (let page = 1; page <= totalPages; page += 1) {
-        const pageBtn = document.createElement('button');
-        pageBtn.type = 'button';
-        pageBtn.className = `page-btn${page === currentPage ? ' active' : ''}`;
-        pageBtn.textContent = String(page);
-        pageBtn.addEventListener('click', () => {
-          currentPage = page;
-          renderHistoryPage();
+        // Fetch full auction details from API
+        const detailRes = await fetch(`api/get-auction-detail.php?auction_id=${encodeURIComponent(auctionId)}`, { cache: 'no-store' });
+        const detailData = await readJsonResponse(detailRes);
+        const detail = detailData.detail || baseBid;
+
+        // Get all bids for this auction
+        const allBidsForAuction = bidRows.filter(r => Number(r.auction_id) === Number(auctionId));
+
+
+
+        // Update modal header
+        document.getElementById('bidModalImage').src = String(detail.cover_image || 'logo.jpg');
+        document.getElementById('bidModalImage').alt = String(detail.item_name || 'Auction');
+        document.getElementById('bidModalTitle').textContent = String(detail.item_name || 'Auction Item');
+        document.getElementById('bidModalMeta').textContent = `${String(detail.category_name || 'No Category')} · ${String(detail.auction_status || 'Scheduled')}`;
+
+        // Update auction details
+        const soldPrice = detail.sold_price !== null && detail.sold_price !== undefined ? Number(detail.sold_price) : null;
+        const currentBid = detail.current_bid !== null && detail.current_bid !== undefined ? Number(detail.current_bid) : 0;
+        const displayPrice = soldPrice !== null ? soldPrice : currentBid;
+        document.getElementById('bidModalPrice').textContent = peso(displayPrice);
+        document.getElementById('bidModalEnds').textContent = formatDate(detail.end_at);
+
+        // Update checkout button visibility
+        const isWinner = Boolean(detail.is_winner);
+        const isSold = String(detail.auction_status || '').toLowerCase() === 'sold';
+        const notCheckedOut = !Boolean(detail.checked_out);
+        const checkoutSection = document.getElementById('bidModalCheckoutSection');
+        const checkoutBtn = document.getElementById('bidModalCheckoutBtn');
+
+        if (isWinner && isSold && notCheckedOut) {
+          checkoutBtn.style.display = 'block';
+          checkoutBtn.onclick = () => {
+            closeBidModal();
+            beginCheckout(baseBid);
+          };
+          checkoutSection.innerHTML = '<span class="pill highest">Highest Bid</span>';
+        } else if (isWinner && isSold && !notCheckedOut) {
+          checkoutBtn.style.display = 'none';
+          checkoutSection.innerHTML = '<span class="pill ordered">Ordered</span>';
+        } else {
+          checkoutBtn.style.display = 'none';
+          checkoutSection.innerHTML = '';
+        }
+
+        // Render bid history for this auction
+        const bidList = document.getElementById('bidModalBidList');
+        bidList.innerHTML = '';
+
+        allBidsForAuction.sort((a, b) => {
+          const timeA = new Date(String(a.created_at || '')).getTime();
+          const timeB = new Date(String(b.created_at || '')).getTime();
+          return timeB - timeA; // Most recent first
         });
-        host.appendChild(pageBtn);
-      }
 
-      const nextBtn = document.createElement('button');
-      nextBtn.type = 'button';
-      nextBtn.className = 'page-btn';
-      nextBtn.textContent = 'Next';
-      nextBtn.disabled = currentPage >= totalPages;
-      nextBtn.addEventListener('click', () => {
-        if (currentPage < totalPages) {
-          currentPage += 1;
-          renderHistoryPage();
-        }
-      });
-      host.appendChild(nextBtn);
+        allBidsForAuction.forEach((bid) => {
+          const item = document.createElement('div');
+          item.className = 'bid-history-item';
+          const isHighest = Number(bid.bid_id || 0) === (highestBidIdByAuction[auctionId] || 0);
+          item.innerHTML = `
+            <div>
+              <div style="font-size: 12px; color: var(--muted);">
+                ${isHighest ? '<span style="color: #a7f3d0; font-weight: 800;">Highest • </span>' : ''}
+                ${formatDate(bid.created_at)}
+              </div>
+            </div>
+            <div class="bid-history-amount">${peso(Number(bid.bid_amount || 0))}</div>
+            <div class="bid-history-status">${isHighest ? 'HIGHEST' : 'BID'}</div>
+          `;
+          bidList.appendChild(item);
+        });
+      } catch (err) {
+        console.error('loadBidModalData error:', err);
+        showAlert('error', 'Load Failed', String(err.message || 'Unable to load auction details'));
+        closeBidModal();
+      }
     }
 
     function renderHistory(rows) {
@@ -990,11 +1259,18 @@ if ($role !== 'user') {
       rows.forEach((row) => {
         const card = document.createElement('article');
         card.className = 'card';
+        
+        // Make card clickable
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', () => {
+          openBidModal(Number(row.auction_id || 0));
+        });
 
         const thumb = document.createElement('img');
         thumb.className = 'thumb';
         thumb.src = String(row.cover_image || 'logo.jpg');
         thumb.alt = row.item_name || 'Auction';
+        thumb.style.pointerEvents = 'none'; // Allow click to propagate
 
         const middle = document.createElement('div');
         const statusClass = String(row.auction_status || '').toLowerCase();
@@ -1006,16 +1282,18 @@ if ($role !== 'user') {
             <span class="pill ${statusClass}">${String(row.auction_status || 'scheduled')}</span>
             <span class="pill">${String(row.bid_status || 'valid')}</span>
             ${isHighestBidRow ? '<span class="pill highest">Highest Bid</span>' : ''}
-            ${isOrdered ? '<span class="pill ordered">Ordered</span>' : ''}
+            ${isHighestBidRow && isOrdered ? '<span class="pill ordered">Ordered</span>' : ''}
           </div>
           <h3 class="meta-title">${String(row.item_name || 'Auction Item')}</h3>
           <div class="meta-line">Category: ${String(row.category_name || 'No Category')}</div>
           <div class="meta-line">Your bid: ${formatMoney(row.bid_amount)} · ${formatDate(row.created_at)}</div>
           <div class="meta-line">Ends: ${formatDate(row.end_at)}</div>
         `;
+        middle.style.pointerEvents = 'none';
 
         const right = document.createElement('div');
         right.className = 'right';
+        right.style.pointerEvents = 'none';
 
         const amount = document.createElement('div');
         amount.className = 'amount';
@@ -1025,20 +1303,6 @@ if ($role !== 'user') {
           : `Your bid ${bidAmountLabel}`;
         right.appendChild(amount);
 
-        if (row.auction_status === 'sold' && row.is_winner && isHighestBidRow && !row.checked_out) {
-          const checkoutBtn = document.createElement('button');
-          checkoutBtn.className = 'btn checkout';
-          checkoutBtn.textContent = 'Checkout Win';
-          checkoutBtn.addEventListener('click', () => beginCheckout(row));
-          right.appendChild(checkoutBtn);
-        } else {
-          const liveBtn = document.createElement('button');
-          liveBtn.className = 'btn live';
-          liveBtn.textContent = 'Back to Live';
-          liveBtn.addEventListener('click', () => { window.location.href = 'auction.php'; });
-          right.appendChild(liveBtn);
-        }
-
         card.appendChild(thumb);
         card.appendChild(middle);
         card.appendChild(right);
@@ -1046,17 +1310,153 @@ if ($role !== 'user') {
       });
     }
 
-    function renderHistoryPage() {
-      const totalPages = getPageCount();
-      if (currentPage > totalPages) currentPage = totalPages;
-      if (currentPage < 1) currentPage = 1;
+    function getUniqueAuctionBids() {
+      // Group bids by auction and get the highest bid for each
+      const auctionMap = {};
+      
+      if (Array.isArray(bidRows)) {
+        bidRows.forEach((row) => {
+          const auctionId = Number(row.auction_id || 0);
+          if (!auctionId) return;
+          
+          if (!auctionMap[auctionId]) {
+            auctionMap[auctionId] = row;
+          } else {
+            // Keep the highest bid
+            const current = auctionMap[auctionId];
+            const currentAmount = Number(current.bid_amount || 0);
+            const rowAmount = Number(row.bid_amount || 0);
+            if (rowAmount > currentAmount) {
+              auctionMap[auctionId] = row;
+            }
+          }
+        });
+      }
+      
+      // Convert to array and sort by most recent
+      return Object.values(auctionMap).sort((a, b) => {
+        const timeA = new Date(String(a.created_at || '')).getTime();
+        const timeB = new Date(String(b.created_at || '')).getTime();
+        return timeB - timeA;
+      });
+    }
 
-      const start = (currentPage - 1) * pageSize;
-      const end = start + pageSize;
-      const pageRows = Array.isArray(bidRows) ? bidRows.slice(start, end) : [];
+    function switchHistoryTab(tabName) {
+      // Update tab buttons
+      const tabBtns = document.querySelectorAll('.history-tab-btn');
+      tabBtns.forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.historyTab === tabName);
+      });
+
+      currentHistoryTab = tabName;
+      currentHistoryOrderedPage = 1;
+      currentHistoryNotOrderedPage = 1;
+      renderHistoryPage();
+    }
+
+    function renderHistoryPage() {
+      const uniqueAuctions = getUniqueAuctionBids();
+      
+      // Separate into ordered and not ordered
+      historyOrderedAuctions = uniqueAuctions.filter(row => Boolean(row.checked_out));
+      historyNotOrderedAuctions = uniqueAuctions.filter(row => !Boolean(row.checked_out));
+
+      // Update tab count badges
+      document.getElementById('orderedTabCount').textContent = `(${historyOrderedAuctions.length})`;
+      document.getElementById('notOrderedTabCount').textContent = `(${historyNotOrderedAuctions.length})`;
+
+      // Get appropriate data based on current tab
+      const currentData = currentHistoryTab === 'ordered' ? historyOrderedAuctions : historyNotOrderedAuctions;
+      const currentPageVar = currentHistoryTab === 'ordered' ? currentHistoryOrderedPage : currentHistoryNotOrderedPage;
+      const totalItems = currentData.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / historyPageSize));
+      
+      // Validate current page
+      const validPage = Math.min(Math.max(currentPageVar, 1), totalPages);
+      if (currentHistoryTab === 'ordered') {
+        currentHistoryOrderedPage = validPage;
+      } else {
+        currentHistoryNotOrderedPage = validPage;
+      }
+
+      // Paginate
+      const start = (validPage - 1) * historyPageSize;
+      const end = start + historyPageSize;
+      const pageRows = currentData.slice(start, end);
 
       renderHistory(pageRows);
-      renderPagination();
+      renderHistoryPagination(totalItems, validPage);
+    }
+
+    function renderHistoryPagination(totalItems, currentPageNum) {
+      const host = document.getElementById('pagination');
+      host.innerHTML = '';
+
+      if (!totalItems || totalItems === 0) {
+        host.style.display = 'none';
+        return;
+      }
+
+      const totalPages = Math.max(1, Math.ceil(totalItems / historyPageSize));
+      host.style.display = totalPages > 1 ? 'flex' : 'none';
+      if (totalPages <= 1) return;
+
+      const prevBtn = document.createElement('button');
+      prevBtn.type = 'button';
+      prevBtn.className = 'page-btn';
+      prevBtn.textContent = 'Prev';
+      prevBtn.disabled = currentPageNum <= 1;
+      prevBtn.addEventListener('click', () => {
+        if (currentHistoryTab === 'ordered') {
+          if (currentHistoryOrderedPage > 1) {
+            currentHistoryOrderedPage -= 1;
+            renderHistoryPage();
+          }
+        } else {
+          if (currentHistoryNotOrderedPage > 1) {
+            currentHistoryNotOrderedPage -= 1;
+            renderHistoryPage();
+          }
+        }
+      });
+      host.appendChild(prevBtn);
+
+      for (let page = 1; page <= totalPages; page += 1) {
+        const pageBtn = document.createElement('button');
+        pageBtn.type = 'button';
+        pageBtn.className = `page-btn${page === currentPageNum ? ' active' : ''}`;
+        pageBtn.textContent = String(page);
+        pageBtn.addEventListener('click', () => {
+          if (currentHistoryTab === 'ordered') {
+            currentHistoryOrderedPage = page;
+          } else {
+            currentHistoryNotOrderedPage = page;
+          }
+          renderHistoryPage();
+        });
+        host.appendChild(pageBtn);
+      }
+
+      const nextBtn = document.createElement('button');
+      nextBtn.type = 'button';
+      nextBtn.className = 'page-btn';
+      nextBtn.textContent = 'Next';
+      nextBtn.disabled = currentPageNum >= totalPages;
+      nextBtn.addEventListener('click', () => {
+        const totalPages = Math.max(1, Math.ceil(totalItems / historyPageSize));
+        if (currentHistoryTab === 'ordered') {
+          if (currentHistoryOrderedPage < totalPages) {
+            currentHistoryOrderedPage += 1;
+            renderHistoryPage();
+          }
+        } else {
+          if (currentHistoryNotOrderedPage < totalPages) {
+            currentHistoryNotOrderedPage += 1;
+            renderHistoryPage();
+          }
+        }
+      });
+      host.appendChild(nextBtn);
     }
 
     function computeHighestBidByAuction() {
@@ -1109,8 +1509,40 @@ if ($role !== 'user') {
         closeCheckout();
       }
     });
+
+    // Modal controls
+    const bidModal = document.getElementById('bidModal');
+    const bidModalCloseBtn = document.getElementById('bidModalCloseBtn');
+    const bidModalBackBtn = document.getElementById('bidModalBackBtn');
+
+    if (bidModalCloseBtn) {
+      bidModalCloseBtn.addEventListener('click', closeBidModal);
+    }
+
+    if (bidModalBackBtn) {
+      bidModalBackBtn.addEventListener('click', () => {
+        window.location.href = 'auction.php';
+      });
+    }
+
+    if (bidModal) {
+      bidModal.addEventListener('click', (event) => {
+        if (event.target === bidModal) {
+          closeBidModal();
+        }
+      });
+    }
+
     document.getElementById('placeOrderBtn')?.removeEventListener('click', handleCheckoutClick);
     initCheckoutTermsControls();
+
+    // History tab buttons
+    const historyTabBtns = document.querySelectorAll('.history-tab-btn');
+    historyTabBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        switchHistoryTab(btn.dataset.historyTab);
+      });
+    });
 
     loadHistory();
   </script>

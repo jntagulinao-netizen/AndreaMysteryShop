@@ -18,9 +18,11 @@ if ($role !== 'user') {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Auction House</title>
   <link rel="stylesheet" href="main.css">
-  <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260407-1">
+  <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260407-2">
   <link rel="stylesheet" href="assets/css/local_swal.css">
+  <link rel="stylesheet" href="assets/css/winner_notify.css?v=20260501-4">
   <script src="assets/js/local_swal.js"></script>
+  <script src="assets/js/winner_notify.js?v=20260501-9"></script>
   <style>
     :root {
       --bg: #05060a;
@@ -1300,7 +1302,7 @@ if ($role !== 'user') {
       <div class="topbar-inner">
         <a class="nav-link active" href="auction.php">Live</a>
         <a class="nav-link" href="#upcomingSection">Upcoming</a>
-        <a class="nav-link" href="bidding_history.php">My Bids <span id="myBidsBadge" class="nav-badge" hidden>WIN</span></a>
+        <a class="nav-link" href="bidding_history.php">My Bids</a>
         <a class="nav-link" href="user_dashboard.php">Home</a>
       </div>
     </header>

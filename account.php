@@ -321,7 +321,9 @@ $recentPreviewJson = json_encode($recentPreviewItems, JSON_UNESCAPED_SLASHES | J
         html, body { margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f8f8; padding-bottom: 78px; }
         .container { width: calc(100% - 48px); max-width: none; margin: 0 auto; padding: 104px 0 16px 0; }
-        .hero { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); width: calc(100% - 48px); max-width: none; margin: 0; background: #fff; border-radius: 14px; padding: 14px 16px; border: 1px solid #eee; box-shadow: 0 8px 20px rgba(0,0,0,.05); display: flex; justify-content: space-between; align-items: center; min-height: 62px; z-index: 1000; box-sizing: border-box; }
+        .hero { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); width: calc(100% - 48px); max-width: none; margin: 0; background: #fff; border-radius: 14px; padding: 14px 16px; border: 1px solid #eee; box-shadow: 0 8px 20px rgba(0,0,0,.05); display: flex; justify-content: space-between; align-items: center; min-height: 62px; z-index: 1000; box-sizing: border-box; gap: 12px; }
+        .hero-back { display: flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none; color: #555; font-size: 24px; width: 40px; height: 40px; border-radius: 8px; transition: background 0.2s ease, color 0.2s ease; }
+        .hero-back:hover { background: #f0f0f0; color: #333; }
         .hero-text { flex: 1; }
         .hero h1 { margin: 0; font-size: 1.3rem; }
         .hero p { margin: 4px 0 0 0; color: #555; }
@@ -460,6 +462,7 @@ $recentPreviewJson = json_encode($recentPreviewItems, JSON_UNESCAPED_SLASHES | J
 <body>
     <div class="container">
         <section class="hero">
+            <a href="user_dashboard.php" class="hero-back" title="Go back">‹</a>
             <div class="hero-text">
                 <h1>My Account</h1>
                 <p>Hello, <strong><?php echo htmlspecialchars($user['full_name']); ?></strong>!</p>
