@@ -148,6 +148,7 @@ if ($role !== 'user') {
       cursor: pointer;
       transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
       white-space: nowrap;
+      position: relative;
     }
     .chip:hover, .nav-link:hover {
       transform: translateY(-1px);
@@ -158,6 +159,23 @@ if ($role !== 'user') {
       border-color: rgba(251, 191, 36, 0.5);
       background: rgba(251, 191, 36, 0.12);
       color: #fff;
+    }
+
+    .nav-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      margin-left: 6px;
+      border-radius: 999px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+      box-shadow: 0 6px 16px rgba(239, 68, 68, 0.35);
     }
 
     .hero {
@@ -1282,7 +1300,7 @@ if ($role !== 'user') {
       <div class="topbar-inner">
         <a class="nav-link active" href="auction.php">Live</a>
         <a class="nav-link" href="#upcomingSection">Upcoming</a>
-        <a class="nav-link" href="bidding_history.php">My Bids</a>
+        <a class="nav-link" href="bidding_history.php">My Bids <span id="myBidsBadge" class="nav-badge" hidden>WIN</span></a>
         <a class="nav-link" href="user_dashboard.php">Home</a>
       </div>
     </header>
@@ -1574,6 +1592,37 @@ if ($role !== 'user') {
       return fallback;
     }
 
+    function syncVideoMedia(videoEl, imageEl, source) {
+      if (!videoEl) return;
+      const nextSource = String(source || '').trim();
+      const currentSource = String(videoEl.dataset.source || '');
+
+      if (nextSource && nextSource === currentSource) {
+        videoEl.style.display = 'block';
+        if (imageEl) imageEl.style.display = 'none';
+        return;
+      }
+
+      if (nextSource) {
+        videoEl.dataset.source = nextSource;
+        if (videoEl.src !== nextSource) {
+          videoEl.src = nextSource;
+        }
+        videoEl.style.display = 'block';
+        if (imageEl) imageEl.style.display = 'none';
+        return;
+      }
+
+      videoEl.dataset.source = '';
+      if (!videoEl.paused) {
+        videoEl.pause();
+      }
+      videoEl.removeAttribute('src');
+      videoEl.load();
+      videoEl.style.display = 'none';
+      if (imageEl) imageEl.style.display = 'block';
+    }
+
     function formatUpcomingLead(raw) {
       if (!raw) return 'Soon';
       const start = new Date(String(raw).replace(' ', 'T')).getTime();
@@ -1740,16 +1789,7 @@ if ($role !== 'user') {
       const detailImage = document.getElementById('detailImage');
       document.getElementById('detailImage').src = image;
       if (detailVideo && detailImage) {
-        if (detailVideoPath) {
-          detailVideo.src = detailVideoPath;
-          detailVideo.style.display = 'block';
-          detailImage.style.display = 'none';
-        } else {
-          detailVideo.pause();
-          detailVideo.currentTime = 0;
-          detailVideo.style.display = 'none';
-          detailImage.style.display = 'block';
-        }
+        syncVideoMedia(detailVideo, detailImage, detailVideoPath);
       }
       document.getElementById('detailModalTitle').textContent = detail.item_name || 'Auction details';
       document.getElementById('detailName').textContent = detail.item_name || 'Untitled Auction';
@@ -2133,17 +2173,7 @@ if ($role !== 'user') {
       document.getElementById('heroImage').src = image || 'logo.jpg';
       document.getElementById('heroPanelImage').src = image || 'logo.jpg';
       if (heroPanelVideo && heroPanelImage) {
-        if (video) {
-          heroPanelVideo.src = video;
-          heroPanelVideo.style.display = 'block';
-          heroPanelImage.style.display = 'none';
-        } else {
-          heroPanelVideo.pause();
-          heroPanelVideo.removeAttribute('src');
-          heroPanelVideo.load();
-          heroPanelVideo.style.display = 'none';
-          heroPanelImage.style.display = 'block';
-        }
+        syncVideoMedia(heroPanelVideo, heroPanelImage, video);
       }
       document.getElementById('heroTitle').textContent = item.item_name || 'Untitled Auction';
       document.getElementById('heroPanelTitle').textContent = item.item_name || 'Untitled Auction';
@@ -2328,6 +2358,32 @@ if ($role !== 'user') {
       }
     }
 
+    async function loadBidNotifications() {
+      const badge = document.getElementById('myBidsBadge');
+      if (!badge) return;
+      try {
+        const res = await fetch('api/get-user-bids.php?limit=200', { cache: 'no-store' });
+        const data = await readJsonResponse(res);
+        if (!res.ok || !data.success || !Array.isArray(data.bids)) {
+          badge.hidden = true;
+          return;
+        }
+
+        const wonAuctionIds = new Set();
+        data.bids.forEach((row) => {
+          if (!row) return;
+          if (row.auction_status !== 'sold') return;
+          if (!row.is_winner || row.checked_out) return;
+          if (!row.is_highest_bid_record) return;
+          if (row.bid_status && String(row.bid_status).toLowerCase() !== 'valid') return;
+          wonAuctionIds.add(Number(row.auction_id || 0));
+        });
+        badge.hidden = wonAuctionIds.size === 0;
+      } catch (err) {
+        badge.hidden = true;
+      }
+    }
+
     document.querySelectorAll('[data-close-modal]').forEach((button) => {
       button.addEventListener('click', closeAllModals);
     });
@@ -2408,10 +2464,12 @@ if ($role !== 'user') {
     });
 
     loadListings();
+    loadBidNotifications();
     if (countdownTimer) clearInterval(countdownTimer);
     countdownTimer = setInterval(updateFeaturedTimer, 1000);
     setInterval(loadListings, 30000);
     modalRefreshTimer = setInterval(refreshCurrentModal, 10000);
+    setInterval(loadBidNotifications, 45000);
   </script>
 </body>
 </html>

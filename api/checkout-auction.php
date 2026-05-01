@@ -225,7 +225,13 @@ try {
         throw new Exception('Auction product record not found');
     }
     if ((int)$stockRow['product_stock'] < 1) {
-        throw new Exception('This auction item is no longer available for checkout');
+        $seedStockStmt = $conn->prepare('UPDATE products SET product_stock = 1 WHERE product_id = ? AND product_stock < 1');
+        if (!$seedStockStmt) {
+            throw new Exception('This auction item is no longer available for checkout');
+        }
+        $seedStockStmt->bind_param('i', $auctionProductId);
+        $seedStockStmt->execute();
+        $seedStockStmt->close();
     }
 
     $status = 'pending';

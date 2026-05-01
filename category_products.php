@@ -24,7 +24,7 @@ if ($role !== 'user') {
         <link rel="stylesheet" href="assets/css/reusable_catalog_modal_reviews.css?v=20260404-2">
     <link rel="stylesheet" href="assets/css/user_dashboard_search.css?v=20260331-1">
     <link rel="stylesheet" href="assets/css/user_dashboard_cart.css?v=20260407-3">
-    <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260407-2">
+    <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260501-1">
     <link rel="stylesheet" href="assets/css/local_swal.css?v=20260414-1">
   <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260409-2">
     <link rel="stylesheet" href="assets/css/category_products_custom_display.css?v=20260402-5">

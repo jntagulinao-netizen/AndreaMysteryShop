@@ -75,3 +75,25 @@ Insert result: true
 }
 Insert result: true
 
+2026-04-23T09:02:29+02:00
+{
+    "mediaPublicPath": "",
+    "mediaType": "",
+    "mediaMime": null,
+    "mediaSize": null,
+    "mediaOriginalName": null,
+    "finalMessageText": "ghcjgdsc"
+}
+Insert result: true
+
+2026-04-23T09:02:36+02:00
+{
+    "mediaPublicPath": "message_media\/images\/msg_20260423_090236_eeafa4e3.png",
+    "mediaType": "image",
+    "mediaMime": "image\/png",
+    "mediaSize": 1216213,
+    "mediaOriginalName": "review and feedback.png",
+    "finalMessageText": "[CHAT_MEDIA]message_media\/images\/msg_20260423_090236_eeafa4e3.png|image[\/CHAT_MEDIA]"
+}
+Insert result: true
+

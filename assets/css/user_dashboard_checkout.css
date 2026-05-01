@@ -24,6 +24,9 @@
     padding: 20px;
 }
 .swal-overlay.show { display: flex; }
+#checkoutLocalSwal {
+    z-index: 30010;
+}
 .swal-card {
     width: 100%;
     max-width: 360px;
