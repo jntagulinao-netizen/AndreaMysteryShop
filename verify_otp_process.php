@@ -3,7 +3,7 @@ session_start();
 include 'dbConnection.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $enteredOtp = trim($_POST['otp']);
+    $enteredOtp = preg_replace('/\s+/', '', trim($_POST['otp']));
 
     $isOwnerReset = !empty($_SESSION['owner_reset_mode']);
 

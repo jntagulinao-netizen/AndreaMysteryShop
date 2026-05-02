@@ -322,7 +322,7 @@ $reportData = [
   <link rel="stylesheet" href="main.css">
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; padding-bottom: 78px; }
+    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; padding-bottom: 14278px; }
 
     .page-header {
       position: fixed;
@@ -640,25 +640,25 @@ $reportData = [
 
   <nav class="mobile-bottom-nav fixed">
     <div class="mobile-nav-inner">
-      <a href="admin_dashboard.php">
+      <a href="owner_administrative_page.php" class="active">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5L12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.5z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
         <span>Home</span>
       </a>
-      <a href="admin_orders.php">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 8V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v1"></path><rect x="3" y="8" width="18" height="11" rx="2" ry="2"></rect></svg>
-        <span>Orders</span>
-      </a>
-      <a href="admin_my_products.php">
+      <a href="owner_top_selling_products.php">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7l9-4 9 4-9 4-9-4z"></path><path d="M3 17l9 4 9-4"></path><path d="M3 12l9 4 9-4"></path></svg>
-        <span>Products</span>
+        <span>Top Products</span>
       </a>
-      <a href="admin_live_auctions.php">
+      <a href="owner_recent_activity.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="12,6 12,12 16,14"></polyline></svg>
+        <span>Activity</span>
+      </a>
+      <a href="owner_customer_management.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span>Customers</span>
+      </a>
+      <a href="owner_auction_summary.php">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l2.9 5.9 6.5.9-4.7 4.5 1.1 6.4-5.8-3.1-5.8 3.1 1.1-6.4-4.7-4.5 6.5-.9z"></path></svg>
-        <span>Auctions</span>
-      </a>
-      <a href="admin_profile.php" class="active">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.5 0 4.5-2 4.5-4.5S14.5 3 12 3 7.5 5 7.5 7.5 9.5 12 12 12z"></path><path d="M4 21c0-4.5 4-8 8-8s8 3.5 8 8"></path></svg>
-        <span>Profile</span>
+        <span>Auction</span>
       </a>
     </div>
   </nav>

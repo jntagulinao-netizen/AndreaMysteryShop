@@ -112,7 +112,7 @@ $activityChart = [
   <link rel="stylesheet" href="main.css">
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; padding-bottom: 70px; }
+    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; padding-bottom: 78px; }
     .page-header { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); width: calc(100% - 48px); background: #fff; z-index: 120; display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-radius: 14px; border: 1px solid #e5e7eb; }
     .back-arrow { cursor: pointer; font-size: 22px; color: #111827; }
     .header-content { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
@@ -139,10 +139,31 @@ $activityChart = [
     .pie-legend-color { width: 12px; height: 12px; min-width: 12px; border-radius: 4px; display: inline-block; flex-shrink: 0; }
     .empty-chart { width: 100%; min-height: 140px; display: grid; place-items: center; color: #64748b; font-size: 13px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 16px; }
     .activity-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; }
-    .activity-item strong { display: block; margin-bottom: 8px; font-size: 15px; color: #0f172a; }
-    .activity-item span { display: block; font-size: 13px; color: #475569; margin-bottom: 6px; }
-    .activity-item .note { font-size: 13px; color: #334155; }
+    .activity-item strong { display: block; margin-bottom: 10px; font-size: 15px; color: #0f172a; }
+    .activity-item span { display: block; font-size: 13px; color: #475569; margin-bottom: 10px; }
+    .activity-item .note { font-size: 13px; color: #334155; margin-bottom: 10px; }
     .activity-item .time { margin-top: 10px; font-size: 12px; color: #64748b; }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0 18px;
+      flex-wrap: wrap;
+    }
+    .tab-button {
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      background: #fff;
+      color: #111827;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .18s ease, border-color .18s ease, color .18s ease;
+    }
+    .tab-button.active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #fff;
+    }
     .topbar-menu { position: relative; }
     .menu-trigger { border: 1px solid #d1d5db; border-radius: 12px; background: #fff; color: #111827; padding: 10px 14px; cursor: pointer; }
     .menu-dropdown { position: absolute; top: calc(100% + 8px); right: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12); display: none; min-width: 210px; z-index: 100; }
@@ -153,12 +174,68 @@ $activityChart = [
     .activity-item { cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
     .activity-item:hover { transform: translateY(-2px); box-shadow: 0 18px 32px rgba(15, 23, 42, 0.12); }
     .activity-item:focus { outline: 2px solid #2563eb; outline-offset: 3px; }
+    .swal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 20px;
+    }
+    .swal-overlay.show { display: flex; }
+    .swal-card {
+      width: 100%;
+      max-width: 360px;
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #dde5ee;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+      text-align: center;
+      padding: 20px 18px 16px;
+      animation: swalIn .16s ease-out;
+    }
+    @keyframes swalIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .swal-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      margin: 0 auto 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .swal-icon.success { background: #e9f9ef; color: #0c8f3f; }
+    .swal-icon.error { background: #ffecee; color: #c62839; }
+    .swal-icon.warning { background: #fff6e5; color: #bb6a00; }
+    .swal-title { font-size: 20px; font-weight: 700; color: #152033; margin-bottom: 8px; }
+    .swal-text { font-size: 14px; color: #5f6d7f; margin-bottom: 14px; line-height: 1.45; }
+    .swal-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .swal-actions.two { grid-template-columns: 1fr 1fr; }
+    .swal-btn {
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      width: 100%;
+      height: 42px;
+      cursor: pointer;
+    }
+    .swal-btn.primary { background: #2d68d8; color: #fff; }
+    .swal-btn.primary:hover { background: #1f56bf; }
+    .swal-btn.secondary { background: #f2f5fb; color: #44546a; border: 1px solid #d5deea; }
+    .swal-btn.secondary:hover { background: #e9eef7; }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
   <div class="page-header">
-    <a class="back-arrow" href="owner_administrative_page.php">←</a>
+    <a class="back-arrow" href="owner_administrative_page.php">‹</a>
     <div class="header-content">
       <div class="header-title">Recent Activity Feed</div>
       <div class="header-meta">Browse recent orders and user signups sorted by time.</div>
@@ -173,6 +250,17 @@ $activityChart = [
         <a href="owner_customer_management.php">Customer Management</a>
         <a href="owner_auction_summary.php">Auction Summary</a>
         <a href="owner_administrative_page.php?lock=1">Lock Owner Access</a>
+      </div>
+    </div>
+  </div>
+  <div id="localSwal" class="swal-overlay" role="dialog" aria-modal="true" aria-live="polite">
+    <div class="swal-card">
+      <div id="localSwalIcon" class="swal-icon success">✓</div>
+      <div id="localSwalTitle" class="swal-title">Success</div>
+      <div id="localSwalText" class="swal-text"></div>
+      <div id="localSwalActions" class="swal-actions">
+        <button id="localSwalCancel" type="button" class="swal-btn secondary" style="display:none;">Cancel</button>
+        <button id="localSwalConfirm" type="button" class="swal-btn primary">OK</button>
       </div>
     </div>
   </div>
@@ -210,10 +298,19 @@ $activityChart = [
     </section>
 
     <section class="section-card">
-      <div class="section-actions"><div><h2>Latest Events</h2></div></div>
-      <div class="activity-list">
+      <div class="section-actions">
+        <div>
+          <h2>Latest Events</h2>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Latest events tabs">
+          <button type="button" class="tab-button active" data-tab="all">All</button>
+          <button type="button" class="tab-button" data-tab="order">Orders</button>
+          <button type="button" class="tab-button" data-tab="customer">Users</button>
+        </div>
+      </div>
+      <div class="activity-list" id="activityList">
         <?php foreach ($activityFeed as $index => $event): ?>
-          <div class="activity-item" role="button" tabindex="0" data-event-index="<?= $index ?>">
+          <div class="activity-item" role="button" tabindex="0" data-event-index="<?= $index ?>" data-event-type="<?= htmlspecialchars($event['type']) ?>">
             <strong><?= htmlspecialchars($event['title']) ?></strong>
             <span><?= htmlspecialchars($event['subtitle']) ?></span>
             <div class="note"><?= htmlspecialchars($event['note']) ?></div>
@@ -230,6 +327,71 @@ $activityChart = [
   <script>
     const chartData = <?php echo json_encode(['activityChart' => $activityChart, 'activityFeed' => $activityFeed], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
     const chartColors = ['#2563eb', '#22c55e'];
+
+    function openLocalSweetAlert(options = {}) {
+      const overlay = document.getElementById('localSwal');
+      const iconEl = document.getElementById('localSwalIcon');
+      const titleEl = document.getElementById('localSwalTitle');
+      const textEl = document.getElementById('localSwalText');
+      const actions = document.getElementById('localSwalActions');
+      const confirmBtn = document.getElementById('localSwalConfirm');
+      const cancelBtn = document.getElementById('localSwalCancel');
+      if (!overlay || !iconEl || !titleEl || !textEl || !actions || !confirmBtn || !cancelBtn) return Promise.resolve(true);
+
+      const type = options.type || 'success';
+      const isError = type === 'error';
+      const isWarning = type === 'warning';
+      const hasCancel = !!options.showCancel;
+      iconEl.className = `swal-icon ${isError ? 'error' : isWarning ? 'warning' : 'success'}`;
+      iconEl.textContent = isError ? '!' : isWarning ? '⚠' : '✓';
+      titleEl.textContent = options.title || 'Notice';
+      if (options.html) {
+        textEl.innerHTML = options.html;
+      } else {
+        textEl.textContent = options.text || '';
+      }
+
+      confirmBtn.textContent = options.confirmText || 'OK';
+      cancelBtn.textContent = options.cancelText || 'Cancel';
+      cancelBtn.style.display = hasCancel ? 'block' : 'none';
+      actions.className = hasCancel ? 'swal-actions two' : 'swal-actions';
+
+      return new Promise((resolve) => {
+        const cleanup = () => {
+          overlay.classList.remove('show');
+          confirmBtn.onclick = null;
+          cancelBtn.onclick = null;
+          overlay.onclick = null;
+        };
+
+        confirmBtn.onclick = () => {
+          cleanup();
+          if (typeof options.onConfirm === 'function') options.onConfirm();
+          resolve(true);
+        };
+        cancelBtn.onclick = () => {
+          cleanup();
+          if (typeof options.onCancel === 'function') options.onCancel();
+          resolve(false);
+        };
+        overlay.onclick = (event) => {
+          if (event.target === overlay && hasCancel) {
+            cleanup();
+            resolve(false);
+          }
+        };
+
+        overlay.classList.add('show');
+      });
+    }
+
+    function showLocalSweetAlert(type, title, text) {
+      return openLocalSweetAlert({ type, title, text, confirmText: 'OK' });
+    }
+
+    function showLocalConfirm(title, text, confirmText = 'OK', cancelText = 'Cancel') {
+      return openLocalSweetAlert({ type: 'success', title, text, confirmText, cancelText, showCancel: true });
+    }
 
     function renderPieChart(areaId, subtitleId, values, subtitleText) {
       const chartArea = document.getElementById(areaId);
@@ -294,17 +456,15 @@ $activityChart = [
       const event = chartData.activityFeed[parseInt(index, 10)];
       if (!event) return;
       const icon = event.type === 'order' ? 'info' : 'success';
-      Swal.fire({
+      openLocalSweetAlert({
         title: event.title,
-        icon,
+        type: icon === 'success' ? 'success' : icon === 'warning' ? 'warning' : 'success',
         html: `
           <p style="margin:0 0 10px;font-weight:700;">${event.subtitle}</p>
           <p style="margin:0 0 8px;">${event.note}</p>
           <p style="margin:0;color:#6b7280;font-size:13px;">${event.timestamp_label}</p>
         `,
-        showCloseButton: true,
-        confirmButtonText: 'Close',
-        width: 560
+        confirmText: 'Close'
       });
     }
 
@@ -320,8 +480,45 @@ $activityChart = [
       });
     }
 
+    function applyActivityTabFilter(filter) {
+      document.querySelectorAll('.activity-item').forEach(item => {
+        const type = item.dataset.eventType;
+        if (filter === 'all' || type === filter) {
+          item.style.display = '';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+      const visibleItems = Array.from(document.querySelectorAll('.activity-item')).filter(item => item.style.display !== 'none');
+      if (visibleItems.length === 0) {
+        const existingEmpty = document.querySelector('.activity-list .empty-row');
+        if (!existingEmpty) {
+          const emptyCard = document.createElement('div');
+          emptyCard.className = 'activity-item empty-row';
+          emptyCard.textContent = 'No recent activity available for this category.';
+          document.getElementById('activityList').appendChild(emptyCard);
+        }
+      } else {
+        const existingEmpty = document.querySelector('.activity-list .empty-row');
+        if (existingEmpty) {
+          existingEmpty.remove();
+        }
+      }
+    }
+
+    function attachTabHandlers() {
+      document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+          document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+          button.classList.add('active');
+          applyActivityTabFilter(button.dataset.tab);
+        });
+      });
+    }
+
     renderActivityChart();
     attachActivityCardHandlers();
+    attachTabHandlers();
 
     function downloadActivityCsv() {
       const month = document.querySelector('select[name="month"]').value;
@@ -352,13 +549,7 @@ $activityChart = [
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      Swal.fire({
-        title: 'Export started',
-        text: 'Your activity CSV download should begin shortly.',
-        icon: 'success',
-        timer: 1800,
-        showConfirmButton: false
-      });
+      showLocalSweetAlert('success', 'Export started', 'Your activity CSV download should begin shortly.');
     }
     document.addEventListener('click', (event) => {
       const menu = document.querySelector('.menu-dropdown');
@@ -368,5 +559,29 @@ $activityChart = [
       }
     });
   </script>
+  <nav class="mobile-bottom-nav fixed">
+    <div class="mobile-nav-inner">
+      <a href="owner_administrative_page.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5L12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.5z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        <span>Home</span>
+      </a>
+      <a href="owner_top_selling_products.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7l9-4 9 4-9 4-9-4z"></path><path d="M3 17l9 4 9-4"></path><path d="M3 12l9 4 9-4"></path></svg>
+        <span>Top Products</span>
+      </a>
+      <a href="owner_recent_activity.php" class="active">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="12,6 12,12 16,14"></polyline></svg>
+        <span>Activity</span>
+      </a>
+      <a href="owner_customer_management.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span>Customers</span>
+      </a>
+      <a href="owner_auction_summary.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l2.9 5.9 6.5.9-4.7 4.5 1.1 6.4-5.8-3.1-5.8 3.1 1.1-6.4-4.7-4.5 6.5-.9z"></path></svg>
+        <span>Auction</span>
+      </a>
+    </div>
+  </nav>
 </body>
 </html>

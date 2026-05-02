@@ -160,7 +160,7 @@ $revenueData = [
   <link rel="stylesheet" href="main.css">
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; padding-bottom: 70px; }
+    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; padding-bottom: 78px; }
     .page-header { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); width: calc(100% - 48px); background: #fff; z-index: 120; display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-radius: 14px; border: 1px solid #e5e7eb; }
     .back-arrow { cursor: pointer; font-size: 22px; color: #111827; }
     .header-content { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
@@ -208,7 +208,7 @@ $revenueData = [
 </head>
 <body>
   <div class="page-header">
-    <a class="back-arrow" href="owner_administrative_page.php">←</a>
+    <a class="back-arrow" href="owner_administrative_page.php">‹</a>
     <div class="header-content">
       <div class="header-title">Revenue Analytics</div>
       <div class="header-meta">Owner-only analytics and export for revenue performance.</div>

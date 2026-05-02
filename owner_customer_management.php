@@ -43,21 +43,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['customer_action'], $_
     $action = $_POST['customer_action'] === 'block' ? 'block' : ($_POST['customer_action'] === 'unblock' ? 'unblock' : '');
     if ($customerId > 0 && $action) {
         $newStatus = $action === 'block' ? 'inactive' : 'active';
-        $updateStmt = $conn->prepare('UPDATE users SET status = ? WHERE user_id = ? AND LOWER(role) = "user"');
+        $updateStmt = $conn->prepare('UPDATE users SET status = ? WHERE user_id = ? AND (LOWER(role) = "user" OR LOWER(role) = "admin")');
         if ($updateStmt) {
             $updateStmt->bind_param('si', $newStatus, $customerId);
             if ($updateStmt->execute()) {
-                $_SESSION['customer_action_message'] = 'Customer account has been ' . ($action === 'block' ? 'blocked' : 'unblocked') . ' successfully.';
+                $_SESSION['customer_action_message'] = 'Account has been ' . ($action === 'block' ? 'blocked' : 'unblocked') . ' successfully.';
             } else {
-                $_SESSION['customer_action_message'] = 'Unable to update the customer account status. Please try again.';
+                $_SESSION['customer_action_message'] = 'Unable to update the account status. Please try again.';
             }
             $updateStmt->close();
         } else {
             $_SESSION['customer_action_message'] = 'Unable to prepare account update. Please contact support.';
         }
     } else {
-        $_SESSION['customer_action_message'] = 'Invalid customer action request.';
+        $_SESSION['customer_action_message'] = 'Invalid account action request.';
     }
+    header('Location: owner_customer_management.php');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['make_admin_id'])) {
+    $makeAdminId = intval($_POST['make_admin_id']);
+    if ($makeAdminId > 0) {
+        $roleStmt = $conn->prepare('UPDATE users SET role = "admin" WHERE user_id = ? AND LOWER(role) = "user"');
+        if ($roleStmt) {
+            $roleStmt->bind_param('i', $makeAdminId);
+            if ($roleStmt->execute()) {
+                $_SESSION['customer_action_message'] = 'Customer account has been converted to admin successfully.';
+            } else {
+                $_SESSION['customer_action_message'] = 'Unable to convert customer to admin. Please try again.';
+            }
+            $roleStmt->close();
+        } else {
+            $_SESSION['customer_action_message'] = 'Unable to prepare admin conversion. Please contact support.';
+        }
+    } else {
+        $_SESSION['customer_action_message'] = 'Invalid admin conversion request.';
+    }
+    header('Location: owner_customer_management.php');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['make_user_id'])) {
+    $makeUserId = intval($_POST['make_user_id']);
+    if ($makeUserId > 0) {
+        $roleStmt = $conn->prepare('UPDATE users SET is_owner = 0 WHERE user_id = ? AND LOWER(role) = "admin"');
+        if ($roleStmt) {
+            $roleStmt->bind_param('i', $makeUserId);
+            if ($roleStmt->execute()) {
+                $_SESSION['customer_action_message'] = 'Admin account has been demoted to non-owner successfully.';
+            } else {
+                $_SESSION['customer_action_message'] = 'Unable to demote admin to non-owner. Please try again.';
+            }
+            $roleStmt->close();
+        } else {
+            $_SESSION['customer_action_message'] = 'Unable to prepare demotion. Please contact support.';
+        }
+    } else {
+        $_SESSION['customer_action_message'] = 'Invalid demotion request.';
+    }
+    header('Location: owner_customer_management.php');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['make_owner_id'])) {
+    $makeOwnerId = intval($_POST['make_owner_id']);
+    if ($makeOwnerId > 0) {
+        $targetStmt = $conn->prepare('SELECT user_id FROM users WHERE user_id = ? AND LOWER(role) = "admin" LIMIT 1');
+        if ($targetStmt) {
+            $targetStmt->bind_param('i', $makeOwnerId);
+            $targetStmt->execute();
+            $targetResult = $targetStmt->get_result();
+            if ($targetResult && $targetResult->num_rows > 0) {
+                $_SESSION['owner_new_pin_target_id'] = $makeOwnerId;
+                $_SESSION['owner_reset_mode'] = true;
+                $_SESSION['owner_reset_verified'] = true;
+                $targetStmt->close();
+                header('Location: owner_new_pin.php');
+                exit;
+            }
+            $targetStmt->close();
+        }
+    }
+    $_SESSION['customer_action_message'] = 'Unable to set this admin account as owner. Please try again.';
     header('Location: owner_customer_management.php');
     exit;
 }
@@ -90,11 +158,14 @@ $customerSignupChart = [
 ];
 
 $recentCustomers = [];
-$recentCustomersSql = 'SELECT user_id, full_name, email, created_at, COALESCE(status, "active") AS status FROM users WHERE LOWER(role) = "user"' . $whereClause;
+$roleCondition = $selectedTab === 'admins' ? "LOWER(role) = 'admin'" : "LOWER(role) = 'user'";
+$recentCustomersSql = 'SELECT user_id, full_name, email, created_at, LOWER(role) AS role, COALESCE(status, "active") AS status, COALESCE(is_owner, 0) AS is_owner FROM users WHERE ' . $roleCondition . ' AND user_id != ? AND email != \'andreamysteryshop@gmail.com\'' . $whereClause;
 if ($selectedTab === 'recent') {
     $recentCustomersSql .= ' AND created_at >= DATE_SUB(CURDATE(), INTERVAL 15 DAY)';
 } elseif ($selectedTab === 'all') {
     // No additional condition
+} elseif ($selectedTab === 'admins') {
+    // Show all admin accounts matching the selected filters
 }
 $recentCustomersSql .= ' ORDER BY created_at DESC';
 if ($selectedTab === 'recent') {
@@ -102,7 +173,10 @@ if ($selectedTab === 'recent') {
 } else {
     $recentCustomersSql .= ' LIMIT 100'; // Paginate or limit for all
 }
-$recentCustomersResult = $conn->query($recentCustomersSql);
+$recentCustomersResult = $conn->prepare($recentCustomersSql);
+$recentCustomersResult->bind_param('i', $userId);
+$recentCustomersResult->execute();
+$recentCustomersResult = $recentCustomersResult->get_result();
 if ($recentCustomersResult) {
     while ($row = $recentCustomersResult->fetch_assoc()) {
         $recentCustomers[] = [
@@ -110,7 +184,9 @@ if ($recentCustomersResult) {
             'full_name' => $row['full_name'] ?? '',
             'email' => $row['email'] ?? '',
             'created_at' => $row['created_at'] ?? '',
-            'status' => $row['status'] ?? 'active'
+            'status' => $row['status'] ?? 'active',
+            'role' => $row['role'] ?? 'user',
+            'is_owner' => intval($row['is_owner'] ?? 0)
         ];
     }
 }
@@ -124,7 +200,7 @@ if ($recentCustomersResult) {
   <link rel="stylesheet" href="main.css">
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; padding-bottom: 70px; }
+    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; padding-bottom: 578px; }
     .page-header { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); width: calc(100% - 48px); background: #fff; z-index: 120; display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-radius: 14px; border: 1px solid #e5e7eb; }
     .back-arrow { cursor: pointer; font-size: 22px; color: #111827; }
     .header-content { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
@@ -181,11 +257,80 @@ if ($recentCustomersResult) {
       50% { transform: scale(1.02); opacity: 1; }
       100% { transform: scale(1); opacity: 1; }
     }
+    .swal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 20px;
+    }
+    .swal-overlay.show { display: flex; }
+    .swal-card {
+      width: 100%;
+      max-width: 360px;
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #dde5ee;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+      text-align: center;
+      padding: 20px 18px 16px;
+      animation: swalIn .16s ease-out;
+    }
+    @keyframes swalIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .swal-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      margin: 0 auto 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .swal-icon.success { background: #e9f9ef; color: #0c8f3f; }
+    .swal-icon.error { background: #ffecee; color: #c62839; }
+    .swal-icon.warning { background: #fff6e5; color: #bb6a00; }
+    .swal-title { font-size: 20px; font-weight: 700; color: #152033; margin-bottom: 8px; }
+    .swal-text { font-size: 14px; color: #5f6d7f; margin-bottom: 14px; line-height: 1.45; }
+    .swal-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .swal-actions.two { grid-template-columns: 1fr 1fr; }
+    .swal-btn {
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      width: 100%;
+      height: 42px;
+      cursor: pointer;
+    }
+    .swal-btn.primary { background: #2d68d8; color: #fff; }
+    .swal-btn.primary:hover { background: #1f56bf; }
+    .swal-btn.secondary { background: #f2f5fb; color: #44546a; border: 1px solid #d5deea; }
+    .swal-btn.secondary:hover { background: #e9eef7; }
+
+    .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .tabs a.btn { width: 100%; }
+
+    @media (max-width: 720px) {
+      .modal-card { width: calc(100% - 32px); max-width: 100%; border-radius: 20px; padding: 18px; }
+      .modal-header { flex-direction: column; align-items: stretch; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .modal-card .btn { width: 100%; }
+      .modal-card .actions { width: 100%; display: flex; flex-direction: column; align-items: stretch; }
+      .modal-card .actions .btn { width: 100%; }
+    }
   </style>
 </head>
 <body>
   <div class="page-header">
-    <a class="back-arrow" href="owner_administrative_page.php">←</a>
+    <a class="back-arrow" href="owner_administrative_page.php">‹</a>
     <div class="header-content">
       <div class="header-title">Customer Management</div>
       <div class="header-meta">Manage customer metrics and most recent user signups.</div>
@@ -200,6 +345,17 @@ if ($recentCustomersResult) {
         <a href="owner_customer_management.php">Customer Management</a>
         <a href="owner_auction_summary.php">Auction Summary</a>
         <a href="owner_administrative_page.php?lock=1">Lock Owner Access</a>
+      </div>
+    </div>
+  </div>
+  <div id="localSwal" class="swal-overlay" role="dialog" aria-modal="true" aria-live="polite">
+    <div class="swal-card">
+      <div id="localSwalIcon" class="swal-icon success">✓</div>
+      <div id="localSwalTitle" class="swal-title">Success</div>
+      <div id="localSwalText" class="swal-text"></div>
+      <div id="localSwalActions" class="swal-actions">
+        <button id="localSwalCancel" type="button" class="swal-btn secondary" style="display:none;">Cancel</button>
+        <button id="localSwalConfirm" type="button" class="swal-btn primary">OK</button>
       </div>
     </div>
   </div>
@@ -249,9 +405,10 @@ if ($recentCustomersResult) {
 
     <section class="section-card">
       <div class="section-actions"><div><h2>Customer List</h2></div></div>
-      <div class="tabs" style="display: flex; gap: 10px; margin-bottom: 16px;">
+      <div class="tabs">
         <a href="?tab=recent<?= $selectedMonth ? '&month=' . $selectedMonth : '' ?><?= $selectedYear ? '&year=' . $selectedYear : '' ?>" class="btn<?= $selectedTab === 'recent' ? ' primary' : '' ?>" style="text-decoration: none;">Recent Signups (15 days)</a>
         <a href="?tab=all<?= $selectedMonth ? '&month=' . $selectedMonth : '' ?><?= $selectedYear ? '&year=' . $selectedYear : '' ?>" class="btn<?= $selectedTab === 'all' ? ' primary' : '' ?>" style="text-decoration: none;">All Customers</a>
+        <a href="?tab=admins<?= $selectedMonth ? '&month=' . $selectedMonth : '' ?><?= $selectedYear ? '&year=' . $selectedYear : '' ?>" class="btn<?= $selectedTab === 'admins' ? ' primary' : '' ?>" style="text-decoration: none;">Admin Accounts</a>
       </div>
       <div class="table-wrap">
         <table>
@@ -264,7 +421,13 @@ if ($recentCustomersResult) {
                 <td><?= htmlspecialchars($customer['full_name']) ?></td>
                 <td><?= htmlspecialchars($customer['email']) ?></td>
                 <td><?= htmlspecialchars($customer['created_at']) ?></td>
-                <td><?= htmlspecialchars(ucfirst($customer['status'])) ?></td>
+                <td><?php
+                  $status = ucfirst($customer['status']);
+                  if ($customer['role'] === 'admin') {
+                    $status = 'Admin' . ($customer['is_owner'] ? ' (Owner)' : '');
+                  }
+                  echo htmlspecialchars($status);
+                ?></td>
                 <td><button class="btn" type="button" onclick="showCustomerDetails(<?= $customer['user_id'] ?>)">View Details</button></td>
               </tr>
             <?php endforeach; ?>
@@ -293,13 +456,25 @@ if ($recentCustomersResult) {
         <div><strong>Joined</strong><p id="detailJoined"></p></div>
         <div><strong>Status</strong><p id="detailStatus"></p></div>
       </div>
-      <div class="actions" style="margin-top:24px;justify-content:flex-end;">
+      <div class="actions" style="margin-top:24px;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
         <form id="customerActionForm" method="post" style="display:flex;gap:10px;flex-wrap:wrap;">
           <input type="hidden" name="customer_id" id="detailCustomerId" value="">
           <input type="hidden" name="customer_action" id="detailCustomerAction" value="">
-          <button class="btn warn" id="detailActionButton" type="submit">Block Account</button>
-          <button class="btn" type="button" onclick="hideCustomerDetails()">Close</button>
+          <button class="btn warn" id="detailActionButton" type="button" onclick="confirmAction('customerActionForm', 'Are you sure you want to ' + (document.getElementById('detailCustomerAction').value === 'block' ? 'block' : 'unblock') + ' this account?')">Block Account</button>
         </form>
+        <form id="makeAdminForm" method="post" style="display:none;align-items:center;">
+          <input type="hidden" name="make_admin_id" id="makeAdminId" value="">
+          <button class="btn" type="button" onclick="confirmAction('makeAdminForm', 'Are you sure you want to promote this customer to admin?')" id="makeAdminButton">Switch to Admin</button>
+        </form>
+        <form id="makeUserForm" method="post" style="display:none;align-items:center;">
+          <input type="hidden" name="make_user_id" id="makeUserId" value="">
+          <button class="btn warn" type="button" onclick="confirmAction('makeUserForm', 'Are you sure you want to demote this admin to non-owner?')" id="makeUserButton">Demote to Non-Owner</button>
+        </form>
+        <form id="makeOwnerForm" method="post" style="display:none;align-items:center;">
+          <input type="hidden" name="make_owner_id" id="makeOwnerId" value="">
+          <button class="btn primary" type="button" onclick="confirmAction('makeOwnerForm', 'Are you sure you want to make this admin an owner?')" id="makeOwnerButton">Make Owner</button>
+        </form>
+        <button class="btn" type="button" onclick="hideCustomerDetails()">Close</button>
       </div>
     </div>
   </div>
@@ -370,16 +545,122 @@ if ($recentCustomersResult) {
       document.getElementById('detailJoined').textContent = customer.created_at;
       document.getElementById('detailStatus').textContent = customer.status.charAt(0).toUpperCase() + customer.status.slice(1);
       document.getElementById('detailCustomerId').value = customer.user_id;
+      const actionButton = document.getElementById('detailActionButton');
+      const actionForm = document.getElementById('customerActionForm');
+      const makeAdminForm = document.getElementById('makeAdminForm');
+      const makeUserForm = document.getElementById('makeUserForm');
+      const makeOwnerForm = document.getElementById('makeOwnerForm');
+      const makeAdminIdInput = document.getElementById('makeAdminId');
+      const makeUserIdInput = document.getElementById('makeUserId');
+      const makeOwnerIdInput = document.getElementById('makeOwnerId');
+
+      actionForm.style.display = 'flex';
       const nextAction = customer.status.toLowerCase() === 'inactive' ? 'unblock' : 'block';
       document.getElementById('detailCustomerAction').value = nextAction;
-      const actionButton = document.getElementById('detailActionButton');
       actionButton.textContent = nextAction === 'block' ? 'Block Account' : 'Unblock Account';
       actionButton.className = nextAction === 'block' ? 'btn warn' : 'btn primary';
-      document.getElementById('detailSubtitle').textContent = 'Manage this customer account and block or restore access as needed.';
+
+      if (customer.role === 'admin') {
+        makeAdminForm.style.display = 'none';
+        if (customer.is_owner === 1) {
+          makeUserForm.style.display = 'flex';
+          makeUserIdInput.value = customer.user_id;
+          makeOwnerForm.style.display = 'none';
+          document.getElementById('detailSubtitle').textContent = 'This admin account is an owner. You can demote to non-owner.';
+        } else {
+          makeUserForm.style.display = 'none';
+          makeOwnerForm.style.display = 'flex';
+          makeOwnerIdInput.value = customer.user_id;
+          document.getElementById('detailSubtitle').textContent = 'This admin can be promoted to owner.';
+        }
+      } else {
+        makeOwnerForm.style.display = 'none';
+        makeUserForm.style.display = 'none';
+        if (customer.role === 'user') {
+          makeAdminForm.style.display = 'flex';
+          makeAdminIdInput.value = customer.user_id;
+          document.getElementById('detailSubtitle').textContent = 'This customer can be promoted to admin.';
+        } else {
+          makeAdminForm.style.display = 'none';
+          document.getElementById('detailSubtitle').textContent = 'Manage this account and block or restore access as needed.';
+        }
+      }
     }
 
     function hideCustomerDetails() {
       document.getElementById('customerDetailOverlay').style.display = 'none';
+    }
+
+    function openLocalSweetAlert(options = {}) {
+      const overlay = document.getElementById('localSwal');
+      const iconEl = document.getElementById('localSwalIcon');
+      const titleEl = document.getElementById('localSwalTitle');
+      const textEl = document.getElementById('localSwalText');
+      const actions = document.getElementById('localSwalActions');
+      const confirmBtn = document.getElementById('localSwalConfirm');
+      const cancelBtn = document.getElementById('localSwalCancel');
+      if (!overlay || !iconEl || !titleEl || !textEl || !actions || !confirmBtn || !cancelBtn) return Promise.resolve(true);
+
+      const type = options.type || 'success';
+      const isError = type === 'error';
+      const isWarning = type === 'warning';
+      const hasCancel = !!options.showCancel;
+      iconEl.className = `swal-icon ${isError ? 'error' : isWarning ? 'warning' : 'success'}`;
+      iconEl.textContent = isError ? '!' : isWarning ? '⚠' : '✓';
+      titleEl.textContent = options.title || 'Notice';
+      if (options.html) {
+        textEl.innerHTML = options.html;
+      } else {
+        textEl.textContent = options.text || '';
+      }
+
+      confirmBtn.textContent = options.confirmText || 'OK';
+      cancelBtn.textContent = options.cancelText || 'Cancel';
+      cancelBtn.style.display = hasCancel ? 'block' : 'none';
+      actions.className = hasCancel ? 'swal-actions two' : 'swal-actions';
+
+      return new Promise((resolve) => {
+        const cleanup = () => {
+          overlay.classList.remove('show');
+          confirmBtn.onclick = null;
+          cancelBtn.onclick = null;
+          overlay.onclick = null;
+        };
+
+        confirmBtn.onclick = () => {
+          cleanup();
+          if (typeof options.onConfirm === 'function') options.onConfirm();
+          resolve(true);
+        };
+        cancelBtn.onclick = () => {
+          cleanup();
+          if (typeof options.onCancel === 'function') options.onCancel();
+          resolve(false);
+        };
+        overlay.onclick = (event) => {
+          if (event.target === overlay && hasCancel) {
+            cleanup();
+            resolve(false);
+          }
+        };
+
+        overlay.classList.add('show');
+      });
+    }
+
+    function showLocalSweetAlert(type, title, text) {
+      return openLocalSweetAlert({ type, title, text, confirmText: 'OK' });
+    }
+
+    function showLocalConfirm(title, text, confirmText = 'OK', cancelText = 'Cancel') {
+      return openLocalSweetAlert({ type: 'warning', title, text, confirmText, cancelText, showCancel: true });
+    }
+
+    async function confirmAction(formId, message) {
+      const confirmed = await showLocalConfirm('Confirm Action', message, 'Yes', 'No');
+      if (confirmed) {
+        document.getElementById(formId).submit();
+      }
     }
 
     renderCustomerChart();
@@ -420,6 +701,8 @@ if ($recentCustomersResult) {
       }
       if ('<?= $selectedTab ?>' === 'recent') {
         filename = filename.replace('.csv', '_recent.csv');
+      } else if ('<?= $selectedTab ?>' === 'admins') {
+        filename = filename.replace('.csv', '_admins.csv');
       } else {
         filename = filename.replace('.csv', '_all.csv');
       }
@@ -438,5 +721,29 @@ if ($recentCustomersResult) {
       }
     });
   </script>
+  <nav class="mobile-bottom-nav fixed">
+    <div class="mobile-nav-inner">
+      <a href="owner_administrative_page.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5L12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.5z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        <span>Home</span>
+      </a>
+      <a href="owner_top_selling_products.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7l9-4 9 4-9 4-9-4z"></path><path d="M3 17l9 4 9-4"></path><path d="M3 12l9 4 9-4"></path></svg>
+        <span>Top Products</span>
+      </a>
+      <a href="owner_recent_activity.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="12,6 12,12 16,14"></polyline></svg>
+        <span>Activity</span>
+      </a>
+      <a href="owner_customer_management.php" class="active">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span>Customers</span>
+      </a>
+      <a href="owner_auction_summary.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l2.9 5.9 6.5.9-4.7 4.5 1.1 6.4-5.8-3.1-5.8 3.1 1.1-6.4-4.7-4.5 6.5-.9z"></path></svg>
+        <span>Auction</span>
+      </a>
+    </div>
+  </nav>
 </body>
 </html>

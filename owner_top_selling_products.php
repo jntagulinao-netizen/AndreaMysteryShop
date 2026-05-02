@@ -155,31 +155,29 @@ if (!empty($topSellers)) {
     body {
       margin: 0;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f7f8fb;
+      background: #f3f4f6;
       color: #111827;
-      padding-bottom: 70px;
+      padding-bottom: 78px;
     }
     .page-header {
       position: fixed;
       top: 16px;
       left: 50%;
       transform: translateX(-50%);
-      width: calc(100% - 32px);
-      max-width: none;
-      background: #ffffff;
+      width: calc(100% - 48px);
+      background: #fff;
       z-index: 120;
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 16px 18px;
-      border-radius: 18px;
-      border: 1px solid rgba(148, 163, 184, 0.28);
-      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+      padding: 14px 18px;
+      border-radius: 14px;
+      border: 1px solid #e5e7eb;
     }
     .back-arrow {
       cursor: pointer;
       font-size: 22px;
-      color: #374151;
+      color: #111827;
       text-decoration: none;
     }
     .header-content {
@@ -199,19 +197,17 @@ if (!empty($topSellers)) {
       color: #6b7280;
     }
     .wrap {
-      width: calc(100% - 32px);
-      max-width: none;
+      width: calc(100% - 48px);
       margin: 0 auto;
-      padding: 110px 0 18px;
+      padding: 90px 0 18px;
     }
     .hero {
       background: linear-gradient(135deg, #0f172a, #1e293b);
       color: #fff;
-      border-radius: 20px;
-      padding: 24px;
+      border-radius: 16px;
+      padding: 20px;
       margin-bottom: 18px;
-      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
-      border: 1px solid rgba(148, 163, 184, 0.24);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
     }
     .hero h1 {
       margin: 0 0 6px;
@@ -221,32 +217,36 @@ if (!empty($topSellers)) {
       margin: 0;
       color: #cbd5e1;
       font-size: 14px;
-      line-height: 1.7;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
     }
     .actions {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      margin-top: 18px;
+      margin-top: 14px;
     }
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      border-radius: 12px;
-      padding: 12px 16px;
+      border-radius: 10px;
+      padding: 10px 14px;
       text-decoration: none;
       font-weight: 700;
-      border: 1px solid rgba(148, 163, 184, 0.4);
-      background: #ffffff;
+      border: 1px solid #d1d5db;
+      background: #fff;
       color: #111827;
-      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
     }
     .btn.primary {
       background: #0f172a;
       border-color: #0f172a;
-      color: #ffffff;
+      color: #fff;
     }
     .stats-grid {
       display: grid;
@@ -500,11 +500,6 @@ if (!empty($topSellers)) {
       .header-content { margin-top: 8px; }
       .topbar-menu { width: auto; margin-left: auto; }
       .menu-trigger { width: auto; }
-      .actions { flex-direction: column; align-items: stretch; }
-      .btn { width: 100%; }
-      .filters { flex-direction: column; }
-      .filters select,
-      .filters button { width: 100%; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .wrap { padding: 130px 16px 18px; }
       .product-name { white-space: normal; }
@@ -537,7 +532,7 @@ if (!empty($topSellers)) {
 </head>
 <body>
   <div class="page-header">
-    <a class="back-arrow" href="owner_administrative_page.php">←</a>
+    <a class="back-arrow" href="owner_administrative_page.php">‹</a>
     <div class="header-content">
       <div class="header-title">Top Selling Products</div>
       <div class="header-meta">View the best-selling inventory and export product sales metrics.</div>
@@ -759,5 +754,29 @@ if (!empty($topSellers)) {
       }
     });
   </script>
+  <nav class="mobile-bottom-nav fixed">
+    <div class="mobile-nav-inner">
+      <a href="owner_administrative_page.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5L12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.5z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        <span>Home</span>
+      </a>
+      <a href="owner_top_selling_products.php" class="active">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7l9-4 9 4-9 4-9-4z"></path><path d="M3 17l9 4 9-4"></path><path d="M3 12l9 4 9-4"></path></svg>
+        <span>Top Products</span>
+      </a>
+      <a href="owner_recent_activity.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="12,6 12,12 16,14"></polyline></svg>
+        <span>Activity</span>
+      </a>
+      <a href="owner_customer_management.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span>Customers</span>
+      </a>
+      <a href="owner_auction_summary.php">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l2.9 5.9 6.5.9-4.7 4.5 1.1 6.4-5.8-3.1-5.8 3.1 1.1-6.4-4.7-4.5 6.5-.9z"></path></svg>
+        <span>Auction</span>
+      </a>
+    </div>
+  </nav>
 </body>
 </html>

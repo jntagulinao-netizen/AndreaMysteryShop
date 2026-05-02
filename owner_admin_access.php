@@ -108,8 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $flashError = 'Code confirmation does not match.';
         } else {
             $hash = password_hash($code, PASSWORD_DEFAULT);
-            $saveStmt = $conn->prepare('UPDATE admin_owner_security SET access_code_hash = ?, reset_otp = NULL, reset_otp_expires = NULL, reset_otp_verified = 0 WHERE user_id = ?');
-            $saveStmt->bind_param('si', $hash, $userId);
+            $saveStmt = $conn->prepare('INSERT INTO admin_owner_security (user_id, access_code_hash, reset_otp, reset_otp_expires, reset_otp_verified) VALUES (?, ?, NULL, NULL, 0) ON DUPLICATE KEY UPDATE access_code_hash = VALUES(access_code_hash), reset_otp = NULL, reset_otp_expires = NULL, reset_otp_verified = 0');
+            $saveStmt->bind_param('is', $userId, $hash);
             $saveStmt->execute();
             $saveStmt->close();
             $flashMessage = '4-digit owner access code has been created.';
@@ -137,8 +137,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $otp = (string)random_int(100000, 999999);
         $expiresAt = date('Y-m-d H:i:s', time() + 300);
 
-        $otpStmt = $conn->prepare('UPDATE admin_owner_security SET reset_otp = ?, reset_otp_expires = ?, reset_otp_verified = 0 WHERE user_id = ?');
-        $otpStmt->bind_param('ssi', $otp, $expiresAt, $userId);
+        $otpStmt = $conn->prepare('INSERT INTO admin_owner_security (user_id, access_code_hash, reset_otp, reset_otp_expires, reset_otp_verified) VALUES (?, NULL, ?, ?, 0) ON DUPLICATE KEY UPDATE reset_otp = VALUES(reset_otp), reset_otp_expires = VALUES(reset_otp_expires), reset_otp_verified = VALUES(reset_otp_verified)');
+        $otpStmt->bind_param('iss', $userId, $otp, $expiresAt);
         $otpStmt->execute();
         $otpStmt->close();
 
@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'verify_reset_otp') {
-        $otp = trim((string)($_POST['otp_code'] ?? ''));
+        $otp = preg_replace('/\s+/', '', trim((string)($_POST['otp_code'] ?? '')));
         $savedOtp = (string)($security['reset_otp'] ?? '');
         $expires = (string)($security['reset_otp_expires'] ?? '');
         $isExpired = ($expires === '' || strtotime($expires) < time());
@@ -184,8 +184,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $flashError = 'Code confirmation does not match.';
         } else {
             $newHash = password_hash($newCode, PASSWORD_DEFAULT);
-            $saveNewStmt = $conn->prepare('UPDATE admin_owner_security SET access_code_hash = ?, reset_otp = NULL, reset_otp_expires = NULL, reset_otp_verified = 0 WHERE user_id = ?');
-            $saveNewStmt->bind_param('si', $newHash, $userId);
+            $saveNewStmt = $conn->prepare('INSERT INTO admin_owner_security (user_id, access_code_hash, reset_otp, reset_otp_expires, reset_otp_verified) VALUES (?, ?, NULL, NULL, 0) ON DUPLICATE KEY UPDATE access_code_hash = VALUES(access_code_hash), reset_otp = NULL, reset_otp_expires = NULL, reset_otp_verified = 0');
+            $saveNewStmt->bind_param('is', $userId, $newHash);
             $saveNewStmt->execute();
             $saveNewStmt->close();
             $flashMessage = 'Owner access code updated successfully.';

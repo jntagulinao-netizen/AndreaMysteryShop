@@ -34,6 +34,21 @@ if (!empty($_SESSION['owner_new_pin_error'])) {
     $flashError = (string)$_SESSION['owner_new_pin_error'];
     unset($_SESSION['owner_new_pin_error']);
 }
+
+$targetUserId = $_SESSION['owner_new_pin_target_id'] ?? $userId;
+$targetUserName = '';
+if (!empty($_SESSION['owner_new_pin_target_id']) && intval($_SESSION['owner_new_pin_target_id']) !== $userId) {
+    $targetStmt = $conn->prepare('SELECT full_name FROM users WHERE user_id = ? LIMIT 1');
+    if ($targetStmt) {
+        $targetStmt->bind_param('i', $_SESSION['owner_new_pin_target_id']);
+        $targetStmt->execute();
+        $targetResult = $targetStmt->get_result();
+        if ($targetResult && ($targetRow = $targetResult->fetch_assoc())) {
+            $targetUserName = $targetRow['full_name'] ?? '';
+        }
+        $targetStmt->close();
+    }
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -43,7 +58,6 @@ if (!empty($_SESSION['owner_new_pin_error'])) {
   <title>Create New Owner PIN</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link rel="icon" type="image/png" href="logo.jpg"/>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     :root {
       --bg-deep: #141926;
@@ -255,6 +269,64 @@ if (!empty($_SESSION['owner_new_pin_error'])) {
       border: 1px solid rgba(74, 222, 128, 0.45);
     }
 
+    .swal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 20px;
+    }
+    .swal-overlay.show { display: flex; }
+    .swal-card {
+      width: 100%;
+      max-width: 360px;
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #dde5ee;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+      text-align: center;
+      padding: 20px 18px 16px;
+      animation: swalIn .16s ease-out;
+    }
+    @keyframes swalIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .swal-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      margin: 0 auto 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .swal-icon.success { background: #e9f9ef; color: #0c8f3f; }
+    .swal-icon.error { background: #ffecee; color: #c62839; }
+    .swal-icon.warning { background: #fff6e5; color: #bb6a00; }
+    .swal-title { font-size: 20px; font-weight: 700; color: #152033; margin-bottom: 8px; }
+    .swal-text { font-size: 14px; color: #5f6d7f; margin-bottom: 14px; line-height: 1.45; }
+    .swal-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .swal-actions.two { grid-template-columns: 1fr 1fr; }
+    .swal-btn {
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      width: 100%;
+      height: 42px;
+      cursor: pointer;
+    }
+    .swal-btn.primary { background: #2d68d8; color: #fff; }
+    .swal-btn.primary:hover { background: #1f56bf; }
+    .swal-btn.secondary { background: #f2f5fb; color: #44546a; border: 1px solid #d5deea; }
+    .swal-btn.secondary:hover { background: #e9eef7; }
+
     @media (max-width: 430px) {
       .shell { padding: 16px 14px; }
       .brand img { width: 64px; height: 64px; border-radius: 16px; }
@@ -274,7 +346,11 @@ if (!empty($_SESSION['owner_new_pin_error'])) {
       <img src="logo.jpg" alt="Administrative System">
       <h1>Administrative System</h1>
       <p class="kicker">Andrea Mystery Shop Owner Access</p>
-      <p>Create New PIN</p>
+      <?php if ($targetUserName !== ''): ?>
+        <p>Create owner PIN for <?= htmlspecialchars($targetUserName) ?></p>
+      <?php else: ?>
+        <p>Create New PIN</p>
+      <?php endif; ?>
     </div>
 
     <div class="panel">
@@ -309,8 +385,78 @@ if (!empty($_SESSION['owner_new_pin_error'])) {
       </form>
     </div>
   </div>
+  <div id="localSwal" class="swal-overlay" role="dialog" aria-modal="true" aria-live="polite">
+    <div class="swal-card">
+      <div id="localSwalIcon" class="swal-icon success">✓</div>
+      <div id="localSwalTitle" class="swal-title">Success</div>
+      <div id="localSwalText" class="swal-text"></div>
+      <div id="localSwalActions" class="swal-actions">
+        <button id="localSwalCancel" type="button" class="swal-btn secondary" style="display:none;">Cancel</button>
+        <button id="localSwalConfirm" type="button" class="swal-btn primary">OK</button>
+      </div>
+    </div>
+  </div>
 
   <script>
+    function openLocalSweetAlert(options = {}) {
+      var overlay = document.getElementById('localSwal');
+      var iconEl = document.getElementById('localSwalIcon');
+      var titleEl = document.getElementById('localSwalTitle');
+      var textEl = document.getElementById('localSwalText');
+      var confirmBtn = document.getElementById('localSwalConfirm');
+      var cancelBtn = document.getElementById('localSwalCancel');
+      if (!overlay || !iconEl || !titleEl || !textEl || !confirmBtn || !cancelBtn) return Promise.resolve(true);
+
+      var type = options.type || 'success';
+      var showCancel = !!options.showCancel;
+      iconEl.className = 'swal-icon ' + (type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'success');
+      iconEl.textContent = type === 'error' ? '!' : type === 'warning' ? '⚠' : '✓';
+      titleEl.textContent = options.title || 'Notice';
+      if (options.html) {
+        textEl.innerHTML = options.html;
+      } else {
+        textEl.textContent = options.text || '';
+      }
+      confirmBtn.textContent = options.confirmText || 'OK';
+      cancelBtn.textContent = options.cancelText || 'Cancel';
+      cancelBtn.style.display = showCancel ? 'block' : 'none';
+      document.getElementById('localSwalActions').className = showCancel ? 'swal-actions two' : 'swal-actions';
+      overlay.classList.add('show');
+
+      return new Promise(function (resolve) {
+        function cleanup() {
+          overlay.classList.remove('show');
+          confirmBtn.onclick = null;
+          cancelBtn.onclick = null;
+          overlay.onclick = null;
+        }
+        confirmBtn.onclick = function () {
+          cleanup();
+          if (typeof options.onConfirm === 'function') options.onConfirm();
+          resolve(true);
+        };
+        cancelBtn.onclick = function () {
+          cleanup();
+          if (typeof options.onCancel === 'function') options.onCancel();
+          resolve(false);
+        };
+        overlay.onclick = function (event) {
+          if (event.target === overlay && showCancel) {
+            cleanup();
+            resolve(false);
+          }
+        };
+      });
+    }
+
+    function showLocalSweetAlert(type, title, text) {
+      return openLocalSweetAlert({ type: type, title: title, text: text, confirmText: 'OK' });
+    }
+
+    function showLocalConfirm(title, text, confirmText, cancelText) {
+      return openLocalSweetAlert({ title: title, text: text, confirmText: confirmText || 'OK', cancelText: cancelText || 'Cancel', showCancel: true });
+    }
+
     (function () {
       function bindRow(groupSelector, hiddenInputId) {
         var group = document.querySelector(groupSelector);
@@ -346,7 +492,7 @@ if (!empty($_SESSION['owner_new_pin_error'])) {
         var confirmPin = document.getElementById('confirmPinHidden').value;
         if (newPin.length !== 4 || confirmPin.length !== 4) {
           event.preventDefault();
-          Swal.fire({icon:'warning', title:'Incomplete', text:'Please enter both 4-digit codes.'});
+          showLocalSweetAlert('warning', 'Incomplete', 'Please enter both 4-digit codes.');
           return;
         }
       });
