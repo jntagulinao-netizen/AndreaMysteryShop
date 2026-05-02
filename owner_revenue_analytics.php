@@ -12,6 +12,9 @@ if ($role !== 'admin') {
 
 require_once 'dbConnection.php';
 
+$selectedMonth = $_GET['month'] ?? '';
+$selectedYear = $_GET['year'] ?? '';
+
 $userId = (int)$_SESSION['user_id'];
 $isOwnerAdmin = false;
 $isOwnerStmt = $conn->prepare("SELECT is_owner FROM users WHERE user_id = ? AND LOWER(role) = 'admin' LIMIT 1");
@@ -42,20 +45,23 @@ function format_peso_display($amount) {
     return rtrim(rtrim(number_format($value, 2, '.', ','), '0'), '.');
 }
 
+$whereClause = '';
+if (!empty($selectedMonth) && !empty($selectedYear)) {
+    $whereClause = " AND YEAR(order_date) = $selectedYear AND MONTH(order_date) = $selectedMonth";
+}
+
 $quickStatsSql = 'SELECT
-  SUM(CASE WHEN DATE(order_date) = CURDATE() THEN 1 ELSE 0 END) AS today_orders,
-  SUM(CASE WHEN YEARWEEK(order_date, 1) = YEARWEEK(CURDATE(), 1) AND status IN ("delivered", "received", "reviewed") THEN total_amount ELSE 0 END) AS week_revenue,
-  SUM(CASE WHEN MONTH(order_date) = MONTH(CURDATE()) AND YEAR(order_date) = YEAR(CURDATE()) AND status IN ("delivered", "received", "reviewed") THEN total_amount ELSE 0 END) AS month_revenue,
-  SUM(CASE WHEN YEAR(order_date) = YEAR(CURDATE()) AND status IN ("delivered", "received", "reviewed") THEN total_amount ELSE 0 END) AS year_revenue
+  COUNT(*) AS total_orders,
+  SUM(total_amount) AS total_revenue
   FROM orders
-  WHERE archived = 0 AND binned = 0';
-$quickStats = ['today_orders' => 0, 'week_revenue' => 0.0, 'month_revenue' => 0.0, 'year_revenue' => 0.0];
+  WHERE archived = 0 AND binned = 0 AND status IN ("delivered", "received", "reviewed")' . $whereClause;
+$quickStats = ['total_orders' => 0, 'total_revenue' => 0.0];
 $quickResult = $conn->query($quickStatsSql);
 if ($quickResult && $quickResult->num_rows > 0) {
     $quickStats = array_merge($quickStats, $quickResult->fetch_assoc());
 }
 
-function buildReportSeries($conn, $unit) {
+function buildReportSeries($conn, $unit, $whereClause = '') {
     $series = [];
     $now = new DateTime();
     if ($unit === 'weeks') {
@@ -68,7 +74,7 @@ function buildReportSeries($conn, $unit) {
         }
         $sql = 'SELECT YEARWEEK(order_date, 1) AS week_id, SUM(total_amount) AS total_value
           FROM orders
-          WHERE archived = 0 AND binned = 0 AND status IN ("delivered", "received", "reviewed") AND order_date >= DATE_SUB(CURDATE(), INTERVAL 28 DAY)
+          WHERE archived = 0 AND binned = 0 AND status IN ("delivered", "received", "reviewed") AND order_date >= DATE_SUB(CURDATE(), INTERVAL 28 DAY)' . $whereClause . '
           GROUP BY YEARWEEK(order_date, 1)
           ORDER BY week_id ASC';
         $result = $conn->query($sql);
@@ -92,7 +98,7 @@ function buildReportSeries($conn, $unit) {
         }
         $sql = 'SELECT YEAR(order_date) AS yr, MONTH(order_date) AS mon, SUM(total_amount) AS total_value
           FROM orders
-          WHERE archived = 0 AND binned = 0 AND status IN ("delivered", "received", "reviewed") AND order_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+          WHERE archived = 0 AND binned = 0 AND status IN ("delivered", "received", "reviewed") AND order_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)' . $whereClause . '
           GROUP BY yr, mon
           ORDER BY yr, mon ASC';
         $result = $conn->query($sql);
@@ -117,7 +123,7 @@ function buildReportSeries($conn, $unit) {
         }
         $sql = 'SELECT YEAR(order_date) AS yr, SUM(total_amount) AS total_value
           FROM orders
-          WHERE archived = 0 AND binned = 0 AND status IN ("delivered", "received", "reviewed") AND order_date >= DATE_SUB(CURDATE(), INTERVAL 5 YEAR)
+          WHERE archived = 0 AND binned = 0 AND status IN ("delivered", "received", "reviewed") AND order_date >= DATE_SUB(CURDATE(), INTERVAL 5 YEAR)' . $whereClause . '
           GROUP BY yr
           ORDER BY yr ASC';
         $result = $conn->query($sql);
@@ -136,14 +142,12 @@ function buildReportSeries($conn, $unit) {
 }
 
 $revenueData = [
-    'today_orders' => intval($quickStats['today_orders'] ?? 0),
-    'week_revenue' => floatval($quickStats['week_revenue'] ?? 0),
-    'month_revenue' => floatval($quickStats['month_revenue'] ?? 0),
-    'year_revenue' => floatval($quickStats['year_revenue'] ?? 0),
+    'total_orders' => intval($quickStats['total_orders'] ?? 0),
+    'total_revenue' => floatval($quickStats['total_revenue'] ?? 0),
     'series' => [
-        'weeks' => buildReportSeries($conn, 'weeks'),
-        'months' => buildReportSeries($conn, 'months'),
-        'years' => buildReportSeries($conn, 'years')
+        'weeks' => buildReportSeries($conn, 'weeks', $whereClause),
+        'months' => buildReportSeries($conn, 'months', $whereClause),
+        'years' => buildReportSeries($conn, 'years', $whereClause)
     ]
 ];
 ?>
@@ -169,7 +173,7 @@ $revenueData = [
     .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; padding: 10px 14px; text-decoration: none; font-weight: 700; border: 1px solid #d1d5db; background: #fff; color: #111827; }
     .btn.primary { background: #0f172a; border-color: #0f172a; color: #fff; }
-    .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
     .stat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06); }
     .stat-card strong { display: block; margin-bottom: 6px; font-size: 24px; color: #111827; }
     .stat-card span { color: #475569; font-size: 13px; }
@@ -226,17 +230,32 @@ $revenueData = [
     <div class="hero">
       <h1>Owner Revenue Analytics</h1>
       <p>Review sales performance across daily, weekly, monthly and annual revenue trends with export support.</p>
-      <div class="actions">
-        <a class="btn primary" href="owner_revenue_analytics.php" onclick="event.preventDefault(); downloadRevenueCsv(event)">Export Revenue CSV</a>
-        <a class="btn" href="owner_administrative_page.php">Back to Overview</a>
-      </div>
+      <form method="GET" style="margin-top: 18px;">
+        <div class="filters" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px;">
+          <select name="month">
+            <option value="">All Months</option>
+            <?php for ($m=1; $m<=12; $m++): ?>
+              <option value="<?= $m ?>" <?= $selectedMonth == $m ? 'selected' : '' ?>><?= date('F', mktime(0,0,0,$m,1)) ?></option>
+            <?php endfor; ?>
+          </select>
+          <select name="year">
+            <option value="">All Years</option>
+            <?php $currentYear = date('Y'); for ($y=2020; $y<=$currentYear; $y++): ?>
+              <option value="<?= $y ?>" <?= $selectedYear == $y ? 'selected' : '' ?>><?= $y ?></option>
+            <?php endfor; ?>
+          </select>
+          <button type="submit" class="btn">Apply Filters</button>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn primary" onclick="downloadRevenueCsv()">Export Revenue CSV</button>
+          <a class="btn" href="owner_administrative_page.php">Back to Overview</a>
+        </div>
+      </form>
     </div>
 
     <div class="stats-grid">
-      <div class="stat-card"><strong><?= intval($revenueData['today_orders']) ?></strong><span>Orders Today</span></div>
-      <div class="stat-card"><strong>₱<?= format_peso_display($revenueData['week_revenue']) ?></strong><span>Week Revenue</span></div>
-      <div class="stat-card"><strong>₱<?= format_peso_display($revenueData['month_revenue']) ?></strong><span>Month Revenue</span></div>
-      <div class="stat-card"><strong>₱<?= format_peso_display($revenueData['year_revenue']) ?></strong><span>Year Revenue</span></div>
+      <div class="stat-card"><strong><?= intval($revenueData['total_orders']) ?></strong><span>Total Orders</span></div>
+      <div class="stat-card"><strong>₱<?= format_peso_display($revenueData['total_revenue']) ?></strong><span>Total Revenue</span></div>
     </div>
 
     <section class="section-card">
@@ -261,10 +280,8 @@ $revenueData = [
             <tr><th>Metric</th><th>Value</th></tr>
           </thead>
           <tbody>
-            <tr><td>Orders Today</td><td><?= intval($revenueData['today_orders']) ?></td></tr>
-            <tr><td>This Week Revenue</td><td>₱<?= format_peso_display($revenueData['week_revenue']) ?></td></tr>
-            <tr><td>This Month Revenue</td><td>₱<?= format_peso_display($revenueData['month_revenue']) ?></td></tr>
-            <tr><td>This Year Revenue</td><td>₱<?= format_peso_display($revenueData['year_revenue']) ?></td></tr>
+            <tr><td>Total Orders</td><td><?= intval($revenueData['total_orders']) ?></td></tr>
+            <tr><td>Total Revenue</td><td>₱<?= format_peso_display($revenueData['total_revenue']) ?></td></tr>
           </tbody>
         </table>
       </div>
@@ -340,26 +357,33 @@ $revenueData = [
       container.appendChild(wrapper);
     }
 
-    function downloadRevenueCsv(event) {
-      event.preventDefault();
+    function downloadRevenueCsv() {
+      const month = document.querySelector('select[name="month"]').value;
+      const year = document.querySelector('select[name="year"]').value;
       const rows = [
         ['Revenue Analytics'],
         [],
         ['Metric', 'Value'],
-        ['Orders Today', <?= intval($revenueData['today_orders']) ?>],
-        ['This Week Revenue', '₱<?= format_peso_display($revenueData['week_revenue']) ?>'],
-        ['This Month Revenue', '₱<?= format_peso_display($revenueData['month_revenue']) ?>'],
-        ['This Year Revenue', '₱<?= format_peso_display($revenueData['year_revenue']) ?>'],
+        ['Total Orders', <?= intval($revenueData['total_orders']) ?>],
+        ['Total Revenue', '₱<?= format_peso_display($revenueData['total_revenue']) ?>'],
         [],
         ['Range', 'Value']
       ];
       (reportSeries[currentRange] || []).forEach((item) => rows.push([item.label, item.value]));
+      if (rows.length <= 6) {
+        alert('No data available for the selected period.');
+        return;
+      }
       const csvContent = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
+      let filename = 'owner_revenue_analytics.csv';
+      if (month && year) {
+        filename = `owner_revenue_analytics_${year}_${month}.csv`;
+      }
       link.href = url;
-      link.download = 'owner_revenue_analytics.csv';
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

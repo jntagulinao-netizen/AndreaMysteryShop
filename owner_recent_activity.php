@@ -12,6 +12,9 @@ if ($role !== 'admin') {
 
 require_once 'dbConnection.php';
 
+$selectedMonth = $_GET['month'] ?? '';
+$selectedYear = $_GET['year'] ?? '';
+
 $userId = (int)$_SESSION['user_id'];
 $isOwnerAdmin = false;
 $isOwnerStmt = $conn->prepare("SELECT is_owner FROM users WHERE user_id = ? AND LOWER(role) = 'admin' LIMIT 1");
@@ -34,6 +37,16 @@ if ((int)($_SESSION['owner_admin_access_unlocked'] ?? 0) !== 1) {
     exit;
 }
 
+$whereClause = '';
+if (!empty($selectedMonth) && !empty($selectedYear)) {
+    $whereClause = " AND YEAR(o.order_date) = $selectedYear AND MONTH(o.order_date) = $selectedMonth";
+}
+
+$signupWhereClause = '';
+if (!empty($selectedMonth) && !empty($selectedYear)) {
+    $signupWhereClause = " AND YEAR(created_at) = $selectedYear AND MONTH(created_at) = $selectedMonth";
+}
+
 $activityFeed = [];
 $recentOrdersSql = 'SELECT o.order_id, o.order_date, o.status, u.full_name AS customer_name,
   GROUP_CONCAT(DISTINCT COALESCE(p.product_name, "Item") SEPARATOR ", ") AS products
@@ -41,7 +54,7 @@ $recentOrdersSql = 'SELECT o.order_id, o.order_date, o.status, u.full_name AS cu
   LEFT JOIN users u ON o.user_id = u.user_id
   LEFT JOIN order_items oi ON o.order_id = oi.order_id
   LEFT JOIN products p ON oi.product_id = p.product_id
-  WHERE o.archived = 0 AND o.binned = 0
+  WHERE o.archived = 0 AND o.binned = 0' . $whereClause . '
   GROUP BY o.order_id
   ORDER BY o.order_date DESC
   LIMIT 6';
@@ -58,7 +71,7 @@ if ($orderFeedResult) {
         ];
     }
 }
-$recentCustomersSql = 'SELECT full_name, email, created_at FROM users WHERE LOWER(role) = "user" ORDER BY created_at DESC LIMIT 6';
+$recentCustomersSql = 'SELECT full_name, email, created_at FROM users WHERE LOWER(role) = "user"' . $signupWhereClause . ' ORDER BY created_at DESC LIMIT 6';
 $customerFeedResult = $conn->query($recentCustomersSql);
 if ($customerFeedResult) {
     while ($row = $customerFeedResult->fetch_assoc()) {
@@ -167,10 +180,27 @@ $activityChart = [
     <div class="hero">
       <h1>Recent Activity Feed</h1>
       <p>Monitor the latest order and customer events with exportable activity details.</p>
-      <div class="actions">
-        <a class="btn primary" href="owner_recent_activity.php" onclick="event.preventDefault(); downloadActivityCsv(event)">Export Activity CSV</a>
-        <a class="btn" href="owner_administrative_page.php">Back to Overview</a>
-      </div>
+      <form method="GET" style="margin-top: 18px;">
+        <div class="filters" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px;">
+          <select name="month">
+            <option value="">All Months</option>
+            <?php for ($m=1; $m<=12; $m++): ?>
+              <option value="<?= $m ?>" <?= $selectedMonth == $m ? 'selected' : '' ?>><?= date('F', mktime(0,0,0,$m,1)) ?></option>
+            <?php endfor; ?>
+          </select>
+          <select name="year">
+            <option value="">All Years</option>
+            <?php $currentYear = date('Y'); for ($y=2020; $y<=$currentYear; $y++): ?>
+              <option value="<?= $y ?>" <?= $selectedYear == $y ? 'selected' : '' ?>><?= $y ?></option>
+            <?php endfor; ?>
+          </select>
+          <button type="submit" class="btn">Apply Filters</button>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn primary" onclick="downloadActivityCsv()">Export Activity CSV</button>
+          <a class="btn" href="owner_administrative_page.php">Back to Overview</a>
+        </div>
+      </form>
     </div>
 
     <section class="section-card">
@@ -293,8 +323,9 @@ $activityChart = [
     renderActivityChart();
     attachActivityCardHandlers();
 
-    function downloadActivityCsv(event) {
-      event.preventDefault();
+    function downloadActivityCsv() {
+      const month = document.querySelector('select[name="month"]').value;
+      const year = document.querySelector('select[name="year"]').value;
       const rows = [
         ['Recent Activity Feed'],
         [],
@@ -303,12 +334,20 @@ $activityChart = [
       <?php foreach ($activityFeed as $event): ?>
         rows.push(['<?= addslashes($event['title']) ?>', '<?= addslashes($event['subtitle']) ?>', '<?= addslashes($event['note']) ?>', '<?= addslashes($event['timestamp_label']) ?>']);
       <?php endforeach; ?>
+      if (rows.length <= 4) {
+        alert('No data available for the selected period.');
+        return;
+      }
       const csvContent = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
+      let filename = 'owner_recent_activity.csv';
+      if (month && year) {
+        filename = `owner_recent_activity_${year}_${month}.csv`;
+      }
       link.href = url;
-      link.download = 'owner_recent_activity.csv';
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

@@ -12,6 +12,9 @@ if ($role !== 'admin') {
 
 require_once 'dbConnection.php';
 
+$selectedMonth = $_GET['month'] ?? '';
+$selectedYear = $_GET['year'] ?? '';
+
 $userId = (int)$_SESSION['user_id'];
 $isOwnerAdmin = false;
 $isOwnerStmt = $conn->prepare("SELECT is_owner FROM users WHERE user_id = ? AND LOWER(role) = 'admin' LIMIT 1");
@@ -34,12 +37,17 @@ if ((int)($_SESSION['owner_admin_access_unlocked'] ?? 0) !== 1) {
     exit;
 }
 
+$whereClause = '';
+if (!empty($selectedMonth) && !empty($selectedYear)) {
+    $whereClause = " WHERE YEAR(start_at) = $selectedYear AND MONTH(start_at) = $selectedMonth";
+}
+
 $auctionSummary = ['live_auctions' => 0, 'ended_today' => 0, 'upcoming' => 0];
 $auctionSql = 'SELECT
   SUM(auction_status = "active") AS live_auctions,
   SUM(auction_status IN ("ended", "sold") AND DATE(end_at) = CURDATE()) AS ended_today,
   SUM(auction_status = "scheduled") AS upcoming
-  FROM auction_listings';
+  FROM auction_listings' . $whereClause;
 $auctionResult = $conn->query($auctionSql);
 if ($auctionResult && $auctionResult->num_rows > 0) {
     $auctionSummary = array_merge($auctionSummary, $auctionResult->fetch_assoc());
@@ -47,7 +55,7 @@ if ($auctionResult && $auctionResult->num_rows > 0) {
 
 $auctionList = [];
 $auctionListSql = 'SELECT auction_id, item_name, auction_status, start_at, end_at, current_bid, starting_bid
-  FROM auction_listings
+  FROM auction_listings' . $whereClause . '
   ORDER BY start_at DESC
   LIMIT 10';
 $auctionListResult = $conn->query($auctionListSql);
@@ -138,10 +146,27 @@ function format_peso_display($amount) {
     <div class="hero">
       <h1>Auction Summary</h1>
       <p>Get quick auction health metrics with details on active, scheduled and recently ended auctions.</p>
-      <div class="actions">
-        <a class="btn primary" href="owner_auction_summary.php" onclick="event.preventDefault(); downloadAuctionCsv(event)">Export Auction CSV</a>
-        <a class="btn" href="owner_administrative_page.php">Back to Overview</a>
-      </div>
+      <form method="GET" style="margin-top: 18px;">
+        <div class="filters" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px;">
+          <select name="month">
+            <option value="">All Months</option>
+            <?php for ($m=1; $m<=12; $m++): ?>
+              <option value="<?= $m ?>" <?= $selectedMonth == $m ? 'selected' : '' ?>><?= date('F', mktime(0,0,0,$m,1)) ?></option>
+            <?php endfor; ?>
+          </select>
+          <select name="year">
+            <option value="">All Years</option>
+            <?php $currentYear = date('Y'); for ($y=2020; $y<=$currentYear; $y++): ?>
+              <option value="<?= $y ?>" <?= $selectedYear == $y ? 'selected' : '' ?>><?= $y ?></option>
+            <?php endfor; ?>
+          </select>
+          <button type="submit" class="btn">Apply Filters</button>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn primary" onclick="downloadAuctionCsv()">Export Auction CSV</button>
+          <a class="btn" href="owner_administrative_page.php">Back to Overview</a>
+        </div>
+      </form>
     </div>
 
     <div class="stat-grid">
@@ -178,8 +203,9 @@ function format_peso_display($amount) {
   </div>
 
   <script>
-    function downloadAuctionCsv(event) {
-      event.preventDefault();
+    function downloadAuctionCsv() {
+      const month = document.querySelector('select[name="month"]').value;
+      const year = document.querySelector('select[name="year"]').value;
       const rows = [
         ['Auction Summary'],
         [],
@@ -193,12 +219,20 @@ function format_peso_display($amount) {
       <?php foreach ($auctionList as $auction): ?>
         rows.push(['#<?= $auction['auction_id'] ?>', '<?= addslashes($auction['item_name']) ?>', '<?= addslashes($auction['auction_status']) ?>', '<?= addslashes($auction['start_at']) ?>', '<?= addslashes($auction['end_at']) ?>', '₱<?= format_peso_display($auction['highest_bid']) ?>']);
       <?php endforeach; ?>
+      if (rows.length <= 7) {
+        alert('No data available for the selected period.');
+        return;
+      }
       const csvContent = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
+      let filename = 'owner_auction_summary.csv';
+      if (month && year) {
+        filename = `owner_auction_summary_${year}_${month}.csv`;
+      }
       link.href = url;
-      link.download = 'owner_auction_summary.csv';
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

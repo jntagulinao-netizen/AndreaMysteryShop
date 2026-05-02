@@ -12,6 +12,9 @@ if ($role !== 'admin') {
 
 require_once 'dbConnection.php';
 
+$selectedMonth = $_GET['month'] ?? '';
+$selectedYear = $_GET['year'] ?? '';
+
 $userId = (int)$_SESSION['user_id'];
 $isOwnerAdmin = false;
 $isOwnerStmt = $conn->prepare("SELECT is_owner FROM users WHERE user_id = ? AND LOWER(role) = 'admin' LIMIT 1");
@@ -34,6 +37,11 @@ if ((int)($_SESSION['owner_admin_access_unlocked'] ?? 0) !== 1) {
     exit;
 }
 
+$whereClause = '';
+if (!empty($selectedMonth) && !empty($selectedYear)) {
+    $whereClause = " AND YEAR(order_date) = $selectedYear AND MONTH(order_date) = $selectedMonth";
+}
+
 $orderStatusSql = 'SELECT
   SUM(CASE WHEN status = "pending" THEN 1 ELSE 0 END) AS pending_orders,
   SUM(CASE WHEN status = "processing" THEN 1 ELSE 0 END) AS processing_orders,
@@ -42,7 +50,7 @@ $orderStatusSql = 'SELECT
   SUM(CASE WHEN delivery_type = "pickup" THEN 1 ELSE 0 END) AS pickups,
   SUM(CASE WHEN delivery_type = "pickup" AND status IN ("delivered", "received", "reviewed") THEN 1 ELSE 0 END) AS picked_up_orders
   FROM orders
-  WHERE archived = 0 AND binned = 0';
+  WHERE archived = 0 AND binned = 0' . $whereClause;
 $orderStatus = ['pending_orders' => 0, 'processing_orders' => 0, 'shipped_orders' => 0, 'delivered_orders' => 0, 'pickups' => 0, 'picked_up_orders' => 0];
 $statusResult = $conn->query($orderStatusSql);
 if ($statusResult && $statusResult->num_rows > 0) {
@@ -52,7 +60,7 @@ if ($statusResult && $statusResult->num_rows > 0) {
 $orderDetails = [];
 $orderDetailsSql = 'SELECT order_id, user_id, status, delivery_type, total_amount, order_date
   FROM orders
-  WHERE archived = 0 AND binned = 0
+  WHERE archived = 0 AND binned = 0' . $whereClause . '
   ORDER BY order_date DESC
   LIMIT 10';
 $orderDetailsResult = $conn->query($orderDetailsSql);
@@ -164,10 +172,27 @@ function format_peso_display($amount) {
     <div class="hero">
       <h1>Order Status Overview</h1>
       <p>Track order distribution, pickup statistics, and recent fulfillment activity from a single owner page.</p>
-      <div class="actions">
-        <a class="btn primary" href="owner_order_status.php" onclick="event.preventDefault(); downloadOrderStatusCsv(event)">Export Status CSV</a>
-        <a class="btn" href="owner_administrative_page.php">Back to Overview</a>
-      </div>
+      <form method="GET" style="margin-top: 18px;">
+        <div class="filters" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px;">
+          <select name="month">
+            <option value="">All Months</option>
+            <?php for ($m=1; $m<=12; $m++): ?>
+              <option value="<?= $m ?>" <?= $selectedMonth == $m ? 'selected' : '' ?>><?= date('F', mktime(0,0,0,$m,1)) ?></option>
+            <?php endfor; ?>
+          </select>
+          <select name="year">
+            <option value="">All Years</option>
+            <?php $currentYear = date('Y'); for ($y=2020; $y<=$currentYear; $y++): ?>
+              <option value="<?= $y ?>" <?= $selectedYear == $y ? 'selected' : '' ?>><?= $y ?></option>
+            <?php endfor; ?>
+          </select>
+          <button type="submit" class="btn">Apply Filters</button>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn primary" onclick="downloadOrderStatusCsv()">Export Status CSV</button>
+          <a class="btn" href="owner_administrative_page.php">Back to Overview</a>
+        </div>
+      </form>
     </div>
 
     <div class="stat-grid">
@@ -278,8 +303,9 @@ function format_peso_display($amount) {
 
     renderOrderStatusChart();
 
-    function downloadOrderStatusCsv(event) {
-      event.preventDefault();
+    function downloadOrderStatusCsv() {
+      const month = document.querySelector('select[name="month"]').value;
+      const year = document.querySelector('select[name="year"]').value;
       const rows = [
         ['Order Status Overview'],
         [],
@@ -296,12 +322,20 @@ function format_peso_display($amount) {
       <?php foreach ($orderDetails as $order): ?>
         rows.push(['#<?= $order['order_id'] ?>', '<?= addslashes($order['status']) ?>', '<?= addslashes($order['delivery_type']) ?>', '₱<?= format_peso_display($order['total_amount']) ?>', '<?= addslashes($order['order_date']) ?>']);
       <?php endforeach; ?>
+      if (rows.length <= 9) {
+        alert('No data available for the selected period.');
+        return;
+      }
       const csvContent = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
+      let filename = 'owner_order_status.csv';
+      if (month && year) {
+        filename = `owner_order_status_${year}_${month}.csv`;
+      }
       link.href = url;
-      link.download = 'owner_order_status.csv';
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

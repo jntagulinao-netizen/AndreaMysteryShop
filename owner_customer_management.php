@@ -12,6 +12,10 @@ if ($role !== 'admin') {
 
 require_once 'dbConnection.php';
 
+$selectedMonth = $_GET['month'] ?? '';
+$selectedYear = $_GET['year'] ?? '';
+$selectedTab = $_GET['tab'] ?? 'recent';
+
 $userId = (int)$_SESSION['user_id'];
 $isOwnerAdmin = false;
 $isOwnerStmt = $conn->prepare("SELECT is_owner FROM users WHERE user_id = ? AND LOWER(role) = 'admin' LIMIT 1");
@@ -61,11 +65,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['customer_action'], $_
 $customerActionMessage = $_SESSION['customer_action_message'] ?? '';
 unset($_SESSION['customer_action_message']);
 
+$whereClause = '';
+$caseCondition = "created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')";
+if (!empty($selectedMonth) && !empty($selectedYear)) {
+    $whereClause = " AND YEAR(created_at) = $selectedYear AND MONTH(created_at) = $selectedMonth";
+    $monthStart = sprintf('%04d-%02d-01', $selectedYear, $selectedMonth);
+    $caseCondition = "created_at >= '$monthStart'";
+}
+
 $customerStatsSql = 'SELECT
   COUNT(*) AS total_customers,
-  SUM(CASE WHEN created_at >= DATE_FORMAT(CURDATE(), "%Y-%m-01") THEN 1 ELSE 0 END) AS new_signups_month
+  SUM(CASE WHEN ' . $caseCondition . ' THEN 1 ELSE 0 END) AS new_signups_month
   FROM users
-  WHERE LOWER(role) = "user"';
+  WHERE LOWER(role) = "user"' . $whereClause;
 $customerMetrics = ['total_customers' => 0, 'new_signups_month' => 0];
 $customerResult = $conn->query($customerStatsSql);
 if ($customerResult && $customerResult->num_rows > 0) {
@@ -78,7 +90,18 @@ $customerSignupChart = [
 ];
 
 $recentCustomers = [];
-$recentCustomersSql = 'SELECT user_id, full_name, email, created_at, COALESCE(status, "active") AS status FROM users WHERE LOWER(role) = "user" ORDER BY created_at DESC LIMIT 10';
+$recentCustomersSql = 'SELECT user_id, full_name, email, created_at, COALESCE(status, "active") AS status FROM users WHERE LOWER(role) = "user"' . $whereClause;
+if ($selectedTab === 'recent') {
+    $recentCustomersSql .= ' AND created_at >= DATE_SUB(CURDATE(), INTERVAL 15 DAY)';
+} elseif ($selectedTab === 'all') {
+    // No additional condition
+}
+$recentCustomersSql .= ' ORDER BY created_at DESC';
+if ($selectedTab === 'recent') {
+    $recentCustomersSql .= ' LIMIT 50'; // Show more for recent
+} else {
+    $recentCustomersSql .= ' LIMIT 100'; // Paginate or limit for all
+}
 $recentCustomersResult = $conn->query($recentCustomersSql);
 if ($recentCustomersResult) {
     while ($row = $recentCustomersResult->fetch_assoc()) {
@@ -121,7 +144,7 @@ if ($recentCustomersResult) {
     .section-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 20px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04); margin-bottom: 18px; }
     .section-card h2 { margin: 0 0 12px; font-size: 18px; color: #0f172a; }
     .section-actions { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 16px; }
-    .chart-pie { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; padding: 14px 0; }
+    .chart-pie { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: center; padding: 14px 0; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); display: grid; place-items: center; padding: 16px; z-index: 200; }
     .modal-card { width: min(720px, 100%); background: #fff; border-radius: 24px; padding: 28px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25); border: 1px solid rgba(226, 232, 240, 0.8); position: relative; }
     .modal-header { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
@@ -184,10 +207,27 @@ if ($recentCustomersResult) {
     <div class="hero">
       <h1>Customer Management</h1>
       <p>Track total buyers and new customer growth with a dedicated exportable customer report.</p>
-      <div class="actions">
-        <a class="btn primary" href="owner_customer_management.php" onclick="event.preventDefault(); downloadCustomerCsv(event)">Export Customer CSV</a>
-        <a class="btn" href="owner_administrative_page.php">Back to Overview</a>
-      </div>
+      <form method="GET" style="margin-top: 18px;">
+        <div class="filters" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px;">
+          <select name="month">
+            <option value="">All Months</option>
+            <?php for ($m=1; $m<=12; $m++): ?>
+              <option value="<?= $m ?>" <?= $selectedMonth == $m ? 'selected' : '' ?>><?= date('F', mktime(0,0,0,$m,1)) ?></option>
+            <?php endfor; ?>
+          </select>
+          <select name="year">
+            <option value="">All Years</option>
+            <?php $currentYear = date('Y'); for ($y=2020; $y<=$currentYear; $y++): ?>
+              <option value="<?= $y ?>" <?= $selectedYear == $y ? 'selected' : '' ?>><?= $y ?></option>
+            <?php endfor; ?>
+          </select>
+          <button type="submit" class="btn">Apply Filters</button>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn primary" onclick="downloadCustomerCsv()">Export Customer CSV</button>
+          <a class="btn" href="owner_administrative_page.php">Back to Overview</a>
+        </div>
+      </form>
     </div>
 
     <?php if ($customerActionMessage): ?>
@@ -208,7 +248,11 @@ if ($recentCustomersResult) {
     </section>
 
     <section class="section-card">
-      <div class="section-actions"><div><h2>Recent Customer Signups</h2></div></div>
+      <div class="section-actions"><div><h2>Customer List</h2></div></div>
+      <div class="tabs" style="display: flex; gap: 10px; margin-bottom: 16px;">
+        <a href="?tab=recent<?= $selectedMonth ? '&month=' . $selectedMonth : '' ?><?= $selectedYear ? '&year=' . $selectedYear : '' ?>" class="btn<?= $selectedTab === 'recent' ? ' primary' : '' ?>" style="text-decoration: none;">Recent Signups (15 days)</a>
+        <a href="?tab=all<?= $selectedMonth ? '&month=' . $selectedMonth : '' ?><?= $selectedYear ? '&year=' . $selectedYear : '' ?>" class="btn<?= $selectedTab === 'all' ? ' primary' : '' ?>" style="text-decoration: none;">All Customers</a>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -225,7 +269,7 @@ if ($recentCustomersResult) {
               </tr>
             <?php endforeach; ?>
             <?php if (empty($recentCustomers)): ?>
-              <tr><td colspan="5">No recent customer signups found.</td></tr>
+              <tr><td colspan="5">No customers found.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
@@ -347,8 +391,9 @@ if ($recentCustomersResult) {
       }, 1200);
     }
 
-    function downloadCustomerCsv(event) {
-      event.preventDefault();
+    function downloadCustomerCsv() {
+      const month = document.querySelector('select[name="month"]').value;
+      const year = document.querySelector('select[name="year"]').value;
       const rows = [
         ['Customer Management'],
         [],
@@ -361,12 +406,25 @@ if ($recentCustomersResult) {
       <?php foreach ($recentCustomers as $customer): ?>
         rows.push(['<?= addslashes($customer['full_name']) ?>', '<?= addslashes($customer['email']) ?>', '<?= addslashes($customer['created_at']) ?>']);
       <?php endforeach; ?>
+      if (rows.length <= 7) {
+        alert('No data available for the selected period.');
+        return;
+      }
       const csvContent = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
+      let filename = 'owner_customer_management.csv';
+      if (month && year) {
+        filename = `owner_customer_management_${year}_${month}.csv`;
+      }
+      if ('<?= $selectedTab ?>' === 'recent') {
+        filename = filename.replace('.csv', '_recent.csv');
+      } else {
+        filename = filename.replace('.csv', '_all.csv');
+      }
       link.href = url;
-      link.download = 'owner_customer_management.csv';
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
