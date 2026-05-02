@@ -434,50 +434,6 @@
                         </div>
                     </div>
 
-                    <!-- 6 -->
-                    <div class="group bg-white rounded-2xl p-8 sm:p-10 text-center shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-black/10 transform hover:-translate-y-1">
-                        <div class="bg-yellow-50 bg-gradient-to-br from-yellow-50 to-yellow-100 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                            <svg class="h-8 w-8 sm:h-10 sm:w-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        </div>
-                        <h3 class="text-lg sm:text-xl mb-3 font-bold text-gray-900">6. Cookies & Tracking</h3>
-                        <div class="text-sm sm:text-base text-gray-600 leading-relaxed text-left mx-auto" style="max-width:40ch">
-                            <p>We use cookies and similar tracking technologies to improve your browsing experience and analyze site traffic. You can control cookie preferences through your browser settings.</p>
-                        </div>
-                    </div>
-
-                    <!-- 7 -->
-                    <div class="group bg-white rounded-2xl p-8 sm:p-10 text-center shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-black/10 transform hover:-translate-y-1">
-                        <div class="bg-pink-50 bg-gradient-to-br from-pink-50 to-pink-100 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                            <svg class="h-8 w-8 sm:h-10 sm:w-10 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        </div>
-                        <h3 class="text-lg sm:text-xl mb-3 font-bold text-gray-900">7. Children's Privacy</h3>
-                        <div class="text-sm sm:text-base text-gray-600 leading-relaxed text-left mx-auto" style="max-width:40ch">
-                            <p>Our services are not intended for children under 13 years of age. We do not knowingly collect personal information from children.</p>
-                        </div>
-                    </div>
-
-                    <!-- 8 -->
-                    <div class="group bg-white rounded-2xl p-8 sm:p-10 text-center shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-black/10 transform hover:-translate-y-1">
-                        <div class="bg-cyan-50 bg-gradient-to-br from-cyan-50 to-cyan-100 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                            <svg class="h-8 w-8 sm:h-10 sm:w-10 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20H7m6-4v4m0 0h4"></path></svg>
-                        </div>
-                        <h3 class="text-lg sm:text-xl mb-3 font-bold text-gray-900">8. International Transfers</h3>
-                        <div class="text-sm sm:text-base text-gray-600 leading-relaxed text-left mx-auto" style="max-width:40ch">
-                            <p>Your information may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place for such transfers.</p>
-                        </div>
-                    </div>
-
-                    <!-- 9 -->
-                    <div class="group bg-white rounded-2xl p-8 sm:p-10 text-center shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-black/10 transform hover:-translate-y-1">
-                        <div class="bg-orange-50 bg-gradient-to-br from-orange-50 to-orange-100 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                            <svg class="h-8 w-8 sm:h-10 sm:w-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        </div>
-                        <h3 class="text-lg sm:text-xl mb-3 font-bold text-gray-900">9. Changes to This Policy</h3>
-                        <div class="text-sm sm:text-base text-gray-600 leading-relaxed text-left mx-auto" style="max-width:40ch">
-                            <p>We may update this privacy policy from time to time. We will notify you of any material changes by posting the new policy on this page and updating the "Last Updated" date.</p>
-                        </div>
-                    </div>
-
             
                     </div>
                 </div>

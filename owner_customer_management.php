@@ -87,13 +87,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['make_admin_id'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['make_user_id'])) {
     $makeUserId = intval($_POST['make_user_id']);
     if ($makeUserId > 0) {
-        $roleStmt = $conn->prepare('UPDATE users SET is_owner = 0 WHERE user_id = ? AND LOWER(role) = "admin"');
+        $roleStmt = $conn->prepare('UPDATE users SET role = "user", is_owner = 0 WHERE user_id = ? AND LOWER(role) = "admin"');
         if ($roleStmt) {
             $roleStmt->bind_param('i', $makeUserId);
             if ($roleStmt->execute()) {
-                $_SESSION['customer_action_message'] = 'Admin account has been demoted to non-owner successfully.';
+                $_SESSION['customer_action_message'] = 'Admin account has been demoted to user successfully.';
             } else {
-                $_SESSION['customer_action_message'] = 'Unable to demote admin to non-owner. Please try again.';
+                $_SESSION['customer_action_message'] = 'Unable to demote admin to user. Please try again.';
             }
             $roleStmt->close();
         } else {
@@ -468,7 +468,7 @@ if ($recentCustomersResult) {
         </form>
         <form id="makeUserForm" method="post" style="display:none;align-items:center;">
           <input type="hidden" name="make_user_id" id="makeUserId" value="">
-          <button class="btn warn" type="button" onclick="confirmAction('makeUserForm', 'Are you sure you want to demote this admin to non-owner?')" id="makeUserButton">Demote to Non-Owner</button>
+          <button class="btn warn" type="button" onclick="confirmAction('makeUserForm', 'Are you sure you want to demote this admin to user?')" id="makeUserButton">Demote to User</button>
         </form>
         <form id="makeOwnerForm" method="post" style="display:none;align-items:center;">
           <input type="hidden" name="make_owner_id" id="makeOwnerId" value="">
@@ -562,16 +562,15 @@ if ($recentCustomersResult) {
 
       if (customer.role === 'admin') {
         makeAdminForm.style.display = 'none';
+        makeUserForm.style.display = 'flex';
+        makeUserIdInput.value = customer.user_id;
         if (customer.is_owner === 1) {
-          makeUserForm.style.display = 'flex';
-          makeUserIdInput.value = customer.user_id;
           makeOwnerForm.style.display = 'none';
-          document.getElementById('detailSubtitle').textContent = 'This admin account is an owner. You can demote to non-owner.';
+          document.getElementById('detailSubtitle').textContent = 'This admin account is an owner. You can demote to user.';
         } else {
-          makeUserForm.style.display = 'none';
           makeOwnerForm.style.display = 'flex';
           makeOwnerIdInput.value = customer.user_id;
-          document.getElementById('detailSubtitle').textContent = 'This admin can be promoted to owner.';
+          document.getElementById('detailSubtitle').textContent = 'This admin can be promoted to owner or demoted to user.';
         }
       } else {
         makeOwnerForm.style.display = 'none';

@@ -322,7 +322,7 @@ $reportData = [
   <link rel="stylesheet" href="main.css">
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; padding-bottom: 14278px; }
+    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; padding-bottom: 70px; }
 
     .page-header {
       position: fixed;
