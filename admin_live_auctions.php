@@ -750,6 +750,10 @@ if ($role !== 'admin') {
       return normalized === 'active' || normalized === 'scheduled';
     }
 
+    function hasActiveAuction() {
+      return allListings.some(item => String(item.auction_status || '').toLowerCase() === 'active');
+    }
+
     function matchesCurrentView(item) {
       const status = String(item?.auction_status || '').toLowerCase();
       if (currentView === 'closed') {
@@ -981,25 +985,55 @@ if ($role !== 'admin') {
             }
           });
 
-          const forceBtn = document.createElement('button');
-          forceBtn.className = 'btn btn-force';
-          forceBtn.type = 'button';
-          forceBtn.textContent = 'Force Close';
-          forceBtn.addEventListener('click', async (event) => {
-            event.stopPropagation();
-            const confirmed = await showConfirm('Force Close', 'Force close this auction now?', 'Force Close');
-            if (!confirmed) return;
-            try {
-              await runAction(item.auction_id, 'force_close', 0);
-              showAlert('success', 'Closed', 'Auction force-closed successfully.');
-              await loadListings();
-            } catch (err) {
-              showAlert('error', 'Force Close Failed', err.message || 'Unable to force close auction');
-            }
-          });
-
           leftWrap.appendChild(cancelBtn);
-          leftWrap.appendChild(forceBtn);
+
+          const currentStatus = String(item.auction_status || '').toLowerCase();
+          const activeExists = hasActiveAuction();
+
+          if (currentStatus === 'active') {
+            const forceBtn = document.createElement('button');
+            forceBtn.className = 'btn btn-force';
+            forceBtn.type = 'button';
+            forceBtn.textContent = 'Force Close';
+            forceBtn.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              const confirmed = await showConfirm('Force Close', 'Force close this auction now?', 'Force Close');
+              if (!confirmed) return;
+              try {
+                await runAction(item.auction_id, 'force_close', 0);
+                showAlert('success', 'Closed', 'Auction force-closed successfully.');
+                await loadListings();
+              } catch (err) {
+                showAlert('error', 'Force Close Failed', err.message || 'Unable to force close auction');
+              }
+            });
+            leftWrap.appendChild(forceBtn);
+          } else if (currentStatus === 'scheduled') {
+            const startBtn = document.createElement('button');
+            startBtn.className = 'btn btn-force';
+            startBtn.type = 'button';
+            startBtn.textContent = 'Start Auction';
+            if (activeExists) {
+              startBtn.disabled = true;
+              startBtn.title = 'Another auction is already active';
+              startBtn.style.opacity = '0.65';
+              startBtn.style.cursor = 'not-allowed';
+            }
+            startBtn.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              if (startBtn.disabled) return;
+              const confirmed = await showConfirm('Start Auction', 'Start this auction now?', 'Start Auction');
+              if (!confirmed) return;
+              try {
+                await runAction(item.auction_id, 'start', 0);
+                showAlert('success', 'Started', 'Auction started successfully.');
+                await loadListings();
+              } catch (err) {
+                showAlert('error', 'Start Failed', err.message || 'Unable to start auction');
+              }
+            });
+            leftWrap.appendChild(startBtn);
+          }
 
           const extendGroup = document.createElement('div');
           extendGroup.className = 'extend-group';

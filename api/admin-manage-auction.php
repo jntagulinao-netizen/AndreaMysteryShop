@@ -34,7 +34,7 @@ if ($auctionId <= 0) {
     exit;
 }
 
-if (!in_array($action, ['cancel', 'extend', 'force_close'], true)) {
+if (!in_array($action, ['cancel', 'extend', 'force_close', 'start'], true)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Invalid action']);
     exit;
@@ -93,12 +93,40 @@ try {
         $extendStmt->close();
     }
 
-    if ($action === 'force_close') {
-        if (in_array($status, ['sold', 'cancelled'], true)) {
-            throw new Exception('Auction cannot be force-closed in its current state');
+    if ($action === 'start') {
+        if ($status !== 'scheduled') {
+            throw new Exception('Only scheduled auctions can be started');
         }
 
-        $closeStmt = $conn->prepare('UPDATE auction_listings SET end_at = ?, auction_status = CASE WHEN auction_status = \'scheduled\' THEN \'active\' ELSE auction_status END WHERE auction_id = ?');
+        $activeCheckStmt = $conn->prepare('SELECT auction_id FROM auction_listings WHERE admin_user_id = ? AND auction_status = ? AND auction_id != ? LIMIT 1');
+        if (!$activeCheckStmt) {
+            throw new Exception('Failed to check active auctions');
+        }
+        $activeStatus = 'active';
+        $activeCheckStmt->bind_param('isi', $adminUserId, $activeStatus, $auctionId);
+        $activeCheckStmt->execute();
+        $activeCheckRes = $activeCheckStmt->get_result();
+        $activeCheckStmt->close();
+
+        if ($activeCheckRes && $activeCheckRes->num_rows > 0) {
+            throw new Exception('Another auction is already active. Start this one after the current auction ends.');
+        }
+
+        $startStmt = $conn->prepare('UPDATE auction_listings SET start_at = ?, auction_status = ?, end_at = CASE WHEN end_at <= ? THEN DATE_ADD(?, INTERVAL 30 MINUTE) ELSE end_at END WHERE auction_id = ?');
+        if (!$startStmt) {
+            throw new Exception('Failed to start auction');
+        }
+        $startStmt->bind_param('ssssi', $now, $activeStatus, $now, $now, $auctionId);
+        $startStmt->execute();
+        $startStmt->close();
+    }
+
+    if ($action === 'force_close') {
+        if ($status !== 'active') {
+            throw new Exception('Only active auctions can be force closed');
+        }
+
+        $closeStmt = $conn->prepare('UPDATE auction_listings SET end_at = ? WHERE auction_id = ?');
         if (!$closeStmt) {
             throw new Exception('Failed to force close auction');
         }

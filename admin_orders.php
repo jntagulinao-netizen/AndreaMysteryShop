@@ -1197,6 +1197,15 @@ $statusDisplay = [
           $productList = implode(', ', array_map(function ($item) {
             return (string)($item['product_name'] ?? '');
           }, $order['items']));
+
+          $firstProductId = (!empty($order['items']) && isset($order['items'][0]['product_id'])) ? intval($order['items'][0]['product_id']) : 0;
+          $targetReviewId = 0;
+          if ($firstProductId > 0 && intval($order['user_id'] ?? 0) > 0) {
+            $key = intval($order['user_id']) . ':' . $firstProductId;
+            if (isset($latestReviewByUserProduct[$key])) {
+              $targetReviewId = intval($latestReviewByUserProduct[$key]);
+            }
+          }
         ?>
         <div class="order-group" data-status="<?php echo htmlspecialchars($status); ?>" data-archived="<?php echo $isArchived ? '1' : '0'; ?>" data-binned="<?php echo $isBinned ? '1' : '0'; ?>" data-order-id="<?php echo intval($order['order_id']); ?>" data-customer="<?php echo htmlspecialchars(strtolower((string)$order['customer_name'])); ?>" data-products="<?php echo htmlspecialchars(strtolower($productList)); ?>">
           <div class="store-header">
@@ -1304,8 +1313,8 @@ $statusDisplay = [
               <div style="font-size: 16px; font-weight: 600; color: #333;">₱<?php echo number_format((float)$order['total_amount'], 2); ?></div>
             </div>
             <div class="action-buttons">
-              <?php if (strtolower((string)$status) === 'reviewed' && $firstProductId > 0): ?>
-                <a class="action-btn primary" href="admin_manage_reviews.php?focus_product_id=<?php echo intval($firstProductId); ?><?php echo $targetReviewId > 0 ? '&focus_review_id=' . intval($targetReviewId) : ''; ?>">Open this Review</a>
+              <?php if (strtolower((string)$status) === 'reviewed' && $targetReviewId > 0): ?>
+                <a class="action-btn primary" href="admin_manage_reviews.php?focus_product_id=<?php echo intval($firstProductId); ?>&focus_review_id=<?php echo intval($targetReviewId); ?>">Open this Review</a>
               <?php endif; ?>
               <?php if ($nextStatus): ?>
                 <form method="POST" class="order-action-form" style="display:inline;" data-confirm-type="warning" data-confirm-title="Change Order Status" data-confirm-message="Move this order to <?php echo htmlspecialchars($statusLabels[$nextStatus]); ?>?">

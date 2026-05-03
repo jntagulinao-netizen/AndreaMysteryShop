@@ -620,12 +620,24 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
       font-weight: 600;
     }
 
-    .modal-media-wrap { margin: 0 0 12px; }
-    .modal-media-wrap .review-image { max-width: 100%; max-height: 320px; border-radius: 8px; }
+    .modal-media-wrap {
+      margin: 0 0 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .modal-media-wrap .review-image {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      max-height: 240px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
     .modal-media-grid {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
+      margin-top: 6px;
     }
     .modal-media-grid .review-media-clickable {
       width: 96px;
@@ -634,7 +646,9 @@ function buildAdminReviewPageUrl(int $page, string $searchTerm, string $sortOrde
       border-radius: 8px;
       border: 1px solid #e5e7eb;
       background: #f3f4f6;
+      flex: 0 0 auto;
     }
+    .reply-form { margin-top: 14px; }
     .modal-media-grid .review-media-clickable .review-image {
       width: 100%;
       height: 100%;

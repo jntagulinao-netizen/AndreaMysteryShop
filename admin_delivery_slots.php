@@ -279,17 +279,25 @@ if ($result) {
     $result->close();
 }
 
+$todayDate = date('Y-m-d');
 // Categorize slots
 $activeSlots = [];
 $fullSlots = [];
+$inactiveSlots = [];
 foreach ($slotsByDate as $date => $daySlots) {
     $activeDay = [];
     $fullDay = [];
+    $inactiveDay = [];
     foreach ($daySlots as $slot) {
+        $isPastDate = $slot['slot_date'] < $todayDate;
         if ($slot['current_orders'] >= $slot['max_orders']) {
             $fullDay[] = $slot;
+        } elseif ($isPastDate || intval($slot['is_active']) === 0) {
+            $inactiveDay[] = $slot;
         } elseif ($slot['is_active']) {
             $activeDay[] = $slot;
+        } else {
+            $inactiveDay[] = $slot;
         }
     }
     if (!empty($activeDay)) {
@@ -297,6 +305,9 @@ foreach ($slotsByDate as $date => $daySlots) {
     }
     if (!empty($fullDay)) {
         $fullSlots[$date] = $fullDay;
+    }
+    if (!empty($inactiveDay)) {
+        $inactiveSlots[$date] = $inactiveDay;
     }
 }
 ?>
@@ -473,6 +484,8 @@ foreach ($slotsByDate as $date => $daySlots) {
       cursor: pointer;
     }
     .slot-actions {
+      position: relative;
+      z-index: 1;
       display: flex;
       gap: 8px;
       align-items: center;
@@ -480,6 +493,8 @@ foreach ($slotsByDate as $date => $daySlots) {
       margin-top: 0;
     }
     .btn-small {
+      position: relative;
+      z-index: 2;
       padding: 8px 14px;
       border: 1px solid #d1d5db;
       border-radius: 8px;
@@ -622,6 +637,7 @@ foreach ($slotsByDate as $date => $daySlots) {
         <button class="btn-filter active" data-filter="all">All Slots</button>
         <button class="btn-filter" data-filter="active">Active Slots</button>
         <button class="btn-filter" data-filter="full">Full Slots</button>
+        <button class="btn-filter" data-filter="inactive">Inactive Slots</button>
       </div>
 
       <div class="slots-section active" id="all-slots">
@@ -762,6 +778,63 @@ foreach ($slotsByDate as $date => $daySlots) {
                 <div class="slot-actions">
                   <button class="btn-small" type="button" onclick="editSlot(getSelectedSlotId('<?php echo $date; ?>', 'full'))">Edit</button>
                   <button class="btn-small" type="button" onclick="deleteSlot(getSelectedSlotId('<?php echo $date; ?>', 'full'))">Delete</button>
+                </div>
+              </div>
+              <div class="edit-form-inline hidden">
+                <form method="post" class="inline-update-form">
+                  <input type="hidden" name="action" value="update">
+                  <input type="hidden" name="slot_id" class="edit_slot_id">
+                  <input type="hidden" name="filter_month" value="<?php echo $filterMonth; ?>">
+                  <input type="hidden" name="filter_year" value="<?php echo $filterYear; ?>">
+                  <div class="inline-row">
+                    <div class="form-group inline-group">
+                      <label class="form-label">Delivery Date</label>
+                      <input type="date" name="edit_slot_date" class="form-input inline-input" required>
+                    </div>
+                    <div class="form-group inline-group">
+                      <label class="form-label">Delivery Time</label>
+                      <input type="time" name="edit_slot_time" class="form-input inline-input" required>
+                    </div>
+                    <div class="form-group inline-group">
+                      <label class="form-label">Maximum Orders</label>
+                      <input type="number" name="edit_max_orders" class="form-input inline-input" min="1" max="50" required>
+                    </div>
+                    <div class="inline-actions">
+                      <button type="button" class="btn btn-primary btn-small" onclick="confirmSaveSlot(this)">Save</button>
+                      <button type="button" class="btn btn-small" onclick="cancelInlineEdit(this)">Cancel</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+
+      <div class="slots-section" id="inactive-slots">
+        <h4>Inactive Slots</h4>
+        <?php if (empty($inactiveSlots)): ?>
+          <p>No inactive delivery slots found.</p>
+        <?php else: ?>
+          <?php foreach ($inactiveSlots as $date => $daySlots): ?>
+            <div class="slot-item" data-date="<?php echo $date; ?>">
+              <div class="slot-top">
+                <div class="slot-info">
+                  <strong class="slot-date-title"><?php echo date('M j, Y', strtotime($date)); ?></strong>
+                  <div class="slot-select-wrapper">
+                    <div class="slot-select-summary"></div>
+                    <select class="slot-select" data-date="<?php echo $date; ?>" data-section="inactive" onchange="updateSlotSummary(this)">
+                      <?php foreach ($daySlots as $slot): ?>
+                        <option value="<?php echo $slot['slot_id']; ?>" data-time="<?php echo $slot['slot_time']; ?>" data-max="<?php echo $slot['max_orders']; ?>" data-active="<?php echo $slot['is_active']; ?>" data-summary="<?php echo date('g:i A', strtotime($slot['slot_time'])); ?> - Max: <?php echo $slot['max_orders']; ?>, Current: <?php echo $slot['current_orders']; ?>, Status: Inactive">
+                          <?php echo date('g:i A', strtotime($slot['slot_time'])); ?> - Max: <?php echo $slot['max_orders']; ?>, Current: <?php echo $slot['current_orders']; ?>, Status: Inactive
+                        </option>
+                      <?php endforeach; ?>
+                    </select>
+                  </div>
+                </div>
+                <div class="slot-actions">
+                  <button class="btn-small" type="button" onclick="editSlot(getSelectedSlotId('<?php echo $date; ?>', 'inactive'))">Edit</button>
+                  <button class="btn-small" type="button" onclick="deleteSlot(getSelectedSlotId('<?php echo $date; ?>', 'inactive'))">Delete</button>
                 </div>
               </div>
               <div class="edit-form-inline hidden">
