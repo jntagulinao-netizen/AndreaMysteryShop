@@ -855,6 +855,7 @@ $statusDisplay = [
             <button class="tab" data-status="pending" onclick="filterByStatus('pending')">To pay</button>
             <button class="tab" data-status="processing" onclick="filterByStatus('processing')">To ship</button>
             <button class="tab" data-status="pickup" onclick="filterByStatus('pickup')">Pickups</button>
+            <button class="tab" data-status="pickedup" onclick="filterByStatus('pickedup')">Picked Up</button>
             <button class="tab" data-status="shipped" onclick="filterByStatus('shipped')">To receive</button>
             <button class="tab" data-status="delivered" onclick="filterByStatus('delivered')">Completed</button>
             <button class="tab" data-status="delivered-unreviewed" onclick="filterByStatus('delivered-unreviewed')">To review</button>

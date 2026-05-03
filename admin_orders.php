@@ -1122,6 +1122,7 @@ $statusDisplay = [
         <button class="tab" data-status="pending" onclick="filterByStatus('pending')">To process</button>
         <button class="tab" data-status="processing" onclick="filterByStatus('processing')">To ship</button>
         <button class="tab" data-status="pickup" onclick="filterByStatus('pickup')">Pickups</button>
+        <button class="tab" data-status="pickedup" onclick="filterByStatus('pickedup')">Picked Up</button>
         <button class="tab" data-status="shipped" onclick="filterByStatus('shipped')">To receive</button>
         <button class="tab" data-status="delivered" onclick="filterByStatus('delivered')">Delivered</button>
         <button class="tab" data-status="reviewed" onclick="filterByStatus('reviewed')">Reviews</button>
@@ -1147,8 +1148,8 @@ $statusDisplay = [
             'shipped' => 'delivered'
           ];
           
-          $pickupNextStatusMap = [
-            'pending' => 'processing', 
+              $pickupNextStatusMap = [
+            'pending' => 'processing',
             'processing' => 'pickup',
             'pickup' => 'pickedup',
             'pickedup' => 'received'
@@ -1156,6 +1157,10 @@ $statusDisplay = [
           
           $statusMap = ($deliveryType === 'pickup') ? $pickupNextStatusMap : $deliveryNextStatusMap;
           $nextStatus = $statusMap[$status] ?? null;
+          if ($status === 'pickedup') {
+            // Picked up orders are confirmed by the customer, not advanced by admin.
+            $nextStatus = null;
+          }
           
           // Create linear flow for timeline based on delivery type
           $linearFlow = ($deliveryType === 'pickup') ? 
