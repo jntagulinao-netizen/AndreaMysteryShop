@@ -130,6 +130,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['make_owner_id'])) {
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['demote_owner_id'])) {
+    $demoteOwnerId = intval($_POST['demote_owner_id']);
+    if ($demoteOwnerId > 0) {
+        $demoteStmt = $conn->prepare('UPDATE users SET is_owner = 0 WHERE user_id = ? AND LOWER(role) = "admin" AND is_owner = 1');
+        if ($demoteStmt) {
+            $demoteStmt->bind_param('i', $demoteOwnerId);
+            if ($demoteStmt->execute()) {
+                $_SESSION['customer_action_message'] = 'Owner admin account has been demoted to regular admin successfully.';
+            } else {
+                $_SESSION['customer_action_message'] = 'Unable to demote owner admin. Please try again.';
+            }
+            $demoteStmt->close();
+        } else {
+            $_SESSION['customer_action_message'] = 'Unable to prepare demotion. Please contact support.';
+        }
+    } else {
+        $_SESSION['customer_action_message'] = 'Invalid demotion request.';
+    }
+    header('Location: owner_customer_management.php');
+    exit;
+}
+
 $customerActionMessage = $_SESSION['customer_action_message'] ?? '';
 unset($_SESSION['customer_action_message']);
 
@@ -470,6 +492,10 @@ if ($recentCustomersResult) {
           <input type="hidden" name="make_user_id" id="makeUserId" value="">
           <button class="btn warn" type="button" onclick="confirmAction('makeUserForm', 'Are you sure you want to demote this admin to user?')" id="makeUserButton">Demote to User</button>
         </form>
+        <form id="demoteOwnerForm" method="post" style="display:none;align-items:center;">
+          <input type="hidden" name="demote_owner_id" id="demoteOwnerId" value="">
+          <button class="btn warn" type="button" onclick="confirmAction('demoteOwnerForm', 'Are you sure you want to remove owner privileges from this admin?')" id="demoteOwnerButton">Remove Owner Privileges</button>
+        </form>
         <form id="makeOwnerForm" method="post" style="display:none;align-items:center;">
           <input type="hidden" name="make_owner_id" id="makeOwnerId" value="">
           <button class="btn primary" type="button" onclick="confirmAction('makeOwnerForm', 'Are you sure you want to make this admin an owner?')" id="makeOwnerButton">Make Owner</button>
@@ -549,9 +575,11 @@ if ($recentCustomersResult) {
       const actionForm = document.getElementById('customerActionForm');
       const makeAdminForm = document.getElementById('makeAdminForm');
       const makeUserForm = document.getElementById('makeUserForm');
+      const demoteOwnerForm = document.getElementById('demoteOwnerForm');
       const makeOwnerForm = document.getElementById('makeOwnerForm');
       const makeAdminIdInput = document.getElementById('makeAdminId');
       const makeUserIdInput = document.getElementById('makeUserId');
+      const demoteOwnerIdInput = document.getElementById('demoteOwnerId');
       const makeOwnerIdInput = document.getElementById('makeOwnerId');
 
       actionForm.style.display = 'flex';
@@ -566,8 +594,11 @@ if ($recentCustomersResult) {
         makeUserIdInput.value = customer.user_id;
         if (customer.is_owner === 1) {
           makeOwnerForm.style.display = 'none';
-          document.getElementById('detailSubtitle').textContent = 'This admin account is an owner. You can demote to user.';
+          demoteOwnerForm.style.display = 'flex';
+          demoteOwnerIdInput.value = customer.user_id;
+          document.getElementById('detailSubtitle').textContent = 'This admin account is an owner. You can remove owner privileges or demote to user.';
         } else {
+          demoteOwnerForm.style.display = 'none';
           makeOwnerForm.style.display = 'flex';
           makeOwnerIdInput.value = customer.user_id;
           document.getElementById('detailSubtitle').textContent = 'This admin can be promoted to owner or demoted to user.';
@@ -575,6 +606,7 @@ if ($recentCustomersResult) {
       } else {
         makeOwnerForm.style.display = 'none';
         makeUserForm.style.display = 'none';
+        demoteOwnerForm.style.display = 'none';
         if (customer.role === 'user') {
           makeAdminForm.style.display = 'flex';
           makeAdminIdInput.value = customer.user_id;
