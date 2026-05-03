@@ -200,7 +200,7 @@
             </div>
 
             <div class="hero-inner animate-fade-in">
-                <h1 class="animate-up delay-2">About LUXE</h1>
+                <h1 class="animate-up delay-2">About  Andrea Mystery Shop</h1>
                 <p class="animate-up delay-4">We're on a mission to redefine online shopping by curating the finest selection of premium lifestyle products.</p>
             </div>
         </section>
@@ -214,13 +214,13 @@
                         <h2 style="font-size:22px;margin:0;font-weight:700;color:#0f1724">Our Story</h2>
                     </div>
                     <div style="color:#475569;line-height:1.6">
-                        <p>Founded in 2024, LUXE began with a simple vision: to create a premium e-commerce destination where quality meets style. What started as a small boutique has grown into a trusted source for discerning customers worldwide.</p>
+                        <p>Founded in 2024,  Andrea Mystery Shop began with a simple vision: to create a premium e-commerce destination where quality meets style. What started as a small boutique has grown into a trusted source for discerning customers worldwide.</p>
                         <p style="margin-top:12px">We believe that shopping should be an experience, not just a transaction. That's why we meticulously curate every item in our collection, ensuring that each product tells a story and adds value to your life.</p>
                         <p style="margin-top:12px">Today, we serve thousands of satisfied customers across the globe, and we're just getting started.</p>
                     </div>
                 </div>
                 <div>
-                    <img src="palipa.jpg" alt="About LUXE" class="rounded-2xl shadow-lg" style="width:100%;height:auto;object-fit:cover;display:block;" />
+                    <img src="logo.jpg" alt="About Andrea Mystery Shop" class="rounded-2xl shadow-lg" style="width:100%;height:auto;object-fit:cover;display:block;" />
                 </div>
             </div>
         </section>

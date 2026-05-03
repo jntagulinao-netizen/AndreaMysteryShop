@@ -275,8 +275,7 @@
                                     </div>
                                     <div class="flex-1">
                                         <h3 class="text-sm font-bold text-gray-900 mb-2">Email</h3>
-                                        <p class="text-sm text-gray-600">support@luxe.com</p>
-                                        <p class="text-sm text-gray-600">sales@luxe.com</p>
+                                        <p class="text-sm text-gray-600"> andreamysteryshop@gmail.com</p>
                                     </div>
                                 </div>
                             </div>
@@ -291,8 +290,8 @@
                                     </div>
                                     <div class="flex-1">
                                         <h3 class="text-sm font-bold text-gray-900 mb-2">Phone</h3>
-                                        <p class="text-sm text-gray-600">+1 (555) 123-4567</p>
-                                        <p class="text-sm text-gray-600">+1 (555) 987-6543</p>
+                                        <p class="text-sm text-gray-600">+63 981-458-5664</p>
+                                       
                                     </div>
                                 </div>
                             </div>
@@ -309,9 +308,9 @@
                                     <div class="flex-1">
                                         <h3 class="text-sm font-bold text-gray-900 mb-2">Address</h3>
                                         <p class="text-sm text-gray-600">
-                                            123 Luxury Boulevard<br />
-                                            New York, NY 10001<br />
-                                            United States
+                                            Dasmarinas, Cavite<br />
+                                           San Agustin Phase 2<br />
+                                            Philippines
                                         </p>
                                     </div>
                                 </div>
@@ -387,22 +386,7 @@
                             </div>
                         </div>
                     </div>
-                    <!-- FAQ Item 3 -->
-                    <div class="bg-white rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border-l-4 border-purple-500">
-                        <div class="p-6 sm:p-8 cursor-pointer hover:bg-gray-50 transition-colors">
-                            <div class="flex items-start justify-between">
-                                <div class="flex items-start space-x-4 flex-1">
-                                    <div class="bg-purple-100 p-3 rounded-lg flex-shrink-0 mt-1">
-                                        <svg class="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20H7m6-4v4m0 0h4"></path>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h3 class="text-sm sm:text-base font-bold text-gray-900 mb-3">Do you ship internationally?</h3>
-                                        <p class="text-sm sm:text-base text-gray-600 leading-relaxed">
-                                            Yes! We ship to over 25 countries worldwide. International shipping times vary by location (typically 7-14 business days). Additional customs fees may apply depending on your country.
-                                        </p>
-                                    </div>
+                   
                                 </div>
                             </div>
                         </div>

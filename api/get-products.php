@@ -54,6 +54,13 @@ $lockedAuctionFilter .= "
 $whereClauses = [$lockedAuctionFilter];
 if (!$includeArchived) {
     $whereClauses[] = 'p.archived = 0';
+} else {
+    // When viewing archived products, exclude products that exist in auction_listings
+    $whereClauses[] = "NOT EXISTS (
+        SELECT 1
+        FROM auction_listings al
+        WHERE (al.auction_product_id = p.product_id OR al.auction_product_id = p.parent_product_id)
+    )";
 }
 $archiveFilter = 'WHERE ' . implode(' AND ', $whereClauses);
 
