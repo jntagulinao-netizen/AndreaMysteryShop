@@ -496,7 +496,6 @@ if ($role !== 'user') {
     let selectedAuctionBidId = 0;
     const pageSize = 5;
     let currentPage = 1;
-    let highestBidIdByAuction = {};
     let checkoutScheduleSlots = [];
     let availableDeliveryDates = [];
     let checkoutDeliveryType = 'delivery';
@@ -1225,7 +1224,7 @@ if ($role !== 'user') {
         allBidsForAuction.forEach((bid) => {
           const item = document.createElement('div');
           item.className = 'bid-history-item';
-          const isHighest = Number(bid.bid_id || 0) === (highestBidIdByAuction[auctionId] || 0);
+          const isHighest = Boolean(bid.is_highest_bid_record);
           item.innerHTML = `
             <div>
               <div style="font-size: 12px; color: var(--muted);">
@@ -1275,7 +1274,7 @@ if ($role !== 'user') {
         const middle = document.createElement('div');
         const statusClass = String(row.auction_status || '').toLowerCase();
         const auctionId = Number(row.auction_id || 0);
-        const isHighestBidRow = Number(row.bid_id || 0) === (highestBidIdByAuction[auctionId] || 0);
+        const isHighestBidRow = Boolean(row.is_highest_bid_record);
         const isOrdered = Boolean(row.checked_out);
         middle.innerHTML = `
           <div>
@@ -1459,29 +1458,8 @@ if ($role !== 'user') {
       host.appendChild(nextBtn);
     }
 
-    function computeHighestBidByAuction() {
-      highestBidIdByAuction = {};
-      if (!Array.isArray(bidRows) || bidRows.length === 0) {
-        return;
-      }
-      const maxByAuction = {};
-      bidRows.forEach((row) => {
-        const auctionId = Number(row.auction_id || 0);
-        if (!auctionId) return;
-        const amount = Number(row.bid_amount || 0);
-        const createdAt = String(row.created_at || '');
-        const current = maxByAuction[auctionId];
-        if (!current || amount > current.amount || (amount === current.amount && createdAt > current.createdAt)) {
-          maxByAuction[auctionId] = {
-            amount,
-            createdAt,
-            bidId: Number(row.bid_id || 0)
-          };
-        }
-      });
-      Object.keys(maxByAuction).forEach((key) => {
-        highestBidIdByAuction[Number(key)] = maxByAuction[key].bidId;
-      });
+    function computeAuctionStats() {
+      // This is now handled by the API - each bid has is_highest_bid_record flag
     }
 
     async function loadHistory() {
@@ -1493,7 +1471,6 @@ if ($role !== 'user') {
         }
 
         bidRows = Array.isArray(data.bids) ? data.bids : [];
-        computeHighestBidByAuction();
         currentPage = 1;
         renderHistoryPage();
       } catch (err) {
