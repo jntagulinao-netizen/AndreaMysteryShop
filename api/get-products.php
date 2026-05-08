@@ -65,6 +65,11 @@ if (!$includeArchived) {
 $archiveFilter = 'WHERE ' . implode(' AND ', $whereClauses);
 
 $sql = "SELECT p.product_id, p.product_name, p.product_description, p.price, p.product_stock, p.category_id, c.category_name, p.parent_product_id, p.archived, p.featured,
+           EXISTS(
+               SELECT 1
+               FROM auction_listings al
+               WHERE al.auction_product_id = p.product_id OR al.auction_product_id = p.parent_product_id
+           ) AS is_auction_product,
                      (SELECT IFNULL(SUM(oi.quantity), 0)
                             FROM order_items oi
                             JOIN orders o ON o.order_id = oi.order_id
@@ -117,6 +122,7 @@ while ($row = $result->fetch_assoc()) {
         'parent_product_id' => isset($row['parent_product_id']) ? (int)$row['parent_product_id'] : null,
         'archived' => (int)($row['archived'] ?? 0),
         'featured' => (int)($row['featured'] ?? 0),
+        'is_auction_product' => (int)($row['is_auction_product'] ?? 0),
         'name' => $row['product_name'],
         'desc' => $row['product_description'],
         'price' => (float)$row['price'],

@@ -29,6 +29,8 @@ $itemName = trim((string)($_POST['item_name'] ?? ''));
 $itemDescription = trim((string)($_POST['item_description'] ?? ''));
 $conditionGrade = trim((string)($_POST['condition_grade'] ?? ''));
 $categoryId = isset($_POST['category_id']) && $_POST['category_id'] !== '' ? (int)$_POST['category_id'] : null;
+$useNewCategory = (int)(($_POST['use_new_category'] ?? '0') === '1');
+$newCategoryName = trim((string)($_POST['new_category_name'] ?? ''));
 $startingBidRaw = trim((string)($_POST['starting_bid'] ?? ''));
 $reservePriceRaw = trim((string)($_POST['reserve_price'] ?? ''));
 $bidIncrementRaw = trim((string)($_POST['bid_increment'] ?? ''));
@@ -216,6 +218,15 @@ try {
 
     $conn->begin_transaction();
 
+    // If creating a new category, validate it now but do NOT create it yet (only on publish)
+    if ($useNewCategory) {
+        if (strlen($newCategoryName) < 4) {
+            throw new Exception('Category name must be at least 4 characters');
+        }
+        // Keep categoryId null; store the new_category_name in the draft record instead
+        $categoryId = null;
+    }
+
     if ($draftId > 0) {
         $checkStmt = $conn->prepare('SELECT draft_id FROM auction_drafts WHERE draft_id = ? AND admin_user_id = ? LIMIT 1');
         if (!$checkStmt) {
@@ -231,12 +242,12 @@ try {
             throw new Exception('Draft not found or not owned by this admin');
         }
 
-        $updateStmt = $conn->prepare('UPDATE auction_drafts SET category_id = ?, item_name = ?, item_description = ?, condition_grade = ?, starting_bid = ?, reserve_price = ?, bid_increment = ?, start_at = ?, end_at = ? WHERE draft_id = ? AND admin_user_id = ?');
+        $updateStmt = $conn->prepare('UPDATE auction_drafts SET category_id = ?, item_name = ?, item_description = ?, condition_grade = ?, starting_bid = ?, reserve_price = ?, bid_increment = ?, start_at = ?, end_at = ?, use_new_category = ?, new_category_name = ? WHERE draft_id = ? AND admin_user_id = ?');
         if (!$updateStmt) {
             throw new Exception('Failed to prepare draft update');
         }
         $updateStmt->bind_param(
-            'isssdddssii',
+            'isssdddssisii',
             $categoryId,
             $itemName,
             $itemDescription,
@@ -246,18 +257,20 @@ try {
             $bidIncrement,
             $startAt,
             $endAt,
+            $useNewCategory,
+            $newCategoryName,
             $draftId,
             $adminUserId
         );
         $updateStmt->execute();
         $updateStmt->close();
     } else {
-        $insertStmt = $conn->prepare('INSERT INTO auction_drafts (admin_user_id, category_id, item_name, item_description, condition_grade, starting_bid, reserve_price, bid_increment, start_at, end_at, draft_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'draft\')');
+        $insertStmt = $conn->prepare('INSERT INTO auction_drafts (admin_user_id, category_id, item_name, item_description, condition_grade, starting_bid, reserve_price, bid_increment, start_at, end_at, draft_status, use_new_category, new_category_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'draft\', ?, ?)');
         if (!$insertStmt) {
             throw new Exception('Failed to prepare draft insert');
         }
         $insertStmt->bind_param(
-            'iisssdddss',
+            'iisssdddssss',
             $adminUserId,
             $categoryId,
             $itemName,
@@ -267,7 +280,9 @@ try {
             $reservePrice,
             $bidIncrement,
             $startAt,
-            $endAt
+            $endAt,
+            $useNewCategory,
+            $newCategoryName
         );
         $insertStmt->execute();
         $draftId = (int)$insertStmt->insert_id;

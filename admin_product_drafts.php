@@ -884,6 +884,21 @@ if ($role !== 'admin') {
 
 		.swal-btn.secondary:hover { background: #e9edf4; }
 
+		/* Modal category status styles */
+		#mCategoryStatus {
+			border-radius: 8px;
+			font-size: 13px;
+			font-weight: 600;
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			padding: 8px 10px;
+			margin-top: 8px;
+		}
+		#mCategoryStatus.available { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+		#mCategoryStatus.unavailable { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+		#mCategoryStatus.checking { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+
 		@media (max-width: 780px) {
 			.page {
 				width: calc(100% - 24px);
@@ -993,7 +1008,8 @@ if ($role !== 'admin') {
 									<button type="button" class="new-cat-btn" onclick="setCategoryMode(true)">+ New Category</button>
 								</div>
 								<div id="newCategoryBox" class="hidden">
-									<input id="newCategoryName" class="input" type="text" placeholder="Enter new category name">
+									<input id="mNewCategoryName" class="input" type="text" placeholder="Enter new category name">
+									<div id="mCategoryStatus" style="display:none;"></div>
 									<div style="margin-top:8px;">
 										<button type="button" class="new-cat-btn" onclick="setCategoryMode(false)">Use Existing Category</button>
 									</div>
@@ -1068,6 +1084,11 @@ if ($role !== 'admin') {
 		let modalPinnedImageKey = '';
 		let modalPendingVideoPreviewUrl = '';
 
+		// Modal category validation state
+		let modalCategoryValidationState = null; // 'available' | 'unavailable' | null
+		let modalCategoryCheckTimeout = null;
+
+
 		function getMainImageCount() {
 			const existingImages = Array.isArray(modalDraft?.media?.images) ? modalDraft.media.images : [];
 			const keptExistingCount = existingImages.filter((_, idx) => !modalMainImageStates[String(idx)]).length;
@@ -1129,6 +1150,68 @@ if ($role !== 'admin') {
 			URL.revokeObjectURL(modalPendingVideoPreviewUrl);
 			modalPendingVideoPreviewUrl = '';
 		}
+
+		async function checkModalCategoryNameExists(categoryName) {
+			const trimmed = String(categoryName || '').trim();
+			if (trimmed.length < 4) return null;
+			try {
+				const res = await fetch(`api/check-category-name.php?category_name=${encodeURIComponent(trimmed)}`, { cache: 'no-store' });
+				const data = await res.json();
+				return data.success ? data.exists : null;
+			} catch (e) {
+				console.error('Modal category check failed', e);
+				return null;
+			}
+		}
+
+		function updateModalCategoryStatus(state, message) {
+			const el = byId('mCategoryStatus');
+			if (!el) return;
+			modalCategoryValidationState = state;
+			el.className = state || '';
+			el.textContent = message || '';
+			el.style.display = state ? 'flex' : 'none';
+			updateModalPublishButtonState();
+		}
+
+		function updateModalPublishButtonState() {
+			const publishBtn = byId('btnPublish');
+			if (!publishBtn) return;
+			if (modalUseNewCategory) {
+				publishBtn.disabled = modalCategoryValidationState !== 'available';
+			} else {
+				publishBtn.disabled = false;
+			}
+		}
+
+		function handleModalCategoryInput(event) {
+			const input = event.target;
+			const name = String(input.value || '').trim();
+			if (modalCategoryCheckTimeout) clearTimeout(modalCategoryCheckTimeout);
+			if (!name) {
+				updateModalCategoryStatus(null, '');
+				modalCategoryValidationState = null;
+				updateModalPublishButtonState();
+				return;
+			}
+			if (name.length < 4) {
+				updateModalCategoryStatus('unavailable', '❌ Category name must be at least 4 characters');
+				return;
+			}
+			updateModalCategoryStatus('checking', '⏳ Checking availability...');
+			modalCategoryCheckTimeout = setTimeout(async () => {
+				const exists = await checkModalCategoryNameExists(name);
+				if (exists === null) {
+					updateModalCategoryStatus(null, '');
+					modalCategoryValidationState = null;
+				} else if (exists) {
+					updateModalCategoryStatus('unavailable', '❌ This category already exists');
+				} else {
+					updateModalCategoryStatus('available', '✓ Category name is available');
+				}
+			}, 500);
+		}
+
 
 		function renderModalVideoManager() {
 			const input = byId('mVideoInput');
@@ -1776,6 +1859,10 @@ if ($role !== 'admin') {
 			renderModalVideoManager();
 			
 			renderImageStrip();
+			// Trigger category validation when opening a draft using new category
+			if (modalUseNewCategory && mNewCategoryNameEl && mNewCategoryNameEl.value.trim()) {
+				handleModalCategoryInput({ target: mNewCategoryNameEl });
+			}
 		}
 
 		function openModal() {
@@ -1970,6 +2057,13 @@ if ($role !== 'admin') {
 			const err = validateModalForm(true);
 			if (err) {
 				setStatus(err, true);
+				return;
+			}
+
+			// If using new category, ensure it's available
+			if (modalUseNewCategory && modalCategoryValidationState !== 'available') {
+				setStatus('Please enter an available category name before publishing.', true);
+				await showLocalSweetAlert('error', 'Invalid Category', 'Please enter an available category name before publishing.');
 				return;
 			}
 
@@ -2299,6 +2393,10 @@ if ($role !== 'admin') {
 		byId('mVideoInput')?.addEventListener('change', () => {
 			renderModalVideoManager();
 		});
+
+		// Wire modal category input live validation
+		const modalCategoryInput = byId('mNewCategoryName');
+		if (modalCategoryInput) modalCategoryInput.addEventListener('input', handleModalCategoryInput);
 
 		window.addEventListener('resize', () => {
 			updatePageSize();

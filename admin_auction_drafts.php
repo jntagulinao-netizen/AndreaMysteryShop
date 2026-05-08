@@ -235,6 +235,19 @@ if ($role !== 'admin') {
       return true;
     }
 
+    async function checkCategoryNameExists(name) {
+      const trimmed = String(name || '').trim();
+      if (trimmed.length < 4) return { ok: false, reason: 'minlength' };
+      try {
+        const res = await fetch(`api/check-category-name.php?category_name=${encodeURIComponent(trimmed)}`, { cache: 'no-store' });
+        const data = await res.json();
+        if (!res.ok || !data.success) return { ok: false, reason: 'error' };
+        return { ok: !data.exists, reason: data.exists ? 'exists' : 'available' };
+      } catch (e) {
+        return { ok: false, reason: 'error' };
+      }
+    }
+
     function formatCurrency(value) {
       if (value === null || value === undefined || Number.isNaN(Number(value))) return 'N/A';
       return `PHP ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -283,15 +296,37 @@ if ($role !== 'admin') {
 
         const info = document.createElement('div');
         info.className = 'info';
-        info.innerHTML = `
-          <div>Category: ${draft.category_name || 'No Category'}</div>
-          <div>Start bid: ${formatCurrency(draft.starting_bid)}</div>
-          <div>Reserve: ${formatCurrency(draft.reserve_price)}</div>
-          <div>Increment: ${formatCurrency(draft.bid_increment)}</div>
-          <div>Start: ${formatDate(draft.start_at)}</div>
-          <div>End: ${formatDate(draft.end_at)}</div>
-          <div>Updated: ${formatDate(draft.updated_at)}</div>
-        `;
+          info.innerHTML = `
+            <div>Start: ${String(draft.start_at || 'N/A')}</div>
+            <div>End: ${String(draft.end_at || 'N/A')}</div>
+            <div>Starting bid: ${formatCurrency(draft.starting_bid)}</div>
+            <div>Category: ${String(draft.category_name || draft.new_category_name || 'No category')}</div>
+          `;
+
+          // If draft has a new category name, add availability badge and check
+          if (draft.new_category_name && String(draft.new_category_name).trim()) {
+            const badge = document.createElement('div');
+            badge.style.marginTop = '6px';
+            badge.textContent = 'Checking category...';
+            badge.className = 'category-badge';
+            info.appendChild(badge);
+            (async () => {
+              const chk = await checkCategoryNameExists(draft.new_category_name);
+              if (chk.ok) {
+                badge.textContent = 'New category available';
+                badge.style.color = '#166534';
+              } else if (chk.reason === 'minlength') {
+                badge.textContent = 'Category name too short (min 4)';
+                badge.style.color = '#b91c1c';
+              } else if (chk.reason === 'exists') {
+                badge.textContent = 'Category already exists';
+                badge.style.color = '#b91c1c';
+              } else {
+                badge.textContent = 'Category check failed';
+                badge.style.color = '#b91c1c';
+              }
+            })();
+          }
 
         const actions = document.createElement('div');
         actions.className = 'actions';
@@ -344,6 +379,21 @@ if ($role !== 'admin') {
           } catch (err) {
             showAlert('error', 'Schedule Check Failed', err.message || 'Unable to validate draft schedule');
             return;
+          }
+
+          // If draft contains a new category, validate availability before publishing
+          if (draft.new_category_name && String(draft.new_category_name).trim()) {
+            const chk = await checkCategoryNameExists(draft.new_category_name);
+            if (!chk.ok) {
+              if (chk.reason === 'minlength') {
+                showAlert('warning', 'Category Name', 'Draft uses a new category name that is too short (min 4 characters). Please edit the draft first.');
+              } else if (chk.reason === 'exists') {
+                showAlert('warning', 'Category Name', 'Draft uses a new category name that already exists. Please edit the draft first.');
+              } else {
+                showAlert('error', 'Category Check Failed', 'Unable to validate draft category name. Try again later.');
+              }
+              return;
+            }
           }
 
           try {

@@ -39,7 +39,7 @@ try {
         throw new Exception('Auction checkout update is not installed. Run docs/AUCTION_WINNER_CHECKOUT_UPDATES.sql first.');
     }
 
-    $draftStmt = $conn->prepare('SELECT draft_id, admin_user_id, category_id, item_name, item_description, condition_grade, starting_bid, reserve_price, bid_increment, start_at, end_at FROM auction_drafts WHERE draft_id = ? AND admin_user_id = ? LIMIT 1');
+    $draftStmt = $conn->prepare('SELECT draft_id, admin_user_id, category_id, item_name, item_description, condition_grade, starting_bid, reserve_price, bid_increment, start_at, end_at, use_new_category, new_category_name FROM auction_drafts WHERE draft_id = ? AND admin_user_id = ? LIMIT 1');
     if (!$draftStmt) {
         throw new Exception('Failed to prepare draft lookup');
     }
@@ -113,7 +113,40 @@ try {
         throw new Exception('Another auction already overlaps with this schedule. Choose a different time slot.');
     }
 
+    // Handle new category creation (only on publish, not on draft save)
     $listingCategoryId = $draft['category_id'] !== null ? (int)$draft['category_id'] : 0;
+    $useNewCategory = (int)($draft['use_new_category'] ?? 0);
+    $newCategoryName = trim((string)($draft['new_category_name'] ?? ''));
+
+    if ($useNewCategory && $newCategoryName !== '') {
+        if (strlen($newCategoryName) < 4) {
+            throw new Exception('Category name must be at least 4 characters');
+        }
+        // Check if category already exists (case-insensitive)
+        $chkStmt = $conn->prepare('SELECT category_id FROM categories WHERE LOWER(category_name) = LOWER(?) LIMIT 1');
+        if ($chkStmt) {
+            $chkStmt->bind_param('s', $newCategoryName);
+            $chkStmt->execute();
+            $chkRes = $chkStmt->get_result();
+            $row = $chkRes ? $chkRes->fetch_assoc() : null;
+            $chkStmt->close();
+            if ($row && isset($row['category_id'])) {
+                $listingCategoryId = (int)$row['category_id'];
+            } else {
+                // Create new category
+                $insCat = $conn->prepare('INSERT INTO categories (category_name) VALUES (?)');
+                if (!$insCat) {
+                    throw new Exception('Failed to create category');
+                }
+                $insCat->bind_param('s', $newCategoryName);
+                $insCat->execute();
+                $listingCategoryId = (int)$insCat->insert_id;
+                $insCat->close();
+            }
+        }
+    }
+
+    // If no category assigned and not using new category, use fallback
     if ($listingCategoryId <= 0) {
         $fallbackCategoryStmt = $conn->prepare('SELECT category_id FROM categories ORDER BY category_id ASC LIMIT 1');
         if ($fallbackCategoryStmt) {

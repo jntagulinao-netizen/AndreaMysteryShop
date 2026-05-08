@@ -385,6 +385,72 @@ if ($currentView === 'archived') {
       background: #fff;
     }
     .edit-form-group textarea { min-height: 120px; resize: vertical; }
+    .category-management {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+      padding: 10px;
+      border: 1px solid #eceff3;
+      border-radius: 10px;
+      background: #fafbfd;
+    }
+    .category-management-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .category-management-row input {
+      flex: 1;
+      min-width: 200px;
+    }
+    .category-management-row input.is-valid {
+      border-color: #2e7d32;
+      box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.10);
+    }
+    .category-management-row input.is-invalid {
+      border-color: #b42318;
+      box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.10);
+    }
+    .category-indicator {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: #eef2f7;
+      color: #64748b;
+      font-size: 14px;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+    .category-indicator.valid {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    .category-indicator.invalid {
+      background: #ffebee;
+      color: #b42318;
+    }
+    .category-management-status {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.4;
+    }
+    .edit-btn.danger {
+      background: #fff4f4;
+      border-color: #f6c4c4;
+      color: #b42318;
+    }
+    .edit-btn.danger:hover {
+      background: #ffecec;
+      border-color: #ef9a9a;
+    }
+    .edit-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
     .edit-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
     .edit-btn {
       border: 1px solid #ddd;
@@ -1260,6 +1326,15 @@ if ($currentView === 'archived') {
                 <div class="edit-form-group">
                   <label for="editProductCategory">Category</label>
                   <select id="editProductCategory" required></select>
+                  <div class="category-management">
+                    <div class="category-management-row">
+                      <span id="categoryNameIndicator" class="category-indicator">?</span>
+                      <input type="text" id="editCategoryName" placeholder="Rename selected category">
+                      <button type="button" class="edit-btn primary" id="renameCategoryBtn" onclick="renameSelectedCategory()" disabled>Save Name</button>
+                      <button type="button" class="edit-btn danger" id="deleteCategoryBtn" onclick="deleteSelectedCategory()">Delete Empty Category</button>
+                    </div>
+                    <div id="categoryManagerStatus" class="category-management-status">Select a category to rename or delete it.</div>
+                  </div>
                 </div>
 
                 <div class="edit-form-group">
@@ -1346,6 +1421,9 @@ if ($currentView === 'archived') {
     let currentSearchQuery = '';
     let currentSortMode = '';
     let categoryOptions = [];
+    let adminCategoryOptions = [];
+    let categoryRenameValidationTimeout = null;
+    let categoryRenameValidationState = null;
     let activeModalTab = 'reviews';
     let reviewMediaMap = {};
     let currentEditingVariants = [];
@@ -1667,6 +1745,267 @@ if ($currentView === 'archived') {
       const amount = Number(value || 0);
       if (!Number.isFinite(amount)) return '0';
       return amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    function getCategoryUsageCount(category) {
+      if (!category || typeof category !== 'object') return 0;
+      return Number(category.usage_count || 0)
+        || (Number(category.product_count || 0) + Number(category.product_draft_count || 0) + Number(category.auction_count || 0) + Number(category.auction_draft_count || 0));
+    }
+
+    function formatAdminCategoryLabel(category) {
+      if (!category) return 'Category';
+      const name = String(category.category_name || 'Category');
+      const id = Number(category.category_id || 0);
+      const usageCount = getCategoryUsageCount(category);
+      const usageLabel = usageCount > 0 ? ` · used ${usageCount}` : ' · empty';
+      return `${name} (#${id})${usageLabel}`;
+    }
+
+    function updateCategoryManagerStatus(message, tone = 'muted') {
+      const status = document.getElementById('categoryManagerStatus');
+      if (!status) return;
+      status.textContent = message || '';
+      status.style.color = tone === 'danger' ? '#b42318' : tone === 'success' ? '#166534' : '#64748b';
+    }
+
+    function getSelectedAdminCategory() {
+      const categorySelect = document.getElementById('editProductCategory');
+      if (!categorySelect) return null;
+      const categoryId = Number(categorySelect.value || 0);
+      if (!categoryId) return null;
+      return adminCategoryOptions.find((cat) => Number(cat.category_id) === categoryId) || null;
+    }
+
+    function setCategoryRenameValidation(state, message) {
+      const nameInput = document.getElementById('editCategoryName');
+      const renameBtn = document.getElementById('renameCategoryBtn');
+      const indicator = document.getElementById('categoryNameIndicator');
+      if (!nameInput || !renameBtn || !indicator) return;
+
+      categoryRenameValidationState = state;
+      const isValid = state === 'valid';
+      nameInput.classList.toggle('is-valid', isValid);
+      nameInput.classList.toggle('is-invalid', state === 'invalid');
+      indicator.className = `category-indicator ${state === 'valid' ? 'valid' : state === 'invalid' ? 'invalid' : ''}`.trim();
+      indicator.textContent = state === 'valid' ? '✓' : state === 'invalid' ? '✗' : '?';
+      renameBtn.disabled = !isValid;
+      if (message !== undefined) {
+        updateCategoryManagerStatus(message, state === 'valid' ? 'success' : state === 'invalid' ? 'danger' : 'muted');
+      }
+    }
+
+    function validateCategoryRenameInput() {
+      const nameInput = document.getElementById('editCategoryName');
+      const selectedCategory = getSelectedAdminCategory();
+      if (!nameInput) return;
+
+      const newName = (nameInput.value || '').trim();
+      if (!selectedCategory) {
+        setCategoryRenameValidation('neutral', 'Select a category to rename or delete it.');
+        return;
+      }
+
+      if (newName === '') {
+        setCategoryRenameValidation('neutral', 'Enter a new category name to enable Save Name.');
+        return;
+      }
+
+      if (newName.length < 4) {
+        setCategoryRenameValidation('invalid', 'Category name must be at least 4 characters.');
+        return;
+      }
+
+      if (newName.toLowerCase() === String(selectedCategory.category_name || '').trim().toLowerCase()) {
+        setCategoryRenameValidation('neutral', 'Edit the name to enable Save Name.');
+        return;
+      }
+
+      const duplicate = adminCategoryOptions.find((cat) => {
+        return Number(cat.category_id) !== Number(selectedCategory.category_id)
+          && String(cat.category_name || '').trim().toLowerCase() === newName.toLowerCase();
+      });
+
+      if (duplicate) {
+        setCategoryRenameValidation('invalid', '✗ Category already exists');
+        return;
+      }
+
+      setCategoryRenameValidation('valid', '✓ Category name available');
+    }
+
+    function handleCategoryRenameInput() {
+      if (categoryRenameValidationTimeout) {
+        clearTimeout(categoryRenameValidationTimeout);
+      }
+      setCategoryRenameValidation('neutral', 'Checking category name...');
+      categoryRenameValidationTimeout = setTimeout(validateCategoryRenameInput, 200);
+    }
+
+    function syncCategoryManagerFromSelection() {
+      const categorySelect = document.getElementById('editProductCategory');
+      const nameInput = document.getElementById('editCategoryName');
+      const renameBtn = document.getElementById('renameCategoryBtn');
+      const deleteBtn = document.getElementById('deleteCategoryBtn');
+      const indicator = document.getElementById('categoryNameIndicator');
+      if (!categorySelect || !nameInput || !renameBtn || !deleteBtn) return;
+
+      const categoryId = Number(categorySelect.value || 0);
+      const category = adminCategoryOptions.find((cat) => Number(cat.category_id) === categoryId);
+      if (!category) {
+        nameInput.value = '';
+        renameBtn.disabled = true;
+        deleteBtn.disabled = true;
+        if (indicator) {
+          indicator.className = 'category-indicator';
+          indicator.textContent = '?';
+        }
+        updateCategoryManagerStatus('Select a category to rename or delete it.');
+        return;
+      }
+
+      nameInput.value = String(category.category_name || '');
+      const usageCount = getCategoryUsageCount(category);
+      deleteBtn.disabled = usageCount > 0;
+      if (usageCount > 0) {
+        updateCategoryManagerStatus(`This category is used by ${usageCount} item(s), so it cannot be deleted.`, 'danger');
+      } else {
+        updateCategoryManagerStatus('This category is empty and can be deleted.', 'success');
+      }
+      validateCategoryRenameInput();
+    }
+
+    async function loadAdminCategories() {
+      try {
+        const res = await fetch('api/admin-get-categories.php', { cache: 'no-store' });
+        if (!res.ok) {
+          throw new Error('Failed to load categories');
+        }
+        const data = await res.json();
+        if (!data.success || !Array.isArray(data.categories)) {
+          throw new Error(data.error || 'Failed to load categories');
+        }
+        adminCategoryOptions = data.categories;
+      } catch (error) {
+        adminCategoryOptions = [];
+        throw error;
+      }
+    }
+
+    async function renameSelectedCategory() {
+      const categorySelect = document.getElementById('editProductCategory');
+      const nameInput = document.getElementById('editCategoryName');
+      if (!categorySelect || !nameInput) return;
+
+      const categoryId = Number(categorySelect.value || 0);
+      const category = adminCategoryOptions.find((cat) => Number(cat.category_id) === categoryId);
+      const newName = (nameInput.value || '').trim();
+
+      if (!category) {
+        await localAlert('warning', 'Category Required', 'Please select a category first.');
+        return;
+      }
+
+      if (categoryRenameValidationState !== 'valid') {
+        await localAlert('warning', 'Category Name Not Ready', 'Please wait for the available check to pass before saving.');
+        nameInput.focus();
+        return;
+      }
+
+      if (!newName) {
+        await localAlert('warning', 'Category Name Required', 'Enter a new category name.');
+        nameInput.focus();
+        return;
+      }
+
+      if (newName.length < 4) {
+        await localAlert('warning', 'Category Name Too Short', 'Category name must be at least 4 characters.');
+        nameInput.focus();
+        return;
+      }
+
+      const confirmed = await localConfirm('Rename Category', `Rename "${category.category_name}" to "${newName}"?`, 'Rename', 'Cancel');
+      if (!confirmed) return;
+
+      try {
+        const body = new FormData();
+        body.append('action', 'rename');
+        body.append('category_id', String(categoryId));
+        body.append('new_category_name', newName);
+
+        const res = await fetch('api/manage-category.php', {
+          method: 'POST',
+          body
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Failed to rename category');
+        }
+
+        await localAlert('success', 'Category Updated', data.message || 'Category name updated successfully.');
+        await loadAdminCategories();
+        await loadCategories();
+        fillCategoryDropdown(categoryId);
+        syncCategoryManagerFromSelection();
+        const currentCategory = adminCategoryOptions.find((cat) => Number(cat.category_id) === categoryId);
+        if (currentCategory) {
+          const productsWithCategory = products.filter((item) => Number(item.category) === categoryId);
+          productsWithCategory.forEach((item) => {
+            item.categoryName = String(currentCategory.category_name || newName);
+          });
+        }
+        const previewCategory = document.getElementById('previewCategory');
+        if (previewCategory) {
+          previewCategory.textContent = `Category: ${newName}`;
+        }
+      } catch (error) {
+        await localAlert('error', 'Rename Failed', error.message || 'Unable to update category name.');
+      }
+    }
+
+    async function deleteSelectedCategory() {
+      const categorySelect = document.getElementById('editProductCategory');
+      if (!categorySelect) return;
+
+      const categoryId = Number(categorySelect.value || 0);
+      const category = adminCategoryOptions.find((cat) => Number(cat.category_id) === categoryId);
+      if (!category) {
+        await localAlert('warning', 'Category Required', 'Please select a category first.');
+        return;
+      }
+
+      const usageCount = getCategoryUsageCount(category);
+      if (usageCount > 0) {
+        await localAlert('warning', 'Category Not Empty', 'This category is still used by products, drafts, or auctions. It cannot be deleted.');
+        return;
+      }
+
+      const confirmed = await localConfirm('Delete Category', `Delete empty category "${category.category_name}"?`, 'Delete', 'Cancel');
+      if (!confirmed) return;
+
+      try {
+        const body = new FormData();
+        body.append('action', 'delete');
+        body.append('category_id', String(categoryId));
+
+        const res = await fetch('api/manage-category.php', {
+          method: 'POST',
+          body
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Failed to delete category');
+        }
+
+        await localAlert('success', 'Category Deleted', data.message || 'Category deleted successfully.');
+        await loadAdminCategories();
+        await loadCategories();
+        const product = products.find((p) => Number(p.id) === Number(document.getElementById('editProductId').value || 0));
+        fillCategoryDropdown(product ? product.category : 0);
+        syncCategoryManagerFromSelection();
+      } catch (error) {
+        await localAlert('error', 'Delete Failed', error.message || 'Unable to delete category.');
+      }
     }
 
     function goToManageSpecificReview(reviewId, productId) {
@@ -2621,16 +2960,18 @@ if ($currentView === 'archived') {
         return;
       }
 
-      if (!Array.isArray(categoryOptions) || categoryOptions.length === 0) {
+      if (!Array.isArray(adminCategoryOptions) || adminCategoryOptions.length === 0) {
         categorySelect.innerHTML = '<option value="">No categories available</option>';
         return;
       }
 
-      categorySelect.innerHTML = categoryOptions.map((cat) => {
+      categorySelect.innerHTML = adminCategoryOptions.map((cat) => {
         const catId = Number(cat.category_id);
         const selected = Number(selectedCategoryId) === catId ? 'selected' : '';
-        return `<option value="${catId}" ${selected}>${cat.category_name}</option>`;
+        return `<option value="${catId}" ${selected}>${formatAdminCategoryLabel(cat)}</option>`;
       }).join('');
+
+      syncCategoryManagerFromSelection();
     }
 
     async function openProductModal(id) {
@@ -2639,8 +2980,12 @@ if ($currentView === 'archived') {
         return;
       }
 
-      if (categoryOptions.length === 0) {
-        await loadCategories();
+      if (adminCategoryOptions.length === 0) {
+        try {
+          await loadAdminCategories();
+        } catch (error) {
+          await localAlert('warning', 'Category Load Failed', 'The product editor could not load category data, so rename/delete may be unavailable until you reopen it.');
+        }
       }
 
       const image = Array.isArray(product.image) && product.image.length ? product.image[0] : 'https://via.placeholder.com/900x600?text=No+Image';
@@ -2659,6 +3004,15 @@ if ($currentView === 'archived') {
       document.getElementById('editProductPrice').value = Number(product.price || 0).toFixed(2);
       document.getElementById('editProductStock').value = Number(product.stock || 0);
       document.getElementById('editProductDesc').value = product.desc || '';
+      const categorySelect = document.getElementById('editProductCategory');
+      if (categorySelect) {
+        categorySelect.onchange = syncCategoryManagerFromSelection;
+      }
+      const categoryNameInput = document.getElementById('editCategoryName');
+      if (categoryNameInput) {
+        categoryNameInput.oninput = handleCategoryRenameInput;
+        categoryNameInput.onkeyup = handleCategoryRenameInput;
+      }
       const imageInput = document.getElementById('editProductImage');
       if (imageInput) {
         imageInput.value = '';
@@ -2705,6 +3059,7 @@ if ($currentView === 'archived') {
       }
       closeEditActionsDropdown();
       fillCategoryDropdown(product.category);
+      syncCategoryManagerFromSelection();
       
       const variants = loadVariantsForProduct(product.id, product.name, product.category);
       renderVariantsEditSection(variants);
@@ -3137,6 +3492,7 @@ if ($currentView === 'archived') {
             parent_product_id: p.parent_product_id || null,
             archived: Number(p.archived || 0),
             featured: Number(p.featured || 0),
+            isAuctionProduct: Number(p.is_auction_product || 0),
             name: p.name,
             price: Number(p.price || 0).toFixed(2),
             originalPrice: p.original_price ? Number(p.original_price).toFixed(2) : null,
@@ -3153,7 +3509,7 @@ if ($currentView === 'archived') {
         });
 
         if (currentView === 'archived') {
-          products = allProducts.filter((p) => Number(p.archived) === 1);
+          products = allProducts.filter((p) => Number(p.archived) === 1 && Number(p.isAuctionProduct || 0) !== 1);
         } else if (currentView === 'featured') {
           products = allProducts.filter((p) => Number(p.archived) === 0 && Number(p.featured) === 1);
         } else {

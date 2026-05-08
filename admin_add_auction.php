@@ -144,6 +144,23 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
+    .hidden {
+      display: none !important;
+    }
+    /* Category status */
+    #aCategoryStatus {
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      margin-top: 8px;
+    }
+    #aCategoryStatus.available { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+    #aCategoryStatus.unavailable { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+    #aCategoryStatus.checking { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
     .hint {
       margin-top: 6px;
       font-size: 12px;
@@ -300,8 +317,16 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         </div>
         <div>
           <label class="label" for="categoryId">Category (optional)</label>
-          <select class="select" id="categoryId"></select>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select class="select" id="categoryId" style="flex:1"></select>
+            <button type="button" class="mini-btn" onclick="toggleAuctionCategoryMode(true)">+ New</button>
+          </div>
           <div class="field-guide">Category helps users find this auction faster in filters and search results.</div>
+          <div id="newCategoryBox" class="hidden">
+            <input id="aNewCategoryName" class="input" type="text" placeholder="Enter new category name">
+            <div id="aCategoryStatus" style="display:none;"></div>
+            <div style="margin-top:8px;"><button type="button" class="mini-btn" onclick="toggleAuctionCategoryMode(false)">Use Existing</button></div>
+          </div>
         </div>
       </div>
 
@@ -533,6 +558,14 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         return false;
       }
 
+      // If using a new category, ensure it has been validated and is available
+      const usingNewCategory = !byId('newCategoryBox')?.classList.contains('hidden');
+      if (usingNewCategory && aCategoryValidationState !== 'available') {
+        await showAlert('warning', 'Category Name', 'Please provide a valid, available category name (min 4 characters).');
+        byId('aNewCategoryName').focus();
+        return false;
+      }
+
       return true;
     }
 
@@ -561,6 +594,67 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       } catch (err) {
         // Keep default option only when categories fail to load.
       }
+    }
+
+    // Auction category live-check state (moved to top-level scope so UI can call the functions)
+    let aCategoryValidationState = null; // 'available'|'unavailable'|'checking'|null
+    let aCategoryCheckTimeout = null;
+
+    function toggleAuctionCategoryMode(useNew) {
+      const box = byId('newCategoryBox');
+      if (!box) return;
+      box.classList.toggle('hidden', !useNew);
+      const st = byId('aCategoryStatus'); if (st) st.style.display = 'none';
+      aCategoryValidationState = null;
+      updateAuctionPublishState();
+    }
+
+    async function checkAuctionCategoryNameExists(name) {
+      const trimmed = String(name || '').trim();
+      if (trimmed.length < 4) return null;
+      try {
+        const res = await fetch('api/check-category-name.php?category_name=' + encodeURIComponent(trimmed), { cache: 'no-store' });
+        const data = await res.json();
+        return data.success ? data.exists : null;
+      } catch (e) {
+        console.error('Category check error', e);
+        return null;
+      }
+    }
+
+    function updateAuctionCategoryStatus(state, message) {
+      const el = byId('aCategoryStatus');
+      if (!el) return;
+      aCategoryValidationState = state;
+      el.className = state || '';
+      el.textContent = message || '';
+      el.style.display = state ? 'flex' : 'none';
+      updateAuctionPublishState();
+    }
+
+    function updateAuctionPublishState() {
+      const pub = byId('publishBtn');
+      if (!pub) return;
+      const usingNew = !byId('newCategoryBox')?.classList.contains('hidden');
+      if (usingNew) {
+        pub.disabled = aCategoryValidationState !== 'available';
+      } else {
+        pub.disabled = false;
+      }
+    }
+
+    function handleAuctionCategoryInput(e) {
+      const name = String(e.target.value || '').trim();
+      if (aCategoryCheckTimeout) clearTimeout(aCategoryCheckTimeout);
+      if (!name) { updateAuctionCategoryStatus(null,''); return; }
+      if (name.length < 4) { updateAuctionCategoryStatus('unavailable','❌ Category name must be at least 4 characters'); return; }
+      updateAuctionCategoryStatus('checking','⏳ Checking availability...');
+      aCategoryCheckTimeout = setTimeout(async () => {
+        const exists = await checkAuctionCategoryNameExists(name);
+        if (exists === null) { updateAuctionCategoryStatus(null,''); }
+        else if (exists) updateAuctionCategoryStatus('unavailable','❌ This category already exists');
+        else updateAuctionCategoryStatus('available','✓ Category name is available');
+      }, 500);
     }
 
     function renderExistingMedia(draft) {
@@ -729,7 +823,16 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       byId('itemName').value = draft.item_name || '';
       byId('itemDescription').value = draft.item_description || '';
       byId('conditionGrade').value = draft.condition_grade || '';
-      byId('categoryId').value = draft.category_id || '';
+      // If draft saved with a new category, show new category box
+      if (draft.use_new_category || (draft.new_category_name && String(draft.new_category_name).trim())) {
+        toggleAuctionCategoryMode(true);
+        const aIn = byId('aNewCategoryName'); if (aIn) aIn.value = draft.new_category_name || '';
+        // trigger validation for loaded name
+        if (aIn) handleAuctionCategoryInput({ target: aIn });
+      } else {
+        toggleAuctionCategoryMode(false);
+        byId('categoryId').value = draft.category_id || '';
+      }
       byId('startingBid').value = draft.starting_bid || '';
       byId('reservePrice').value = draft.reserve_price || '';
       byId('bidIncrement').value = draft.bid_increment || '';
@@ -772,7 +875,17 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         body.append('item_name', byId('itemName').value.trim());
         body.append('item_description', byId('itemDescription').value.trim());
         body.append('condition_grade', byId('conditionGrade').value);
-        body.append('category_id', byId('categoryId').value);
+        // Category: support selecting existing or creating new
+        const usingNew = !byId('newCategoryBox')?.classList.contains('hidden');
+        if (usingNew) {
+          body.append('category_id', '');
+          body.append('use_new_category', '1');
+          body.append('new_category_name', byId('aNewCategoryName').value.trim());
+        } else {
+          body.append('category_id', byId('categoryId').value);
+          body.append('use_new_category', '0');
+          body.append('new_category_name', '');
+        }
         body.append('starting_bid', byId('startingBid').value.trim());
         body.append('reserve_price', byId('reservePrice').value.trim());
         body.append('bid_increment', byId('bidIncrement').value.trim());
@@ -875,6 +988,8 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       bindLocalMediaPreviews();
       await loadCategories();
       await loadDraft();
+      // wire auction new-category input
+      const aIn = byId('aNewCategoryName'); if (aIn) aIn.addEventListener('input', handleAuctionCategoryInput);
     })();
   </script>
 </body>

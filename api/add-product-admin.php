@@ -409,6 +409,10 @@ try {
             throw new Exception('New category name is required');
         }
 
+        if (strlen($newCategoryName) < 4) {
+            throw new Exception('Category name must be at least 4 characters');
+        }
+
         $findCategoryStmt = $conn->prepare('SELECT category_id FROM categories WHERE LOWER(category_name) = LOWER(?) LIMIT 1');
         if (!$findCategoryStmt) {
             throw new Exception('Failed to prepare category lookup');

@@ -56,7 +56,7 @@ function fetchMedia(mysqli $conn, int $draftId): array {
 
 try {
     if ($draftId > 0) {
-        $stmt = $conn->prepare('SELECT draft_id, category_id, item_name, item_description, condition_grade, starting_bid, reserve_price, bid_increment, start_at, end_at, draft_status, created_at, updated_at FROM auction_drafts WHERE draft_id = ? AND admin_user_id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT draft_id, category_id, item_name, item_description, condition_grade, starting_bid, reserve_price, bid_increment, start_at, end_at, draft_status, created_at, updated_at, use_new_category, new_category_name FROM auction_drafts WHERE draft_id = ? AND admin_user_id = ? LIMIT 1');
         if (!$stmt) {
             throw new Exception('Failed to prepare draft lookup');
         }
@@ -86,6 +86,8 @@ try {
             'draft_status' => (string)($row['draft_status'] ?? 'draft'),
             'created_at' => $row['created_at'] ?? null,
             'updated_at' => $row['updated_at'] ?? null,
+            'use_new_category' => (int)($row['use_new_category'] ?? 0),
+            'new_category_name' => (string)($row['new_category_name'] ?? ''),
             'media' => fetchMedia($conn, (int)$row['draft_id'])
         ];
 
@@ -93,7 +95,7 @@ try {
         exit;
     }
 
-    $stmt = $conn->prepare('SELECT d.draft_id, d.item_name, d.starting_bid, d.reserve_price, d.bid_increment, d.start_at, d.end_at, d.updated_at, d.draft_status, c.category_name FROM auction_drafts d LEFT JOIN categories c ON c.category_id = d.category_id WHERE d.admin_user_id = ? ORDER BY d.updated_at DESC, d.draft_id DESC');
+    $stmt = $conn->prepare('SELECT d.draft_id, d.item_name, d.starting_bid, d.reserve_price, d.bid_increment, d.start_at, d.end_at, d.updated_at, d.draft_status, c.category_name, d.use_new_category, d.new_category_name FROM auction_drafts d LEFT JOIN categories c ON c.category_id = d.category_id WHERE d.admin_user_id = ? ORDER BY d.updated_at DESC, d.draft_id DESC');
     if (!$stmt) {
         throw new Exception('Failed to prepare drafts list');
     }
@@ -119,6 +121,7 @@ try {
             'draft_id' => (int)$row['draft_id'],
             'item_name' => (string)($row['item_name'] ?? ''),
             'category_name' => (string)($row['category_name'] ?? 'No Category'),
+            'new_category_name' => (string)($row['new_category_name'] ?? ''),
             'starting_bid' => $row['starting_bid'] !== null ? (float)$row['starting_bid'] : null,
             'reserve_price' => $row['reserve_price'] !== null ? (float)$row['reserve_price'] : null,
             'bid_increment' => $row['bid_increment'] !== null ? (float)$row['bid_increment'] : null,

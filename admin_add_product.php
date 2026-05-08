@@ -424,6 +424,32 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
     }
     .swal-btn.secondary:hover { background: #e9edf4; }
 
+    #categoryStatus {
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      margin-top: 8px;
+    }
+    #categoryStatus.available {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+    }
+    #categoryStatus.unavailable {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ffcdd2;
+    }
+    #categoryStatus.checking {
+      background: #e3f2fd;
+      color: #1565c0;
+      border: 1px solid #bbdefb;
+    }
+
     @media (max-width: 700px) {
       .screen { width: calc(100% - 24px); }
       .topbar { width: calc(100% - 24px); }
@@ -479,6 +505,7 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
           </div>
           <div id="newCategoryBox" class="hidden">
             <input id="newCategoryName" class="input" type="text" placeholder="Enter new category name">
+            <div id="categoryStatus" style="margin-top: 8px; display: none; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;"></div>
             <div style="margin-top:8px;">
               <button type="button" class="new-cat-btn" onclick="toggleCategoryMode(false)">Use Existing Category</button>
             </div>
@@ -544,6 +571,10 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
     let existingVariantImageMap = {};
     let variantTempIdCounter = 1;
     let variantsList = [];
+    
+    // Category validation state
+    let categoryValidationState = null; // 'available', 'unavailable', or null
+    let categoryCheckTimeout = null;
 
     function byId(id) {
       return document.getElementById(id);
@@ -670,6 +701,102 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       useNewCategory = !!newMode;
       byId('existingCategoryBox').classList.toggle('hidden', useNewCategory);
       byId('newCategoryBox').classList.toggle('hidden', !useNewCategory);
+      
+      // Clear category validation when switching modes
+      if (!useNewCategory) {
+        categoryValidationState = null;
+        updatePublishButtonState();
+        const statusEl = byId('categoryStatus');
+        if (statusEl) statusEl.style.display = 'none';
+      }
+    }
+
+    async function checkCategoryNameExists(categoryName) {
+      const trimmed = categoryName.trim();
+      if (trimmed.length < 4) {
+        return null;
+      }
+      
+      try {
+        const response = await fetch(`api/check-category-name.php?category_name=${encodeURIComponent(trimmed)}`, {
+          cache: 'no-store'
+        });
+        const data = await response.json();
+        return data.success ? data.exists : null;
+      } catch (err) {
+        console.error('Category check error:', err);
+        return null;
+      }
+    }
+
+    function updateCategoryStatus(state, message) {
+      const statusEl = byId('categoryStatus');
+      if (!statusEl) return;
+      
+      categoryValidationState = state;
+      statusEl.className = `${state}`;
+      statusEl.innerHTML = message;
+      statusEl.style.display = state ? 'flex' : 'none';
+      
+      updatePublishButtonState();
+    }
+
+    function updatePublishButtonState() {
+      const publishBtn = byId('publishBtn');
+      if (!publishBtn) return;
+      
+      // If using new category, check validation state
+      if (useNewCategory) {
+        const isValid = categoryValidationState === 'available';
+        publishBtn.disabled = !isValid;
+      } else {
+        // If using existing category, enable button
+        publishBtn.disabled = false;
+      }
+    }
+
+    async function handleCategoryNameInput(event) {
+      const input = event.target;
+      const categoryName = input.value.trim();
+      
+      // Clear previous timeout
+      if (categoryCheckTimeout) {
+        clearTimeout(categoryCheckTimeout);
+      }
+      
+      const statusEl = byId('categoryStatus');
+      if (!statusEl) return;
+      
+      // If empty, hide status
+      if (!categoryName) {
+        statusEl.style.display = 'none';
+        categoryValidationState = null;
+        updatePublishButtonState();
+        return;
+      }
+      
+      if (categoryName.length < 4) {
+        updateCategoryStatus('unavailable', '❌ Category name must be at least 4 characters');
+        return;
+      }
+      
+      // Show checking state
+      updateCategoryStatus('checking', '⏳ Checking availability...');
+      
+      // Debounce the API call
+      categoryCheckTimeout = setTimeout(async () => {
+        const exists = await checkCategoryNameExists(categoryName);
+        
+        if (exists === null) {
+          // Error checking
+          statusEl.style.display = 'none';
+          categoryValidationState = null;
+        } else if (exists) {
+          updateCategoryStatus('unavailable', '❌ This category already exists');
+        } else {
+          updateCategoryStatus('available', '✓ Category name is available');
+        }
+      }, 500); // 500ms debounce
     }
 
     function getFileKey(file) {
@@ -1332,6 +1459,11 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
 
       renderImagePreview();
       showVideoName();
+      
+      // If using new category, trigger validation check
+      if (useNewCategory && newCategoryNameEl && newCategoryNameEl.value.trim()) {
+        handleCategoryNameInput({ target: newCategoryNameEl });
+      }
     }
 
     async function loadDraftFromServer(draftId) {
@@ -1418,6 +1550,12 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       const error = validateForm();
       if (error) {
         await showLocalSweetAlert('error', 'Validation Error', error);
+        return;
+      }
+
+      // If using new category, verify it's available
+      if (useNewCategory && categoryValidationState !== 'available') {
+        await showLocalSweetAlert('error', 'Invalid Category', 'Please select an available category name.');
         return;
       }
 
@@ -1558,6 +1696,11 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
     const videoInput = byId('videoInput');
     if (videoInput) {
       videoInput.addEventListener('change', showVideoName);
+    }
+
+    const categoryInput = byId('newCategoryName');
+    if (categoryInput) {
+      categoryInput.addEventListener('input', handleCategoryNameInput);
     }
 
     loadCategories().then(async () => {
