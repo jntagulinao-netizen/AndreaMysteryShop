@@ -388,7 +388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $flash = $_SESSION['admin_flash'] ?? null;
 unset($_SESSION['admin_flash']);
-$allowedStatuses = ['all', 'pending', 'processing', 'shipped', 'delivered', 'reviewed', 'cancelled', 'archived', 'bin'];
+$allowedStatuses = ['all', 'pending', 'processing', 'shipped', 'delivered', 'completed', 'reviewed', 'cancelled', 'archived', 'bin'];
 $initialStatus = $_GET['status'] ?? 'all';
 if (!in_array($initialStatus, $allowedStatuses, true)) {
   $initialStatus = 'all';
@@ -1125,6 +1125,7 @@ $statusDisplay = [
         <button class="tab" data-status="pickedup" onclick="filterByStatus('pickedup')">Picked Up</button>
         <button class="tab" data-status="shipped" onclick="filterByStatus('shipped')">To receive</button>
         <button class="tab" data-status="delivered" onclick="filterByStatus('delivered')">Delivered</button>
+        <button class="tab" data-status="completed" onclick="filterByStatus('completed')">Completed</button>
         <button class="tab" data-status="reviewed" onclick="filterByStatus('reviewed')">Reviews</button>
         <button class="tab" data-status="cancelled" onclick="filterByStatus('cancelled')">Cancelled</button>
         <button class="tab" data-status="archived" onclick="filterByStatus('archived')">Archived</button>
@@ -1697,7 +1698,9 @@ $statusDisplay = [
               ? (isArchived && !isBinned)
               : (currentStatus === 'bin'
                   ? isBinned
-                  : (!isArchived && !isBinned && status === currentStatus)));
+                  : (currentStatus === 'completed'
+                      ? (!isArchived && !isBinned && (status === 'received' || status === 'reviewed'))
+                      : (!isArchived && !isBinned && status === currentStatus))));
         const searchMatch = !query || orderId.includes(query) || customer.includes(query) || products.includes(query);
         group.dataset.matched = (statusMatch && searchMatch) ? '1' : '0';
       });

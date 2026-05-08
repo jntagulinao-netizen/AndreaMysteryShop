@@ -58,9 +58,13 @@ if ($statusResult && $statusResult->num_rows > 0) {
 }
 
 $orderDetails = [];
-$orderDetailsSql = 'SELECT o.order_id, o.user_id, o.status, o.delivery_type, o.total_amount, o.order_date, COALESCE(u.full_name, CONCAT("Customer #", o.user_id)) AS customer_name
+$orderDetailsSql = 'SELECT o.order_id, o.user_id, o.recipient_id, o.status, o.delivery_type, o.total_amount, o.order_date,
+  COALESCE((SELECT uu.full_name FROM users uu WHERE uu.user_id = o.user_id AND LOWER(uu.role) = "user" LIMIT 1), CONCAT("Customer #", o.user_id)) AS customer_full_name,
+  COALESCE(u.full_name, CONCAT("Customer #", o.user_id)) AS customer_name,
+    COALESCE(r.recipient_name, "") AS recipient_name
   FROM orders o
-  LEFT JOIN users u ON u.user_id = o.user_id
+  LEFT JOIN users u ON u.user_id = o.user_id AND LOWER(u.role) = "user"
+  LEFT JOIN recipients r ON r.recipient_id = o.recipient_id AND r.user_id = o.user_id
   WHERE o.archived = 0 AND o.binned = 0' . $whereClause . '
   ORDER BY o.order_date DESC';
 $orderDetailsResult = $conn->query($orderDetailsSql);
@@ -68,8 +72,11 @@ if ($orderDetailsResult) {
     while ($row = $orderDetailsResult->fetch_assoc()) {
         $orderDetails[] = [
             'order_id' => intval($row['order_id'] ?? 0),
-      'user_id' => intval($row['user_id'] ?? 0),
+          'user_id' => intval($row['user_id'] ?? 0),
+          'recipient_id' => intval($row['recipient_id'] ?? 0),
+            'customer_full_name' => $row['customer_full_name'] ?? '',
           'customer_name' => $row['customer_name'] ?? '',
+          'recipient_name' => $row['recipient_name'] ?? '',
             'status' => $row['status'] ?? 'unknown',
             'delivery_type' => $row['delivery_type'] ?? 'standard',
             'total_amount' => floatval($row['total_amount'] ?? 0),
@@ -273,6 +280,7 @@ function format_peso_display($amount) {
             <option value="shipped">Shipped</option>
             <option value="delivered">Delivered</option>
              <option value="pickedup">Picked Up</option>
+             <option value="received">Received</option>
             <option value="reviewed">Reviewed</option>
             <option value="cancelled">Cancelled</option>
            
@@ -313,7 +321,7 @@ function format_peso_display($amount) {
       <div class="modal-body">
         <div class="detail-grid">
           <div class="detail-box"><strong>Order ID</strong><span id="detailOrderId"></span></div>
-          <div class="detail-box"><strong>Confirmed By</strong><span id="detailCustomerName"></span></div>
+          <div class="detail-box"><strong>Received By</strong><span id="detailCustomerName"></span></div>
           <div class="detail-box"><strong>Status</strong><span id="detailOrderStatus"></span></div>
           <div class="detail-box"><strong>Delivery Type</strong><span id="detailDeliveryType"></span></div>
           <div class="detail-box"><strong>Total</strong><span id="detailOrderTotal"></span></div>
@@ -414,6 +422,8 @@ function format_peso_display($amount) {
     function classifyOrderAction(messageText, currentStatus) {
       const text = String(messageText || '').toLowerCase();
       if (text.includes('cancelled')) return 'Cancelled By';
+      if (text.includes('received')) return 'Received By';
+      if (text.includes('picked up')) return 'Picked Up By';
       if (text.includes('ready for pickup') || text.includes('pickup')) return 'Ready for Pickup By';
       if (text.includes('shipped')) return 'Shipped By';
       if (text.includes('delivered')) return 'Delivered By';
@@ -430,7 +440,10 @@ function format_peso_display($amount) {
       }
 
       document.getElementById('detailOrderId').textContent = `#${order.order_id}`;
-      document.getElementById('detailCustomerName').textContent = order.customer_name || `Customer #${order.user_id}`;
+      const receivedName = ['received', 'reviewed'].includes(order.status)
+        ? (order.recipient_name || order.customer_full_name || order.customer_name || `Customer #${order.user_id}`)
+        : '';
+      document.getElementById('detailCustomerName').textContent = receivedName || '';
       document.getElementById('detailOrderStatus').textContent = order.status.charAt(0).toUpperCase() + order.status.slice(1);
       document.getElementById('detailDeliveryType').textContent = order.delivery_type.charAt(0).toUpperCase() + order.delivery_type.slice(1);
       document.getElementById('detailOrderTotal').textContent = `₱${formatPesoDisplay(order.total_amount)}`;
@@ -441,11 +454,76 @@ function format_peso_display($amount) {
       if (!history.length) {
         historyContainer.innerHTML = '<div class="no-history">No admin action history recorded for this order yet.</div>';
       } else {
-        historyContainer.innerHTML = history.map(entry => {
+        const filteredHistory = history.filter(entry => {
+          const label = classifyOrderAction(entry.message_text, order.status);
+          if (label === 'Received By' && !['received', 'reviewed'].includes(order.status)) {
+            return false;
+          }
+          return true;
+        });
+        const actionMap = {};
+        filteredHistory.forEach(entry => {
+          const label = classifyOrderAction(entry.message_text, order.status);
+          if (!actionMap[label]) {
+            actionMap[label] = entry;
+          }
+        });
+        // If the order is received/reviewed, ensure Received By is present
+        if (['received', 'reviewed'].includes(order.status) && !actionMap['Received By']) {
+          actionMap['Received By'] = {
+            message_text: 'Order received',
+            actor_name: order.recipient_name || order.customer_full_name || order.customer_name || `Customer #${order.user_id}`,
+            sender_role: 'user',
+            created_at: order.order_date
+          };
+        }
+        // If the order is delivered, ensure Delivered By is present when the order has reached that stage
+        if (['delivered', 'received', 'reviewed'].includes(order.status) && !actionMap['Delivered By']) {
+          const deliveredEntry = filteredHistory.find(entry => classifyOrderAction(entry.message_text, order.status) === 'Delivered By');
+          actionMap['Delivered By'] = deliveredEntry || {
+            message_text: 'Order delivered',
+            actor_name: filteredHistory.find(entry => entry.sender_role === 'admin')?.actor_name || 'Unknown admin',
+            sender_role: 'admin',
+            created_at: order.order_date
+          };
+        }
+        const statusOrder = ['pending', 'processing', 'shipped', 'delivered', 'received', 'pickup', 'pickedup', 'cancelled', 'reviewed'];
+        const labelToStatus = {
+          'Processing By': 'processing',
+          'Shipped By': 'shipped',
+          'Delivered By': 'delivered',
+          'Received By': 'received',
+          'Ready for Pickup By': 'pickup',
+          'Picked Up By': 'pickedup',
+          'Cancelled By': 'cancelled',
+          'Archived By': 'archived',
+          'Moved To Bin By': 'binned'
+        };
+        const actions = Object.values(actionMap).sort((a, b) => {
+          const labelA = classifyOrderAction(a.message_text, order.status);
+          const labelB = classifyOrderAction(b.message_text, order.status);
+          const statusA = labelToStatus[labelA] || 'unknown';
+          const statusB = labelToStatus[labelB] || 'unknown';
+          const indexA = statusOrder.indexOf(statusA);
+          const indexB = statusOrder.indexOf(statusB);
+          if (indexA !== indexB) {
+            return indexA - indexB;
+          }
+          return new Date(a.created_at) - new Date(b.created_at);
+        });
+        historyContainer.innerHTML = actions.map(entry => {
           const label = classifyOrderAction(entry.message_text, order.status);
           const timestamp = entry.created_at ? new Date(entry.created_at).toLocaleString() : 'Unknown time';
+          let actionName;
+          if (label === 'Received By') {
+            actionName = order.recipient_name || order.customer_full_name || order.customer_name || `Customer #${order.user_id}`;
+          } else if (label === 'Cancelled By') {
+            actionName = entry.sender_role === 'admin' ? (entry.actor_name || 'Unknown admin') : (order.customer_full_name || order.customer_name || `Customer #${order.user_id}`);
+          } else {
+            actionName = entry.actor_name || 'Unknown admin';
+          }
           return `<div class="action-history-item">
-            <strong>${label}: ${entry.actor_name || 'Unknown admin'}</strong>
+            <strong>${label}: ${actionName}</strong>
             <small>${timestamp}</small>
             <p>${entry.message_text}</p>
           </div>`;
