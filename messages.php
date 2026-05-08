@@ -226,6 +226,31 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             margin-bottom: 8px;
             display: block;
         }
+        .media-preview-wrap {
+            position: relative;
+            display: inline-block;
+            cursor: zoom-in;
+            margin-bottom: 8px;
+        }
+        .media-preview-wrap:focus {
+            outline: 2px solid #2f67d8;
+            outline-offset: 2px;
+            border-radius: 10px;
+        }
+        .media-view-badge {
+            position: absolute;
+            right: 8px;
+            bottom: 8px;
+            background: rgba(15, 23, 42, 0.78);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            border-radius: 999px;
+            padding: 4px 6px;
+            letter-spacing: 0.2px;
+            pointer-events: none;
+        }
         .order-notice-card {
             border: 1px solid #e6ddbf;
             background: #fffdf6;
@@ -372,6 +397,48 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             margin-bottom: 8px;
             background: #000;
             display: block;
+        }
+        .message-media-viewer {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.86);
+            z-index: 4000;
+            padding: 16px;
+        }
+        .message-media-viewer.active { display: flex; }
+        .message-media-content {
+            max-width: 96vw;
+            max-height: 92vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .message-media-content img,
+        .message-media-content video {
+            max-width: 96vw;
+            max-height: 92vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 10px;
+            background: #000;
+        }
+        .message-media-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.45);
+            background: rgba(0,0,0,0.4);
+            color: #fff;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
         }
         .empty { padding: 24px; color: #7b879f; text-align: center; }
 
@@ -554,6 +621,10 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
         </div>
     </div>
     <div id="conversationDrawerOverlay" class="drawer-overlay" onclick="closeConversationDrawer()"></div>
+    <div id="messageMediaViewer" class="message-media-viewer" role="dialog" aria-modal="true" aria-label="Media Viewer">
+        <button type="button" class="message-media-close" onclick="closeMessageMediaViewer()">×</button>
+        <div id="messageMediaContent" class="message-media-content"></div>
+    </div>
 
     <?php if ($isAdmin): ?>
     <nav class="mobile-bottom-nav fixed">
@@ -931,10 +1002,8 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
                 const targetUrl = getOrderTargetUrl();
                 const isOrderNotice = (m.message_type === 'order_notice' || m.message_type === 'status_notice');
                 const mediaHtml = parsed.chatMediaUrl
-                    ? (parsed.chatMediaType === 'video'
-                        ? `<video class="msg-preview-video" src="${escapeAttr(parsed.chatMediaUrl)}" controls playsinline preload="metadata"></video>`
-                        : `<img class="msg-preview-image" src="${escapeAttr(parsed.chatMediaUrl)}" alt="Attachment">`)
-                    : (parsed.imageUrl ? `<img class="msg-preview-image" src="${escapeAttr(parsed.imageUrl)}" alt="Product">` : '');
+                    ? renderMediaPreview(parsed.chatMediaUrl, parsed.chatMediaType, 'Attachment')
+                    : (parsed.imageUrl ? renderMediaPreview(parsed.imageUrl, 'image', 'Product') : '');
                 const contentHtml = `${mediaHtml}<div>${formatMessageText(parsed.cleanText)}</div>`;
                 const noticeHtml = isOrderNotice ? renderOrderNoticeCard(m, parsed, targetUrl) : contentHtml;
                 // Add delete button if message is mine
@@ -955,6 +1024,29 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             }).join('');
 
             list.scrollTop = list.scrollHeight;
+        }
+
+        function renderMediaPreview(url, type, altText) {
+            if (!url) return '';
+            const mediaType = String(type || '').toLowerCase() === 'video' ? 'video' : 'image';
+            const escapedUrl = escapeAttr(url);
+            const escapedAlt = escapeAttr(altText || 'Media');
+
+            if (mediaType === 'video') {
+                return `
+                    <span class="media-preview-wrap media-clickable" role="button" tabindex="0" data-media-url="${escapedUrl}" data-media-type="video" aria-label="View video">
+                        <video class="msg-preview-video" src="${escapedUrl}" playsinline muted preload="metadata"></video>
+                        <span class="media-view-badge">View</span>
+                    </span>
+                `;
+            }
+
+            return `
+                <span class="media-preview-wrap media-clickable" role="button" tabindex="0" data-media-url="${escapedUrl}" data-media-type="image" aria-label="View image">
+                    <img class="msg-preview-image" src="${escapedUrl}" alt="${escapedAlt}">
+                    <span class="media-view-badge">View</span>
+                </span>
+            `;
         }
 
         async function sendMessage() {
@@ -1115,7 +1207,12 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             const parts = parseNoticeParts(parsed.cleanText);
             const detailsId = `notice-details-${message.message_id}`;
             const thumb = parsed.imageUrl
-                ? `<img class="order-notice-thumb" src="${escapeAttr(parsed.imageUrl)}" alt="Product">`
+                ? `
+                    <span class="media-preview-wrap media-clickable" role="button" tabindex="0" data-media-url="${escapeAttr(parsed.imageUrl)}" data-media-type="image" aria-label="View product image">
+                        <img class="order-notice-thumb" src="${escapeAttr(parsed.imageUrl)}" alt="Product">
+                        <span class="media-view-badge">View</span>
+                    </span>
+                `
                 : '';
 
             return `
@@ -1142,6 +1239,39 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             const panel = document.getElementById(detailsId);
             if (!panel) return;
             panel.classList.toggle('open');
+        }
+
+        function openMessageMediaViewer(url, mediaType) {
+            if (!url) return;
+            const overlay = document.getElementById('messageMediaViewer');
+            const content = document.getElementById('messageMediaContent');
+            if (!overlay || !content) return;
+
+            content.innerHTML = '';
+            const type = String(mediaType || '').toLowerCase();
+            if (type === 'video') {
+                const video = document.createElement('video');
+                video.src = url;
+                video.controls = true;
+                video.autoplay = true;
+                video.playsInline = true;
+                content.appendChild(video);
+            } else {
+                const image = document.createElement('img');
+                image.src = url;
+                image.alt = 'Media Preview';
+                content.appendChild(image);
+            }
+
+            overlay.classList.add('active');
+        }
+
+        function closeMessageMediaViewer() {
+            const overlay = document.getElementById('messageMediaViewer');
+            const content = document.getElementById('messageMediaContent');
+            if (!overlay || !content) return;
+            content.innerHTML = '';
+            overlay.classList.remove('active');
         }
 
         function getOrderTargetUrl() {
@@ -1187,6 +1317,35 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            const target = e.target.closest('.media-clickable');
+            if (!target) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const url = target.getAttribute('data-media-url') || '';
+            const type = target.getAttribute('data-media-type') || 'image';
+            openMessageMediaViewer(url, type);
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeMessageMediaViewer();
+            }
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const target = document.activeElement;
+            if (!target || !target.classList || !target.classList.contains('media-clickable')) return;
+            e.preventDefault();
+            const url = target.getAttribute('data-media-url') || '';
+            const type = target.getAttribute('data-media-type') || 'image';
+            openMessageMediaViewer(url, type);
+        });
+
+        document.getElementById('messageMediaViewer')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeMessageMediaViewer();
             }
         });
 

@@ -97,3 +97,25 @@ Insert result: true
 }
 Insert result: true
 
+2026-05-08T11:11:46+02:00
+{
+    "mediaPublicPath": "message_media\/images\/msg_20260508_111146_b5ef6292.png",
+    "mediaType": "image",
+    "mediaMime": "image\/png",
+    "mediaSize": 1024750,
+    "mediaOriginalName": "SanJuan1.png",
+    "finalMessageText": "[CHAT_MEDIA]message_media\/images\/msg_20260508_111146_b5ef6292.png|image[\/CHAT_MEDIA]"
+}
+Insert result: true
+
+2026-05-08T11:12:14+02:00
+{
+    "mediaPublicPath": "message_media\/videos\/msg_20260508_111214_e68a5a78.mp4",
+    "mediaType": "video",
+    "mediaMime": "video\/mp4",
+    "mediaSize": 5910576,
+    "mediaOriginalName": "6c316031f1d080f6622e727c82d0b40a.mp4",
+    "finalMessageText": "[CHAT_MEDIA]message_media\/videos\/msg_20260508_111214_e68a5a78.mp4|video[\/CHAT_MEDIA]"
+}
+Insert result: true
+

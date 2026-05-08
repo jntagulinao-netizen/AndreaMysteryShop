@@ -176,6 +176,11 @@ try {
     }
     $recipient = $recipientRes->fetch_assoc();
 
+    // Validate recipient phone number format (exactly 11 digits)
+    if (!preg_match('/^\d{11}$/', $recipient['phone_no'])) {
+        throw new Exception('Recipient phone number must be exactly 11 digits');
+    }
+
     // Fetch cart
     $cartStmt = $conn->prepare('SELECT cart_id FROM carts WHERE user_id = ? LIMIT 1');
     $cartStmt->bind_param('i', $userId);

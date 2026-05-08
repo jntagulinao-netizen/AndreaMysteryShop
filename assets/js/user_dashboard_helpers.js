@@ -276,6 +276,62 @@ function setRecipientFormFields(values = {}) {
         city: values.city || '',
         district: values.district || ''
     }).catch(() => {});
+
+    // Initialize phone input behavior: allow digits only and cap to 11 digits
+    initRecipientPhoneInput();
+}
+
+function initRecipientPhoneInput() {
+    const phoneEl = document.getElementById('phoneNo');
+    if (!phoneEl) return;
+
+    // Prevent attaching multiple handlers
+    if (phoneEl._recipientPhoneInitialized) return;
+    phoneEl._recipientPhoneInitialized = true;
+
+    phoneEl.addEventListener('input', function (evt) {
+        const original = phoneEl.value || '';
+        // keep only digits
+        const digits = original.replace(/\D/g, '');
+        // limit to 11 digits
+        const limited = digits.slice(0, 11);
+        if (limited !== original) {
+            // try to keep caret position sensible
+            const pos = phoneEl.selectionStart || limited.length;
+            phoneEl.value = limited;
+            try { phoneEl.setSelectionRange(pos, pos); } catch (e) {}
+        } else {
+            phoneEl.value = limited;
+        }
+    });
+
+    // Optionally prevent paste of non-digit content
+    phoneEl.addEventListener('paste', function (evt) {
+        evt.stopPropagation();
+        evt.preventDefault();
+        const text = (evt.clipboardData || window.clipboardData).getData('text') || '';
+        const digits = text.replace(/\D/g, '').slice(0, 11);
+        phoneEl.value = (phoneEl.value || '').replace(/\D/g, '').slice(0, 11 - digits.length) + digits;
+    });
+
+    // Prevent typing additional numeric digits when already at 11 digits
+    phoneEl.addEventListener('keydown', function (e) {
+        // allow navigation and control keys
+        const navKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Home', 'End', 'Enter'];
+        if (navKeys.includes(e.key)) return;
+        if (e.ctrlKey || e.metaKey || e.altKey) return; // allow copy/paste/select all combos
+
+        // If key is a single character digit, check limit
+        if (e.key && e.key.length === 1 && /\d/.test(e.key)) {
+            const currentDigits = (phoneEl.value || '').replace(/\D/g, '');
+            if (currentDigits.length >= 11) {
+                e.preventDefault();
+                // small visual feedback: briefly flash the field
+                phoneEl.classList.add('input-limit-reached');
+                setTimeout(() => phoneEl.classList.remove('input-limit-reached'), 300);
+            }
+        }
+    });
 }
 
 function getRecipientFormValues() {

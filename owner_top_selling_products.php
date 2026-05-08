@@ -608,37 +608,12 @@ if (!empty($topSellers)) {
           <div class="section-meta">Best-selling SKUs sorted by quantity sold.</div>
         </div>
       </div>
-      <div class="top-products-list">
-        <?php if (!empty($topSellers)): ?>
-          <?php foreach ($topSellers as $index => $product): ?>
-            <?php $fillWidth = $maxTopQty > 0 ? round(($product['total_qty'] / $maxTopQty) * 100) : 0; ?>
-            <?php $initial = strtoupper(substr($product['product_name'], 0, 1)); ?>
-            <div class="top-product-row">
-              <div class="top-product-main">
-                <div class="top-product-left">
-                  <div class="rank-badge"><?= $index + 1 ?></div>
-                  <div class="product-thumb">
-                    <?php if (!empty($product['image_url'])): ?>
-                      <img src="<?= htmlspecialchars($product['image_url']) ?>" alt="<?= htmlspecialchars($product['product_name']) ?>">
-                    <?php else: ?>
-                      <?= htmlspecialchars($initial) ?>
-                    <?php endif; ?>
-                  </div>
-                  <div class="product-content">
-                    <div class="product-name"><?= htmlspecialchars($product['product_name']) ?></div>
-                    <div class="product-subtitle"><?= number_format($product['total_qty']) ?> sales</div>
-                  </div>
-                </div>
-                <div class="product-revenue">₱<?= format_peso_display($product['total_revenue']) ?></div>
-              </div>
-              <div class="product-progress">
-                <div class="progress-fill" style="width: <?= $fillWidth ?>%;"></div>
-              </div>
-            </div>
-          <?php endforeach; ?>
-        <?php else: ?>
+      <div class="top-products-list" id="topProductsList">
+        <?php if (empty($topSellers)): ?>
           <div class="empty-chart">No top selling products were found.</div>
         <?php endif; ?>
+      </div>
+      <div id="topProductsPagination" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
       </div>
     </section>
 
@@ -650,32 +625,12 @@ if (!empty($topSellers)) {
             <div class="section-meta">Top sellers by sold units.</div>
           </div>
         </div>
-        <div class="performance-list">
-          <?php if (!empty($topSellersPerformance)): ?>
-            <?php $performanceTotal = array_sum(array_column($topSellersPerformance, 'total_qty')); ?>
-            <?php foreach ($topSellersPerformance as $product): ?>
-              <?php $share = $performanceTotal ? round($product['total_qty'] / $performanceTotal * 100, 1) : 0; ?>
-              <?php $initial = strtoupper(substr($product['product_name'], 0, 1)); ?>
-              <div class="performance-row">
-                <div class="item-left">
-                  <div class="item-thumb">
-                    <?php if (!empty($product['image_url'])): ?>
-                      <img src="<?= htmlspecialchars($product['image_url']) ?>" alt="<?= htmlspecialchars($product['product_name']) ?>">
-                    <?php else: ?>
-                      <?= htmlspecialchars($initial) ?>
-                    <?php endif; ?>
-                  </div>
-                  <div class="item-copy">
-                    <div class="item-title"><?= htmlspecialchars($product['product_name']) ?></div>
-                    <div class="item-subtitle"><?= number_format($product['total_qty']) ?> units</div>
-                  </div>
-                </div>
-                <div class="trend-pill">+<?= $share ?>%</div>
-              </div>
-            <?php endforeach; ?>
-          <?php else: ?>
+        <div class="performance-list" id="performanceList">
+          <?php if (empty($topSellersPerformance)): ?>
             <div class="empty-chart">No product performance data available.</div>
           <?php endif; ?>
+        </div>
+        <div id="performancePagination" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
         </div>
       </section>
 
@@ -686,36 +641,196 @@ if (!empty($topSellers)) {
             <div class="section-meta">Top revenue generators from your catalog.</div>
           </div>
         </div>
-        <div class="breakdown-list">
-          <?php if (!empty($topRevenueBreakdown)): ?>
-            <?php foreach ($topRevenueBreakdown as $product): ?>
-              <?php $initial = strtoupper(substr($product['product_name'], 0, 1)); ?>
-              <div class="breakdown-row">
-                <div class="item-left">
-                  <div class="item-thumb">
-                    <?php if (!empty($product['image_url'])): ?>
-                      <img src="<?= htmlspecialchars($product['image_url']) ?>" alt="<?= htmlspecialchars($product['product_name']) ?>">
-                    <?php else: ?>
-                      <?= htmlspecialchars($initial) ?>
-                    <?php endif; ?>
-                  </div>
-                  <div class="item-copy">
-                    <div class="item-title"><?= htmlspecialchars($product['product_name']) ?></div>
-                    <div class="item-subtitle">Top revenue generator</div>
-                  </div>
-                </div>
-                <div class="breakdown-value">₱<?= format_peso_display($product['total_revenue']) ?></div>
-              </div>
-            <?php endforeach; ?>
-          <?php else: ?>
+        <div class="breakdown-list" id="breakdownList">
+          <?php if (empty($topRevenueBreakdown)): ?>
             <div class="empty-chart">No revenue breakdown data available.</div>
           <?php endif; ?>
+        </div>
+        <div id="breakdownPagination" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
         </div>
       </section>
     </div>
   </div>
 
   <script>
+    const topProductsData = <?php echo json_encode($topSellers, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
+    const performanceData = <?php echo json_encode($topSellersPerformance, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
+    const breakdownData = <?php echo json_encode($topRevenueBreakdown, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
+    const maxQty = <?php echo json_encode($maxTopQty); ?>;
+    
+    const paginationState = {
+      topProducts: { current: 1, perPage: 5 },
+      performance: { current: 1, perPage: 5 },
+      breakdown: { current: 1, perPage: 5 }
+    };
+    
+    function renderTopProducts() {
+      const state = paginationState.topProducts;
+      const total = topProductsData.length;
+      if (total === 0) {
+        document.getElementById('topProductsList').innerHTML = '<div class="empty-chart">No top selling products were found.</div>';
+        document.getElementById('topProductsPagination').innerHTML = '';
+        return;
+      }
+      
+      const totalPages = Math.ceil(total / state.perPage);
+      const startIdx = (state.current - 1) * state.perPage;
+      const endIdx = Math.min(startIdx + state.perPage, total);
+      const pageItems = topProductsData.slice(startIdx, endIdx);
+      
+      let html = '';
+      pageItems.forEach((product, i) => {
+        const realIdx = startIdx + i;
+        const fillWidth = maxQty > 0 ? Math.round((product.total_qty / maxQty) * 100) : 0;
+        const initial = product.product_name.charAt(0).toUpperCase();
+        const thumb = product.image_url ? `<img src="${product.image_url}" alt="${product.product_name}">` : initial;
+        html += `<div class="top-product-row">
+          <div class="top-product-main">
+            <div class="top-product-left">
+              <div class="rank-badge">${realIdx + 1}</div>
+              <div class="product-thumb">${thumb}</div>
+              <div class="product-content">
+                <div class="product-name">${product.product_name}</div>
+                <div class="product-subtitle">${product.total_qty.toLocaleString()} sales</div>
+              </div>
+            </div>
+            <div class="product-revenue">₱${formatPesoDisplay(product.total_revenue)}</div>
+          </div>
+          <div class="product-progress">
+            <div class="progress-fill" style="width: ${fillWidth}%;"></div>
+          </div>
+        </div>`;
+      });
+      document.getElementById('topProductsList').innerHTML = html;
+      renderPaginationControls('topProductsPagination', state.current, totalPages, 'topProducts');
+    }
+    
+    function renderPerformance() {
+      const state = paginationState.performance;
+      const total = performanceData.length;
+      if (total === 0) {
+        document.getElementById('performanceList').innerHTML = '<div class="empty-chart">No product performance data available.</div>';
+        document.getElementById('performancePagination').innerHTML = '';
+        return;
+      }
+      
+      const totalPages = Math.ceil(total / state.perPage);
+      const startIdx = (state.current - 1) * state.perPage;
+      const endIdx = Math.min(startIdx + state.perPage, total);
+      const pageItems = performanceData.slice(startIdx, endIdx);
+      
+      const performanceTotal = performanceData.reduce((sum, p) => sum + p.total_qty, 0);
+      
+      let html = '';
+      pageItems.forEach(product => {
+        const share = performanceTotal ? Math.round(product.total_qty / performanceTotal * 100 * 10) / 10 : 0;
+        const initial = product.product_name.charAt(0).toUpperCase();
+        const thumb = product.image_url ? `<img src="${product.image_url}" alt="${product.product_name}">` : initial;
+        html += `<div class="performance-row">
+          <div class="item-left">
+            <div class="item-thumb">${thumb}</div>
+            <div class="item-copy">
+              <div class="item-title">${product.product_name}</div>
+              <div class="item-subtitle">${product.total_qty.toLocaleString()} units</div>
+            </div>
+          </div>
+          <div class="trend-pill">+${share}%</div>
+        </div>`;
+      });
+      document.getElementById('performanceList').innerHTML = html;
+      renderPaginationControls('performancePagination', state.current, totalPages, 'performance');
+    }
+    
+    function renderBreakdown() {
+      const state = paginationState.breakdown;
+      const total = breakdownData.length;
+      if (total === 0) {
+        document.getElementById('breakdownList').innerHTML = '<div class="empty-chart">No revenue breakdown data available.</div>';
+        document.getElementById('breakdownPagination').innerHTML = '';
+        return;
+      }
+      
+      const totalPages = Math.ceil(total / state.perPage);
+      const startIdx = (state.current - 1) * state.perPage;
+      const endIdx = Math.min(startIdx + state.perPage, total);
+      const pageItems = breakdownData.slice(startIdx, endIdx);
+      
+      let html = '';
+      pageItems.forEach(product => {
+        const initial = product.product_name.charAt(0).toUpperCase();
+        const thumb = product.image_url ? `<img src="${product.image_url}" alt="${product.product_name}">` : initial;
+        html += `<div class="breakdown-row">
+          <div class="item-left">
+            <div class="item-thumb">${thumb}</div>
+            <div class="item-copy">
+              <div class="item-title">${product.product_name}</div>
+              <div class="item-subtitle">Top revenue generator</div>
+            </div>
+          </div>
+          <div class="breakdown-value">₱${formatPesoDisplay(product.total_revenue)}</div>
+        </div>`;
+      });
+      document.getElementById('breakdownList').innerHTML = html;
+      renderPaginationControls('breakdownPagination', state.current, totalPages, 'breakdown');
+    }
+    
+    function renderPaginationControls(containerId, current, totalPages, section) {
+      if (totalPages <= 1) {
+        document.getElementById(containerId).innerHTML = '';
+        return;
+      }
+      
+      let html = `<button onclick="goToPage('${section}', ${Math.max(1, current - 1)})" ${current === 1 ? 'disabled' : ''} style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: ${current === 1 ? '#f3f4f6' : '#fff'}; color: #111827; cursor: ${current === 1 ? 'not-allowed' : 'pointer'}; font-size: 13px;">← Prev</button>`;
+      
+      for (let p = 1; p <= totalPages; p++) {
+        const isActive = p === current;
+        html += `<button onclick="goToPage('${section}', ${p})" style="padding: 8px 12px; border: 1px solid ${isActive ? '#0f172a' : '#d1d5db'}; border-radius: 8px; background: ${isActive ? '#0f172a' : '#fff'}; color: ${isActive ? '#fff' : '#111827'}; cursor: pointer; font-size: 13px; font-weight: ${isActive ? '700' : '400'};">${p}</button>`;
+      }
+      
+      html += `<button onclick="goToPage('${section}', ${Math.min(totalPages, current + 1)})" ${current === totalPages ? 'disabled' : ''} style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: ${current === totalPages ? '#f3f4f6' : '#fff'}; color: #111827; cursor: ${current === totalPages ? 'not-allowed' : 'pointer'}; font-size: 13px;">Next →</button>`;
+      
+      document.getElementById(containerId).innerHTML = html;
+    }
+    
+    function goToPage(section, page) {
+      if (section === 'topProducts') {
+        const total = topProductsData.length;
+        const totalPages = Math.ceil(total / paginationState.topProducts.perPage);
+        if (page >= 1 && page <= totalPages) {
+          paginationState.topProducts.current = page;
+          renderTopProducts();
+        }
+      } else if (section === 'performance') {
+        const total = performanceData.length;
+        const totalPages = Math.ceil(total / paginationState.performance.perPage);
+        if (page >= 1 && page <= totalPages) {
+          paginationState.performance.current = page;
+          renderPerformance();
+        }
+      } else if (section === 'breakdown') {
+        const total = breakdownData.length;
+        const totalPages = Math.ceil(total / paginationState.breakdown.perPage);
+        if (page >= 1 && page <= totalPages) {
+          paginationState.breakdown.current = page;
+          renderBreakdown();
+        }
+      }
+    }
+    
+    function formatPesoDisplay(amount) {
+      const value = parseFloat(amount);
+      if (Math.floor(value) === value) {
+        return value.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+      }
+      return value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/\.?0+$/, '');
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      renderTopProducts();
+      renderPerformance();
+      renderBreakdown();
+    });
+    
     function downloadTopSellersCsv() {
       const month = document.querySelector('select[name="month"]').value;
       const year = document.querySelector('select[name="year"]').value;
@@ -724,9 +839,9 @@ if (!empty($topSellers)) {
         [],
         ['Rank', 'Product', 'Quantity Sold', 'Orders'],
       ];
-      <?php foreach ($topSellers as $index => $product): ?>
-        rows.push([<?= $index + 1 ?>, '<?= addslashes($product['product_name']) ?>', <?= intval($product['total_qty']) ?>, <?= intval($product['order_count']) ?>]);
-      <?php endforeach; ?>
+      topProductsData.forEach((product, index) => {
+        rows.push([index + 1, product.product_name, product.total_qty, product.order_count]);
+      });
       if (rows.length <= 3) {
         alert('No data available for the selected period.');
         return;

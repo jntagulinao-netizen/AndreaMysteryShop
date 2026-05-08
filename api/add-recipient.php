@@ -57,6 +57,13 @@ if (!$data['recipient_name'] || !$data['phone_no'] || !$data['street_name'] || !
     exit;
 }
 
+// Validate phone number: exactly 11 digits
+if (!preg_match('/^\d{11}$/', $data['phone_no'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Phone number must be exactly 11 digits']);
+    exit;
+}
+
 try {
     // If setting as default, unset other defaults for this user
     if ($data['is_default']) {

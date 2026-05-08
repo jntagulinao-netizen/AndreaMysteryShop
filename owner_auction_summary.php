@@ -75,8 +75,7 @@ $auctionList = [];
 $auctionListSql = 'SELECT l.auction_id, l.item_name, l.auction_status, l.start_at, l.end_at, l.current_bid, l.starting_bid, IF(aol.order_id IS NOT NULL, 1, 0) AS has_order
   FROM auction_listings l
   LEFT JOIN auction_order_links aol ON aol.auction_id = l.auction_id' . $whereClause . '
-  ORDER BY l.start_at DESC
-  LIMIT 10';
+  ORDER BY l.start_at DESC';
 $auctionListResult = $conn->query($auctionListSql);
 if ($auctionListResult) {
     while ($row = $auctionListResult->fetch_assoc()) {
@@ -132,6 +131,10 @@ function format_peso_display($amount) {
     .section-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
     .section-tab-button { border: 1px solid #d1d5db; border-radius: 12px; background: #fff; color: #111827; padding: 10px 14px; font-weight: 700; cursor: pointer; transition: background .18s ease, border-color .18s ease, color .18s ease; }
     .section-tab-button.active { background: #0f172a; border-color: #0f172a; color: #fff; }
+    .list-pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .list-pagination button { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827; cursor: pointer; font-size: 13px; }
+    .list-pagination button.active { background: #0f172a; border-color: #0f172a; color: #fff; font-weight: 700; }
+    .list-pagination button:disabled { background: #f3f4f6; color: #6b7280; cursor: not-allowed; }
     .chart-pie { display: flex; flex-wrap: wrap; gap: 30px; align-items: center; justify-content: center; padding: 20px 0; }
     .pie-chart { width: 160px; height: 160px; min-width: 160px; border-radius: 50%; background: #f8fafc; display: grid; place-items: center; box-shadow: inset 0 0 0 1px #e5e7eb; position: relative; }
     .pie-chart-inner { width: 94%; height: 94%; border-radius: 50%; background: conic-gradient(#2563eb 0%, #93c5fd 100%); display: grid; place-items: center; }
@@ -224,35 +227,39 @@ function format_peso_display($amount) {
             <button type="button" class="section-tab-button" data-filter="not-ordered">Non-ordered</button>
           </div>
         </div>
+        <select id="auctionSortFilter" onchange="handleAuctionSortChange(this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827; font-size: 13px; cursor: pointer;">
+          <option value="newest">Newest to Oldest</option>
+          <option value="oldest">Oldest to Newest</option>
+        </select>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr><th>ID</th><th>Title</th><th>Status</th><th>Start</th><th>End</th><th>Highest Bid</th></tr>
           </thead>
-          <tbody>
-            <?php foreach ($auctionList as $auction): ?>
-              <tr data-order-status="<?= $auction['has_order'] ? 'ordered' : 'not-ordered' ?>">
-                <td>#<?= $auction['auction_id'] ?></td>
-                <td><?= htmlspecialchars($auction['item_name']) ?></td>
-                <td><?= htmlspecialchars($auction['auction_status']) ?></td>
-                <td><?= htmlspecialchars($auction['start_at']) ?></td>
-                <td><?= htmlspecialchars($auction['end_at']) ?></td>
-                <td>₱<?= format_peso_display($auction['highest_bid']) ?></td>
-              </tr>
-            <?php endforeach; ?>
-            <?php if (empty($auctionList)): ?>
-              <tr><td colspan="6">No auction listings found.</td></tr>
-            <?php endif; ?>
+          <tbody id="auctionListBody">
           </tbody>
         </table>
       </div>
+      <div id="auctionPagination" class="list-pagination"></div>
     </section>
   </div>
 
   <script>
-    const chartData = <?php echo json_encode(['auctionOrderChart' => $auctionOrderChart], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
+    const chartData = <?php echo json_encode(['auctionOrderChart' => $auctionOrderChart, 'auctionList' => $auctionList], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
     const chartColors = ['#2563eb', '#22c55e'];
+    let currentAuctionPage = 1;
+    const auctionItemsPerPage = 6;
+    let currentAuctionSort = 'newest';
+    let currentAuctionTab = 'all';
+
+    function formatAuctionBid(amount) {
+      const value = Number(amount) || 0;
+      if (Math.floor(value) === value) {
+        return value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      }
+      return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/0+$/, '').replace(/\.$/, '');
+    }
 
     function renderPieChart(areaId, subtitleId, values, subtitleText) {
       const chartArea = document.getElementById(areaId);
@@ -307,7 +314,85 @@ function format_peso_display($amount) {
       renderPieChart('auctionOrderChartArea', 'auctionOrderChartSubtitle', chartData.auctionOrderChart, 'Ordered vs non-ordered auction items.');
     }
 
+    function getFilteredAuctions() {
+      let filtered = chartData.auctionList;
+      if (currentAuctionTab !== 'all') {
+        filtered = filtered.filter(auction => currentAuctionTab === 'ordered' ? auction.has_order === 1 : auction.has_order === 0);
+      }
+      const sorted = [...filtered];
+      if (currentAuctionSort === 'oldest') {
+        sorted.reverse();
+      }
+      return sorted;
+    }
+
+    function renderPaginatedAuctions() {
+      const filtered = getFilteredAuctions();
+      const totalItems = filtered.length;
+      const totalPages = Math.ceil(totalItems / auctionItemsPerPage);
+      const tableBody = document.getElementById('auctionListBody');
+      const pagination = document.getElementById('auctionPagination');
+
+      if (!tableBody || !pagination) {
+        return;
+      }
+
+      if (totalItems === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="padding:14px 10px;text-align:center;color:#64748b;">No matching auction listings found.</td></tr>';
+        pagination.innerHTML = '';
+        return;
+      }
+
+      const startIdx = (currentAuctionPage - 1) * auctionItemsPerPage;
+      const endIdx = Math.min(startIdx + auctionItemsPerPage, totalItems);
+      const pageItems = filtered.slice(startIdx, endIdx);
+
+      tableBody.innerHTML = pageItems.map(auction => `
+        <tr>
+          <td>#${auction.auction_id}</td>
+          <td>${auction.item_name}</td>
+          <td>${auction.auction_status}</td>
+          <td>${auction.start_at}</td>
+          <td>${auction.end_at}</td>
+          <td>₱${formatAuctionBid(auction.highest_bid)}</td>
+        </tr>
+      `).join('');
+
+      if (totalPages > 1) {
+        let paginationHtml = `<button onclick="goToAuctionPage(${Math.max(1, currentAuctionPage - 1)})" ${currentAuctionPage === 1 ? 'disabled' : ''}>← Prev</button>`;
+        for (let page = 1; page <= totalPages; page++) {
+          const isActive = page === currentAuctionPage;
+          paginationHtml += `<button onclick="goToAuctionPage(${page})" class="${isActive ? 'active' : ''}">${page}</button>`;
+        }
+        paginationHtml += `<button onclick="goToAuctionPage(${Math.min(totalPages, currentAuctionPage + 1)})" ${currentAuctionPage === totalPages ? 'disabled' : ''}>Next →</button>`;
+        pagination.innerHTML = paginationHtml;
+      } else {
+        pagination.innerHTML = '';
+      }
+    }
+
+    function goToAuctionPage(page) {
+      const totalPages = Math.ceil(getFilteredAuctions().length / auctionItemsPerPage);
+      if (page >= 1 && page <= totalPages) {
+        currentAuctionPage = page;
+        renderPaginatedAuctions();
+      }
+    }
+
+    function handleAuctionSortChange(value) {
+      currentAuctionSort = value;
+      currentAuctionPage = 1;
+      renderPaginatedAuctions();
+    }
+
+    function applyAuctionTabFilter(filter) {
+      currentAuctionTab = filter;
+      currentAuctionPage = 1;
+      renderPaginatedAuctions();
+    }
+
     renderAuctionOrderChart();
+    renderPaginatedAuctions();
 
     function downloadAuctionCsv() {
       const month = document.querySelector('select[name="month"]').value;
@@ -322,9 +407,9 @@ function format_peso_display($amount) {
         [],
         ['ID', 'Title', 'Status', 'Start', 'End', 'Highest Bid']
       ];
-      <?php foreach ($auctionList as $auction): ?>
-        rows.push(['#<?= $auction['auction_id'] ?>', '<?= addslashes($auction['item_name']) ?>', '<?= addslashes($auction['auction_status']) ?>', '<?= addslashes($auction['start_at']) ?>', '<?= addslashes($auction['end_at']) ?>', '₱<?= format_peso_display($auction['highest_bid']) ?>']);
-      <?php endforeach; ?>
+      chartData.auctionList.forEach(auction => {
+        rows.push(['#' + auction.auction_id, auction.item_name, auction.auction_status, auction.start_at, auction.end_at, '₱' + formatAuctionBid(auction.highest_bid)]);
+      });
       if (rows.length <= 7) {
         alert('No data available for the selected period.');
         return;
@@ -344,25 +429,6 @@ function format_peso_display($amount) {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     }
-    function applyAuctionTabFilter(filter) {
-      document.querySelectorAll('tbody tr[data-order-status]').forEach(row => {
-        const status = row.dataset.orderStatus;
-        row.style.display = filter === 'all' || status === filter ? '' : 'none';
-      });
-      const hasVisible = Array.from(document.querySelectorAll('tbody tr[data-order-status]')).some(row => row.style.display !== 'none');
-      const emptyRow = document.querySelector('tbody tr.empty-row');
-      if (!hasVisible) {
-        if (!emptyRow) {
-          const row = document.createElement('tr');
-          row.className = 'empty-row';
-          row.innerHTML = '<td colspan="6" style="padding:14px 10px;text-align:center;color:#64748b;">No matching auction listings found.</td>';
-          document.querySelector('tbody').appendChild(row);
-        }
-      } else if (emptyRow) {
-        emptyRow.remove();
-      }
-    }
-
     document.querySelectorAll('.section-tab-button').forEach(button => {
       button.addEventListener('click', () => {
         document.querySelectorAll('.section-tab-button').forEach(btn => btn.classList.remove('active'));

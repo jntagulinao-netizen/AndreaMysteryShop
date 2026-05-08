@@ -552,7 +552,7 @@ $recentPreviewJson = json_encode($recentPreviewItems, JSON_UNESCAPED_SLASHES | J
             <div class="card-grid">
                 <div class="status-card" onclick="applyFilter('pending')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 4V2M8 4V2M2 11h20"/></svg>
-                    <strong>To Pay</strong>
+                    <strong>To Process</strong>
                     <span><?php echo $statusCounts['pending']; ?> order(s)</span>
                 </div>
                 <div class="status-card" onclick="applyFilter('processing')">

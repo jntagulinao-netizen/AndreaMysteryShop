@@ -58,22 +58,51 @@ if ($statusResult && $statusResult->num_rows > 0) {
 }
 
 $orderDetails = [];
-$orderDetailsSql = 'SELECT order_id, user_id, status, delivery_type, total_amount, order_date
-  FROM orders
-  WHERE archived = 0 AND binned = 0' . $whereClause . '
-  ORDER BY order_date DESC
-  LIMIT 10';
+$orderDetailsSql = 'SELECT o.order_id, o.user_id, o.status, o.delivery_type, o.total_amount, o.order_date, COALESCE(u.full_name, CONCAT("Customer #", o.user_id)) AS customer_name
+  FROM orders o
+  LEFT JOIN users u ON u.user_id = o.user_id
+  WHERE o.archived = 0 AND o.binned = 0' . $whereClause . '
+  ORDER BY o.order_date DESC';
 $orderDetailsResult = $conn->query($orderDetailsSql);
 if ($orderDetailsResult) {
     while ($row = $orderDetailsResult->fetch_assoc()) {
         $orderDetails[] = [
             'order_id' => intval($row['order_id'] ?? 0),
+      'user_id' => intval($row['user_id'] ?? 0),
+          'customer_name' => $row['customer_name'] ?? '',
             'status' => $row['status'] ?? 'unknown',
             'delivery_type' => $row['delivery_type'] ?? 'standard',
             'total_amount' => floatval($row['total_amount'] ?? 0),
             'order_date' => $row['order_date'] ?? ''
         ];
     }
+}
+
+$orderActors = [];
+$orderActorsSql = 'SELECT o.order_id, m.message_text, m.sender_id, m.sender_role, m.created_at, COALESCE(u.full_name, CONCAT("Admin #", m.sender_id)) AS actor_name
+  FROM orders o
+  LEFT JOIN conversations c ON c.order_id = o.order_id
+  LEFT JOIN messages m ON m.conversation_id = c.conversation_id AND m.message_type = "status_notice"
+  LEFT JOIN users u ON u.user_id = m.sender_id
+  WHERE o.archived = 0 AND o.binned = 0' . $whereClause . '
+  ORDER BY o.order_id DESC, m.created_at ASC, m.message_id ASC';
+$orderActorsResult = $conn->query($orderActorsSql);
+if ($orderActorsResult) {
+  while ($row = $orderActorsResult->fetch_assoc()) {
+    $orderId = intval($row['order_id'] ?? 0);
+    if ($orderId <= 0 || trim((string)($row['message_text'] ?? '')) === '') {
+      continue;
+    }
+    if (!isset($orderActors[$orderId])) {
+      $orderActors[$orderId] = [];
+    }
+    $orderActors[$orderId][] = [
+      'message_text' => $row['message_text'] ?? '',
+      'actor_name' => $row['actor_name'] ?? 'Unknown admin',
+      'sender_role' => $row['sender_role'] ?? 'system',
+      'created_at' => $row['created_at'] ?? ''
+    ];
+  }
 }
 
 $orderStatusChart = [
@@ -136,6 +165,10 @@ function format_peso_display($amount) {
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 13px; color: #334155; }
     th { background: #f8fafc; font-weight: 700; }
+    #recentOrdersBody tr { transition: background-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+    #recentOrdersBody tr:hover { background: #f8fafc; box-shadow: inset 0 0 0 1px #dbe4f0; }
+    #recentOrdersBody tr:focus-visible { outline: 2px solid #0f172a; outline-offset: -2px; background: #eef2ff; }
+    #recentOrdersBody tr td:first-child { font-weight: 700; color: #0f172a; }
     .topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
     .topbar-menu { position: relative; }
     .menu-trigger { border: 1px solid #d1d5db; border-radius: 12px; background: #fff; color: #111827; padding: 10px 14px; cursor: pointer; }
@@ -144,6 +177,24 @@ function format_peso_display($amount) {
     .menu-dropdown a { display: block; padding: 10px 12px; color: #111827; text-decoration: none; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
     .menu-dropdown a:last-child { border-bottom: none; }
     .menu-dropdown a:hover { background: #f8fafc; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.56); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 220; }
+    .modal-overlay.open { display: flex; }
+    .modal-card { width: min(760px, 100%); background: #fff; border-radius: 18px; border: 1px solid #e5e7eb; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24); overflow: hidden; }
+    .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px; border-bottom: 1px solid #e5e7eb; }
+    .modal-header h3 { margin: 0; font-size: 18px; color: #0f172a; }
+    .modal-header p { margin: 4px 0 0; color: #64748b; font-size: 13px; }
+    .modal-close { border: 1px solid #d1d5db; background: #fff; color: #111827; border-radius: 10px; width: 38px; height: 38px; cursor: pointer; font-size: 20px; line-height: 1; }
+    .modal-body { padding: 20px; }
+    .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .detail-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; }
+    .detail-box strong { display: block; color: #475569; font-size: 12px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .02em; }
+    .detail-box span { color: #0f172a; font-size: 14px; font-weight: 700; }
+    .action-history { display: grid; gap: 10px; }
+    .action-history-item { border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 14px; background: #fff; }
+    .action-history-item strong { display: block; color: #0f172a; margin-bottom: 4px; }
+    .action-history-item small { color: #64748b; display: block; margin-bottom: 6px; }
+    .action-history-item p { margin: 0; color: #334155; font-size: 13px; line-height: 1.45; }
+    .no-history { color: #64748b; font-size: 13px; padding: 8px 0; }
     @media(max-width: 980px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media(max-width: 720px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   </style>
@@ -213,34 +264,224 @@ function format_peso_display($amount) {
     <section class="section-card">
       <div class="section-actions">
         <div><h2>Recent Orders</h2></div>
+        <div style="margin-left: auto; display: flex; gap: 8px;">
+          <select id="statusFilter" onchange="handleStatusFilterChange(this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827; font-size: 13px; cursor: pointer;">
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+             <option value="pickup">Pickup</option>
+            <option value="shipped">Shipped</option>
+            <option value="delivered">Delivered</option>
+             <option value="pickedup">Picked Up</option>
+            <option value="reviewed">Reviewed</option>
+            <option value="cancelled">Cancelled</option>
+           
+           
+          </select>
+          <select id="sortFilter" onchange="handleSortChange(this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827; font-size: 13px; cursor: pointer;">
+            <option value="newest">Newest to Oldest</option>
+            <option value="oldest">Oldest to Newest</option>
+          </select>
+        </div>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr><th>Order ID</th><th>Status</th><th>Delivery</th><th>Total</th><th>Date</th></tr>
           </thead>
-          <tbody>
-            <?php foreach ($orderDetails as $order): ?>
-              <tr>
-                <td>#<?= $order['order_id'] ?></td>
-                <td><?= htmlspecialchars($order['status']) ?></td>
-                <td><?= htmlspecialchars($order['delivery_type']) ?></td>
-                <td>₱<?= format_peso_display($order['total_amount']) ?></td>
-                <td><?= htmlspecialchars($order['order_date']) ?></td>
-              </tr>
-            <?php endforeach; ?>
+          <tbody id="recentOrdersBody">
             <?php if (empty($orderDetails)): ?>
               <tr><td colspan="5">No recent orders found.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
       </div>
+      <div id="paginationControls" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
+      </div>
     </section>
   </div>
 
+  <div id="orderDetailOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="orderDetailTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 id="orderDetailTitle">Order Details</h3>
+          <p id="orderDetailSubtitle">Click an order to see its status and who handled each action.</p>
+        </div>
+        <button type="button" class="modal-close" onclick="closeOrderDetails()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-box"><strong>Order ID</strong><span id="detailOrderId"></span></div>
+          <div class="detail-box"><strong>Confirmed By</strong><span id="detailCustomerName"></span></div>
+          <div class="detail-box"><strong>Status</strong><span id="detailOrderStatus"></span></div>
+          <div class="detail-box"><strong>Delivery Type</strong><span id="detailDeliveryType"></span></div>
+          <div class="detail-box"><strong>Total</strong><span id="detailOrderTotal"></span></div>
+          <div class="detail-box"><strong>Order Date</strong><span id="detailOrderDate"></span></div>
+        </div>
+        <div style="margin-bottom: 10px; font-weight: 700; color: #0f172a;">Admin Actions</div>
+        <div id="detailActionHistory" class="action-history"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
+    const allOrdersData = <?php echo json_encode($orderDetails, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
+    const orderActionData = <?php echo json_encode($orderActors, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
     const chartData = <?php echo json_encode(['orderStatusChart' => $orderStatusChart], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
     const chartColors = ['#2563eb', '#0ea5e9', '#22c55e', '#f97316', '#f43f5e', '#a855f7'];
+    
+    let currentSortOrder = 'newest';
+    let currentStatusFilter = '';
+    let currentPage = 1;
+    const itemsPerPage = 6;
+    
+    function getSortedOrders() {
+      let sorted = [...allOrdersData];
+      
+      if (currentStatusFilter) {
+        sorted = sorted.filter(order => order.status === currentStatusFilter);
+      }
+      
+      if (currentSortOrder === 'oldest') {
+        sorted.reverse();
+      }
+      return sorted;
+    }
+    
+    function renderPaginatedOrders() {
+      const sorted = getSortedOrders();
+      const totalItems = sorted.length;
+      const totalPages = Math.ceil(totalItems / itemsPerPage);
+      
+      if (totalPages === 0 || totalItems === 0) {
+        document.getElementById('recentOrdersBody').innerHTML = '<tr><td colspan="5">No recent orders found.</td></tr>';
+        document.getElementById('paginationControls').innerHTML = '';
+        return;
+      }
+      
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+      const pageOrders = sorted.slice(startIndex, endIndex);
+      
+      let tableHtml = '';
+      pageOrders.forEach(order => {
+        tableHtml += `<tr role="button" tabindex="0" onclick="openOrderDetails(${order.order_id})" onkeypress="if(event.key==='Enter'||event.key===' '){event.preventDefault();openOrderDetails(${order.order_id});}" style="cursor:pointer;">
+          <td>#${order.order_id}</td>
+          <td>${order.status}</td>
+          <td>${order.delivery_type}</td>
+          <td>₱${formatPesoDisplay(order.total_amount)}</td>
+          <td>${order.order_date}</td>
+        </tr>`;
+      });
+      document.getElementById('recentOrdersBody').innerHTML = tableHtml;
+      
+      let paginationHtml = '';
+      if (totalPages > 1) {
+        paginationHtml += `<button onclick="goToPage(${Math.max(1, currentPage - 1)})" ${currentPage === 1 ? 'disabled' : ''} style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: ${currentPage === 1 ? '#f3f4f6' : '#fff'}; color: #111827; cursor: ${currentPage === 1 ? 'not-allowed' : 'pointer'}; font-size: 13px;">← Prev</button>`;
+        
+        for (let p = 1; p <= totalPages; p++) {
+          const isActive = p === currentPage;
+          paginationHtml += `<button onclick="goToPage(${p})" style="padding: 8px 12px; border: 1px solid ${isActive ? '#0f172a' : '#d1d5db'}; border-radius: 8px; background: ${isActive ? '#0f172a' : '#fff'}; color: ${isActive ? '#fff' : '#111827'}; cursor: pointer; font-size: 13px; font-weight: ${isActive ? '700' : '400'};">${p}</button>`;
+        }
+        
+        paginationHtml += `<button onclick="goToPage(${Math.min(totalPages, currentPage + 1)})" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: ${currentPage === totalPages ? '#f3f4f6' : '#fff'}; color: #111827; cursor: ${currentPage === totalPages ? 'not-allowed' : 'pointer'}; font-size: 13px;">Next →</button>`;
+      }
+      document.getElementById('paginationControls').innerHTML = paginationHtml;
+    }
+    
+    function goToPage(page) {
+      const sorted = getSortedOrders();
+      const totalPages = Math.ceil(sorted.length / itemsPerPage);
+      if (page >= 1 && page <= totalPages) {
+        currentPage = page;
+        renderPaginatedOrders();
+      }
+    }
+    
+    function handleSortChange(value) {
+      currentSortOrder = value;
+      currentPage = 1;
+      renderPaginatedOrders();
+    }
+    
+    function handleStatusFilterChange(value) {
+      currentStatusFilter = value;
+      currentPage = 1;
+      renderPaginatedOrders();
+    }
+
+    function classifyOrderAction(messageText, currentStatus) {
+      const text = String(messageText || '').toLowerCase();
+      if (text.includes('cancelled')) return 'Cancelled By';
+      if (text.includes('ready for pickup') || text.includes('pickup')) return 'Ready for Pickup By';
+      if (text.includes('shipped')) return 'Shipped By';
+      if (text.includes('delivered')) return 'Delivered By';
+      if (text.includes('processing')) return 'Processing By';
+      if (text.includes('archived')) return 'Archived By';
+      if (text.includes('bin')) return 'Moved To Bin By';
+      return currentStatus ? `${currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)} By` : 'Updated By';
+    }
+
+    function openOrderDetails(orderId) {
+      const order = allOrdersData.find(item => parseInt(item.order_id, 10) === parseInt(orderId, 10));
+      if (!order) {
+        return;
+      }
+
+      document.getElementById('detailOrderId').textContent = `#${order.order_id}`;
+      document.getElementById('detailCustomerName').textContent = order.customer_name || `Customer #${order.user_id}`;
+      document.getElementById('detailOrderStatus').textContent = order.status.charAt(0).toUpperCase() + order.status.slice(1);
+      document.getElementById('detailDeliveryType').textContent = order.delivery_type.charAt(0).toUpperCase() + order.delivery_type.slice(1);
+      document.getElementById('detailOrderTotal').textContent = `₱${formatPesoDisplay(order.total_amount)}`;
+      document.getElementById('detailOrderDate').textContent = order.order_date;
+
+      const history = orderActionData[order.order_id] || [];
+      const historyContainer = document.getElementById('detailActionHistory');
+      if (!history.length) {
+        historyContainer.innerHTML = '<div class="no-history">No admin action history recorded for this order yet.</div>';
+      } else {
+        historyContainer.innerHTML = history.map(entry => {
+          const label = classifyOrderAction(entry.message_text, order.status);
+          const timestamp = entry.created_at ? new Date(entry.created_at).toLocaleString() : 'Unknown time';
+          return `<div class="action-history-item">
+            <strong>${label}: ${entry.actor_name || 'Unknown admin'}</strong>
+            <small>${timestamp}</small>
+            <p>${entry.message_text}</p>
+          </div>`;
+        }).join('');
+      }
+
+      document.getElementById('orderDetailOverlay').classList.add('open');
+    }
+
+    function closeOrderDetails() {
+      document.getElementById('orderDetailOverlay').classList.remove('open');
+    }
+
+    document.getElementById('orderDetailOverlay').addEventListener('click', (event) => {
+      if (event.target.id === 'orderDetailOverlay') {
+        closeOrderDetails();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeOrderDetails();
+      }
+    });
+    
+    function formatPesoDisplay(amount) {
+      const value = parseFloat(amount);
+      if (Math.floor(value) === value) {
+        return value.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+      }
+      return value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/\.?0+$/, '');
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      renderPaginatedOrders();
+    });
 
     function renderPieChart(areaId, subtitleId, values, subtitleText) {
       const chartArea = document.getElementById(areaId);

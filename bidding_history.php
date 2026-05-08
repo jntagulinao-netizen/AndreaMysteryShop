@@ -18,11 +18,11 @@ if ($role !== 'user') {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>My Bid History</title>
   <link rel="stylesheet" href="main.css">
-  <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260501-1">
+  <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260508-2">
   <link rel="stylesheet" href="assets/css/local_swal.css">
 
-  <link rel="stylesheet" href="assets/css/user_dashboard_search.css?v=20260331-1">
-  <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260409-2">
+  <link rel="stylesheet" href="assets/css/user_dashboard_search.css?v=20260508-2">
+  <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260508-2">
   <script src="assets/js/local_swal.js"></script>
  
   <style>
@@ -485,8 +485,8 @@ if ($role !== 'user') {
   </div>
 
   <?php include __DIR__ . '/partials/user_dashboard/checkout_section.php'; ?>
-  <script src="assets/js/user_dashboard_helpers.js?v=20260401-2"></script>
-  <script src="assets/js/user_dashboard_recipients.js?v=20260401-2"></script>
+  <script src="assets/js/user_dashboard_helpers.js?v=20260508-2"></script>
+  <script src="assets/js/user_dashboard_recipients.js?v=20260508-2"></script>
 
   <script>
     let bidRows = [];

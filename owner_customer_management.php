@@ -426,7 +426,13 @@ if ($recentCustomersResult) {
     </section>
 
     <section class="section-card">
-      <div class="section-actions"><div><h2>Customer List</h2></div></div>
+      <div class="section-actions">
+        <div><h2>Customer List</h2></div>
+        <select id="customerSortFilter" onchange="handleCustomerSortChange(this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827; font-size: 13px; cursor: pointer;">
+          <option value="newest">Newest to Oldest</option>
+          <option value="oldest">Oldest to Newest</option>
+        </select>
+      </div>
       <div class="tabs">
         <a href="?tab=recent<?= $selectedMonth ? '&month=' . $selectedMonth : '' ?><?= $selectedYear ? '&year=' . $selectedYear : '' ?>" class="btn<?= $selectedTab === 'recent' ? ' primary' : '' ?>" style="text-decoration: none;">Recent Signups (15 days)</a>
         <a href="?tab=all<?= $selectedMonth ? '&month=' . $selectedMonth : '' ?><?= $selectedYear ? '&year=' . $selectedYear : '' ?>" class="btn<?= $selectedTab === 'all' ? ' primary' : '' ?>" style="text-decoration: none;">All Customers</a>
@@ -437,27 +443,11 @@ if ($recentCustomersResult) {
           <thead>
             <tr><th>Name</th><th>Email</th><th>Joined</th><th>Status</th><th>Action</th></tr>
           </thead>
-          <tbody>
-            <?php foreach ($recentCustomers as $customer): ?>
-              <tr>
-                <td><?= htmlspecialchars($customer['full_name']) ?></td>
-                <td><?= htmlspecialchars($customer['email']) ?></td>
-                <td><?= htmlspecialchars($customer['created_at']) ?></td>
-                <td><?php
-                  $status = ucfirst($customer['status']);
-                  if ($customer['role'] === 'admin') {
-                    $status = 'Admin' . ($customer['is_owner'] ? ' (Owner)' : '');
-                  }
-                  echo htmlspecialchars($status);
-                ?></td>
-                <td><button class="btn" type="button" onclick="showCustomerDetails(<?= $customer['user_id'] ?>)">View Details</button></td>
-              </tr>
-            <?php endforeach; ?>
-            <?php if (empty($recentCustomers)): ?>
-              <tr><td colspan="5">No customers found.</td></tr>
-            <?php endif; ?>
+          <tbody id="customerTableBody">
           </tbody>
         </table>
+      </div>
+      <div id="customerPagination" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
       </div>
     </section>
 
@@ -496,10 +486,6 @@ if ($recentCustomersResult) {
           <input type="hidden" name="demote_owner_id" id="demoteOwnerId" value="">
           <button class="btn warn" type="button" onclick="confirmAction('demoteOwnerForm', 'Are you sure you want to remove owner privileges from this admin?')" id="demoteOwnerButton">Remove Owner Privileges</button>
         </form>
-        <form id="makeOwnerForm" method="post" style="display:none;align-items:center;">
-          <input type="hidden" name="make_owner_id" id="makeOwnerId" value="">
-          <button class="btn primary" type="button" onclick="confirmAction('makeOwnerForm', 'Are you sure you want to make this admin an owner?')" id="makeOwnerButton">Make Owner</button>
-        </form>
         <button class="btn" type="button" onclick="hideCustomerDetails()">Close</button>
       </div>
     </div>
@@ -508,6 +494,86 @@ if ($recentCustomersResult) {
   <script>
     const chartData = <?php echo json_encode(['customerSignupChart' => $customerSignupChart, 'customers' => $recentCustomers], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
     const chartColors = ['#2563eb', '#22c55e'];
+    
+    let currentCustomerPage = 1;
+    const customerItemsPerPage = 8;
+    let currentCustomerSort = 'newest';
+    
+    function getFormattedStatus(customer) {
+      let status = customer.status.charAt(0).toUpperCase() + customer.status.slice(1);
+      if (customer.role === 'admin') {
+        status = 'Admin' + (customer.is_owner ? ' (Owner)' : '');
+      }
+      return status;
+    }
+    
+    function getSortedCustomers() {
+      const sorted = [...chartData.customers];
+      if (currentCustomerSort === 'oldest') {
+        sorted.reverse();
+      }
+      return sorted;
+    }
+    
+    function renderPaginatedCustomers() {
+      const sorted = getSortedCustomers();
+      const totalItems = sorted.length;
+      const totalPages = Math.ceil(totalItems / customerItemsPerPage);
+      
+      if (totalItems === 0) {
+        document.getElementById('customerTableBody').innerHTML = '<tr><td colspan="5">No customers found.</td></tr>';
+        document.getElementById('customerPagination').innerHTML = '';
+        return;
+      }
+      
+      const startIdx = (currentCustomerPage - 1) * customerItemsPerPage;
+      const endIdx = Math.min(startIdx + customerItemsPerPage, totalItems);
+      const pageItems = sorted.slice(startIdx, endIdx);
+      
+      let html = '';
+      pageItems.forEach(customer => {
+        const status = getFormattedStatus(customer);
+        html += `<tr>
+          <td>${customer.full_name}</td>
+          <td>${customer.email}</td>
+          <td>${customer.created_at}</td>
+          <td>${status}</td>
+          <td><button class="btn" type="button" onclick="showCustomerDetails(${customer.user_id})">View Details</button></td>
+        </tr>`;
+      });
+      document.getElementById('customerTableBody').innerHTML = html;
+      
+      // Render pagination
+      if (totalPages > 1) {
+        let paginationHtml = `<button onclick="goToCustomerPage(${Math.max(1, currentCustomerPage - 1)})\" ${currentCustomerPage === 1 ? 'disabled' : ''} style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: ${currentCustomerPage === 1 ? '#f3f4f6' : '#fff'}; color: #111827; cursor: ${currentCustomerPage === 1 ? 'not-allowed' : 'pointer'}; font-size: 13px;">← Prev</button>`;
+        
+        for (let p = 1; p <= totalPages; p++) {
+          const isActive = p === currentCustomerPage;
+          paginationHtml += `<button onclick="goToCustomerPage(${p})" style="padding: 8px 12px; border: 1px solid ${isActive ? '#0f172a' : '#d1d5db'}; border-radius: 8px; background: ${isActive ? '#0f172a' : '#fff'}; color: ${isActive ? '#fff' : '#111827'}; cursor: pointer; font-size: 13px; font-weight: ${isActive ? '700' : '400'};\">${p}</button>`;
+        }
+        
+        paginationHtml += `<button onclick="goToCustomerPage(${Math.min(totalPages, currentCustomerPage + 1)})" ${currentCustomerPage === totalPages ? 'disabled' : ''} style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: ${currentCustomerPage === totalPages ? '#f3f4f6' : '#fff'}; color: #111827; cursor: ${currentCustomerPage === totalPages ? 'not-allowed' : 'pointer'}; font-size: 13px;">Next →</button>`;
+        
+        document.getElementById('customerPagination').innerHTML = paginationHtml;
+      } else {
+        document.getElementById('customerPagination').innerHTML = '';
+      }
+    }
+    
+    function goToCustomerPage(page) {
+      const sorted = getSortedCustomers();
+      const totalPages = Math.ceil(sorted.length / customerItemsPerPage);
+      if (page >= 1 && page <= totalPages) {
+        currentCustomerPage = page;
+        renderPaginatedCustomers();
+      }
+    }
+    
+    function handleCustomerSortChange(value) {
+      currentCustomerSort = value;
+      currentCustomerPage = 1;
+      renderPaginatedCustomers();
+    }
 
     function renderPieChart(areaId, subtitleId, values, subtitleText) {
       const chartArea = document.getElementById(areaId);
@@ -576,11 +642,9 @@ if ($recentCustomersResult) {
       const makeAdminForm = document.getElementById('makeAdminForm');
       const makeUserForm = document.getElementById('makeUserForm');
       const demoteOwnerForm = document.getElementById('demoteOwnerForm');
-      const makeOwnerForm = document.getElementById('makeOwnerForm');
       const makeAdminIdInput = document.getElementById('makeAdminId');
       const makeUserIdInput = document.getElementById('makeUserId');
       const demoteOwnerIdInput = document.getElementById('demoteOwnerId');
-      const makeOwnerIdInput = document.getElementById('makeOwnerId');
 
       actionForm.style.display = 'flex';
       const nextAction = customer.status.toLowerCase() === 'inactive' ? 'unblock' : 'block';
@@ -593,18 +657,14 @@ if ($recentCustomersResult) {
         makeUserForm.style.display = 'flex';
         makeUserIdInput.value = customer.user_id;
         if (customer.is_owner === 1) {
-          makeOwnerForm.style.display = 'none';
           demoteOwnerForm.style.display = 'flex';
           demoteOwnerIdInput.value = customer.user_id;
           document.getElementById('detailSubtitle').textContent = 'This admin account is an owner. You can remove owner privileges or demote to user.';
         } else {
           demoteOwnerForm.style.display = 'none';
-          makeOwnerForm.style.display = 'flex';
-          makeOwnerIdInput.value = customer.user_id;
-          document.getElementById('detailSubtitle').textContent = 'This admin can be promoted to owner or demoted to user.';
+          document.getElementById('detailSubtitle').textContent = 'This admin can be demoted to user.';
         }
       } else {
-        makeOwnerForm.style.display = 'none';
         makeUserForm.style.display = 'none';
         demoteOwnerForm.style.display = 'none';
         if (customer.role === 'user') {
@@ -695,6 +755,7 @@ if ($recentCustomersResult) {
     }
 
     renderCustomerChart();
+    renderPaginatedCustomers();
     const notificationElement = document.getElementById('customerNotification');
     if (notificationElement) {
       notificationElement.classList.add('flash');
@@ -715,9 +776,9 @@ if ($recentCustomersResult) {
         [],
         ['Name', 'Email', 'Joined']
       ];
-      <?php foreach ($recentCustomers as $customer): ?>
-        rows.push(['<?= addslashes($customer['full_name']) ?>', '<?= addslashes($customer['email']) ?>', '<?= addslashes($customer['created_at']) ?>']);
-      <?php endforeach; ?>
+      chartData.customers.forEach(customer => {
+        rows.push([customer.full_name, customer.email, customer.created_at]);
+      });
       if (rows.length <= 7) {
         alert('No data available for the selected period.');
         return;

@@ -165,6 +165,12 @@ async function saveNewRecipient() {
         return;
     }
 
+    // Validate phone number is exactly 11 digits
+    if (!/^[0-9]{11}$/.test(formData.phone_no)) {
+        await showLocalSweetAlert('warning', 'Invalid Phone', 'Phone number must be exactly 11 digits (numbers only).', 1700);
+        return;
+    }
+
     try {
         const body = new URLSearchParams();
         body.append('recipient_name', formData.recipient_name);
@@ -256,6 +262,12 @@ async function saveEditedRecipient() {
     // Validate required fields
     if (!formData.recipient_name || !formData.phone_no || !formData.street_name || !formData.region || !formData.province || !formData.city || !formData.district) {
         await showLocalSweetAlert('warning', 'Missing Required Fields', 'Please fill in all required fields (marked with *).', 1700);
+        return;
+    }
+
+    // Validate phone number is exactly 11 digits
+    if (!/^[0-9]{11}$/.test(formData.phone_no)) {
+        await showLocalSweetAlert('warning', 'Invalid Phone', 'Phone number must be exactly 11 digits (numbers only).', 1700);
         return;
     }
 

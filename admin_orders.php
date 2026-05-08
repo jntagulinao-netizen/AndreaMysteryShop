@@ -560,7 +560,7 @@ if (!empty($reviewUserIds) && !empty($reviewProductIds)) {
 }
 
 $statusDisplay = [
-  'pending' => 'To Pay',
+  'pending' => 'To Process',
   'processing' => 'To Ship',
   'shipped' => 'To Receive',
   'delivered' => 'Order Delivered',
@@ -1523,9 +1523,9 @@ $statusDisplay = [
 
     const statusConfig = {
       pending: {
-        title: 'To Pay',
-        titleText: 'Payment Pending',
-        message: 'Please complete your payment to process your order.'
+        title: 'To Process',
+        titleText: 'Pending',
+        message: 'This order is pending approval.'
       },
       processing: {
         title: 'To Ship',

@@ -38,6 +38,13 @@ if (!$data['recipient_id'] || !$data['recipient_name'] || !$data['phone_no'] || 
     exit;
 }
 
+// Validate phone number: exactly 11 digits
+if (!preg_match('/^\d{11}$/', $data['phone_no'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Phone number must be exactly 11 digits']);
+    exit;
+}
+
 try {
     // Verify recipient belongs to user
     $checkQuery = "SELECT recipient_id FROM recipients WHERE recipient_id = ? AND user_id = ?";

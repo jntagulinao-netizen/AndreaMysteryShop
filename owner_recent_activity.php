@@ -302,24 +302,24 @@ $activityChart = [
         <div>
           <h2>Latest Events</h2>
         </div>
-        <div class="tabs" role="tablist" aria-label="Latest events tabs">
-          <button type="button" class="tab-button active" data-tab="all">All</button>
-          <button type="button" class="tab-button" data-tab="order">Orders</button>
-          <button type="button" class="tab-button" data-tab="customer">Users</button>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <div class="tabs" role="tablist" aria-label="Latest events tabs">
+            <button type="button" class="tab-button active" data-tab="all">All</button>
+            <button type="button" class="tab-button" data-tab="order">Orders</button>
+            <button type="button" class="tab-button" data-tab="customer">Users</button>
+          </div>
+          <select id="sortFilter" onchange="handleActivitySortChange(this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827; font-size: 13px; cursor: pointer;">
+            <option value="newest">Newest to Oldest</option>
+            <option value="oldest">Oldest to Newest</option>
+          </select>
         </div>
       </div>
       <div class="activity-list" id="activityList">
-        <?php foreach ($activityFeed as $index => $event): ?>
-          <div class="activity-item" role="button" tabindex="0" data-event-index="<?= $index ?>" data-event-type="<?= htmlspecialchars($event['type']) ?>">
-            <strong><?= htmlspecialchars($event['title']) ?></strong>
-            <span><?= htmlspecialchars($event['subtitle']) ?></span>
-            <div class="note"><?= htmlspecialchars($event['note']) ?></div>
-            <div class="time"><?= htmlspecialchars($event['timestamp_label']) ?></div>
-          </div>
-        <?php endforeach; ?>
         <?php if (empty($activityFeed)): ?>
           <div class="activity-item">No recent activity available.</div>
         <?php endif; ?>
+      </div>
+      <div id="activityPagination" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
       </div>
     </section>
   </div>
@@ -327,6 +327,11 @@ $activityChart = [
   <script>
     const chartData = <?php echo json_encode(['activityChart' => $activityChart, 'activityFeed' => $activityFeed], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
     const chartColors = ['#2563eb', '#22c55e'];
+    
+    let currentActivityPage = 1;
+    const itemsPerPage = 6;
+    let currentActivityTab = 'all';
+    let currentActivitySort = 'newest';
 
     function openLocalSweetAlert(options = {}) {
       const overlay = document.getElementById('localSwal');
@@ -469,7 +474,7 @@ $activityChart = [
     }
 
     function attachActivityCardHandlers() {
-      document.querySelectorAll('.activity-item').forEach(item => {
+      document.querySelectorAll('.activity-item[data-event-index]').forEach(item => {
         item.addEventListener('click', () => showActivityDetails(item.dataset.eventIndex));
         item.addEventListener('keypress', (event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -480,30 +485,87 @@ $activityChart = [
       });
     }
 
-    function applyActivityTabFilter(filter) {
-      document.querySelectorAll('.activity-item').forEach(item => {
-        const type = item.dataset.eventType;
-        if (filter === 'all' || type === filter) {
-          item.style.display = '';
-        } else {
-          item.style.display = 'none';
-        }
-      });
-      const visibleItems = Array.from(document.querySelectorAll('.activity-item')).filter(item => item.style.display !== 'none');
-      if (visibleItems.length === 0) {
-        const existingEmpty = document.querySelector('.activity-list .empty-row');
-        if (!existingEmpty) {
-          const emptyCard = document.createElement('div');
-          emptyCard.className = 'activity-item empty-row';
-          emptyCard.textContent = 'No recent activity available for this category.';
-          document.getElementById('activityList').appendChild(emptyCard);
-        }
-      } else {
-        const existingEmpty = document.querySelector('.activity-list .empty-row');
-        if (existingEmpty) {
-          existingEmpty.remove();
-        }
+    function getFilteredActivities() {
+      let filtered = chartData.activityFeed;
+      
+      // Apply tab filter
+      if (currentActivityTab !== 'all') {
+        filtered = filtered.filter(event => event.type === currentActivityTab);
       }
+      
+      // Apply sort
+      const sorted = [...filtered];
+      if (currentActivitySort === 'oldest') {
+        sorted.reverse();
+      }
+      
+      return sorted;
+    }
+
+    function renderPaginatedActivities() {
+      const filtered = getFilteredActivities();
+      const totalItems = filtered.length;
+      const totalPages = Math.ceil(totalItems / itemsPerPage);
+      
+      if (totalItems === 0) {
+        document.getElementById('activityList').innerHTML = '<div class="activity-item">No recent activity available for this category.</div>';
+        document.getElementById('activityPagination').innerHTML = '';
+        return;
+      }
+      
+      const startIdx = (currentActivityPage - 1) * itemsPerPage;
+      const endIdx = Math.min(startIdx + itemsPerPage, totalItems);
+      const pageItems = filtered.slice(startIdx, endIdx);
+      
+      let html = '';
+      pageItems.forEach(event => {
+        const eventIdx = chartData.activityFeed.findIndex(e => e.timestamp === event.timestamp && e.type === event.type);
+        html += `<div class="activity-item" role="button" tabindex="0" data-event-index="${eventIdx}" data-event-type="${event.type}">
+          <strong>${event.title}</strong>
+          <span>${event.subtitle}</span>
+          <div class="note">${event.note}</div>
+          <div class="time">${event.timestamp_label}</div>
+        </div>`;
+      });
+      document.getElementById('activityList').innerHTML = html;
+      attachActivityCardHandlers();
+      
+      // Render pagination controls
+      if (totalPages > 1) {
+        let paginationHtml = `<button onclick="goToActivityPage(${Math.max(1, currentActivityPage - 1)})" ${currentActivityPage === 1 ? 'disabled' : ''} style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: ${currentActivityPage === 1 ? '#f3f4f6' : '#fff'}; color: #111827; cursor: ${currentActivityPage === 1 ? 'not-allowed' : 'pointer'}; font-size: 13px;">← Prev</button>`;
+        
+        for (let p = 1; p <= totalPages; p++) {
+          const isActive = p === currentActivityPage;
+          paginationHtml += `<button onclick="goToActivityPage(${p})" style="padding: 8px 12px; border: 1px solid ${isActive ? '#0f172a' : '#d1d5db'}; border-radius: 8px; background: ${isActive ? '#0f172a' : '#fff'}; color: ${isActive ? '#fff' : '#111827'}; cursor: pointer; font-size: 13px; font-weight: ${isActive ? '700' : '400'};\">${p}</button>`;
+        }
+        
+        paginationHtml += `<button onclick="goToActivityPage(${Math.min(totalPages, currentActivityPage + 1)})" ${currentActivityPage === totalPages ? 'disabled' : ''} style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: ${currentActivityPage === totalPages ? '#f3f4f6' : '#fff'}; color: #111827; cursor: ${currentActivityPage === totalPages ? 'not-allowed' : 'pointer'}; font-size: 13px;">Next →</button>`;
+        
+        document.getElementById('activityPagination').innerHTML = paginationHtml;
+      } else {
+        document.getElementById('activityPagination').innerHTML = '';
+      }
+    }
+
+    function goToActivityPage(page) {
+      const filtered = getFilteredActivities();
+      const totalPages = Math.ceil(filtered.length / itemsPerPage);
+      if (page >= 1 && page <= totalPages) {
+        currentActivityPage = page;
+        renderPaginatedActivities();
+      }
+    }
+
+    function applyActivityTabFilter(filter) {
+      currentActivityTab = filter;
+      currentActivityPage = 1;
+      renderPaginatedActivities();
+    }
+
+    function handleActivitySortChange(value) {
+      currentActivitySort = value;
+      currentActivityPage = 1;
+      renderPaginatedActivities();
     }
 
     function attachTabHandlers() {
@@ -517,7 +579,7 @@ $activityChart = [
     }
 
     renderActivityChart();
-    attachActivityCardHandlers();
+    renderPaginatedActivities();
     attachTabHandlers();
 
     function downloadActivityCsv() {
@@ -528,9 +590,9 @@ $activityChart = [
         [],
         ['Title', 'Subtitle', 'Note', 'Timestamp'],
       ];
-      <?php foreach ($activityFeed as $event): ?>
-        rows.push(['<?= addslashes($event['title']) ?>', '<?= addslashes($event['subtitle']) ?>', '<?= addslashes($event['note']) ?>', '<?= addslashes($event['timestamp_label']) ?>']);
-      <?php endforeach; ?>
+      chartData.activityFeed.forEach(event => {
+        rows.push([event.title, event.subtitle, event.note, event.timestamp_label]);
+      });
       if (rows.length <= 4) {
         alert('No data available for the selected period.');
         return;

@@ -133,7 +133,7 @@ foreach ($orders as $order) {
 }
 
 $statusDisplay = [
-    'pending' => 'To Pay',
+    'pending' => 'To Process',
     'processing' => 'To Ship',
     'pickup' => 'Ready for Pickup',
     'pickedup' => 'Picked Up',
@@ -852,7 +852,7 @@ $statusDisplay = [
         <!-- Tabs -->
         <div class="tabs-container">
             <button class="tab active" data-status="all" onclick="filterByStatus('all')">All</button>
-            <button class="tab" data-status="pending" onclick="filterByStatus('pending')">To pay</button>
+            <button class="tab" data-status="pending" onclick="filterByStatus('pending')">To process </button>
             <button class="tab" data-status="processing" onclick="filterByStatus('processing')">To ship</button>
             <button class="tab" data-status="pickup" onclick="filterByStatus('pickup')">Pickups</button>
             <button class="tab" data-status="pickedup" onclick="filterByStatus('pickedup')">Picked Up</button>
@@ -1661,10 +1661,10 @@ $statusDisplay = [
         // Status configurations
         const statusConfig = {
             'pending': {
-                title: 'To Pay',
+                title: 'To Process',
                 icon: '●',
-                message: 'Please complete your payment to process your order.',
-                titleText: 'Payment Pending',
+                message: 'Pending for approval.',
+                titleText: 'Pending',
                 actions: ['Cancel Order']
             },
             'processing': {
