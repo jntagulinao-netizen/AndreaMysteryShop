@@ -1846,7 +1846,7 @@ $statusDisplay = [
             }
 
             // Mock seller address
-            sellerAddressEl.textContent = 'Seller Address: 123 Mystery Lane, Enigma City, Philippines';
+            sellerAddressEl.textContent = 'Seller Address: San Agustin 2, Dasmariñas, Cavite';
             sellerAddressEl.style.display = 'block';
 
             // Update timeline information

@@ -119,3 +119,36 @@ Insert result: true
 }
 Insert result: true
 
+2026-05-09T17:07:02+02:00
+{
+    "mediaPublicPath": "",
+    "mediaType": "",
+    "mediaMime": null,
+    "mediaSize": null,
+    "mediaOriginalName": null,
+    "finalMessageText": "hi"
+}
+Insert result: true
+
+2026-05-09T17:18:37+02:00
+{
+    "mediaPublicPath": "",
+    "mediaType": "",
+    "mediaMime": null,
+    "mediaSize": null,
+    "mediaOriginalName": null,
+    "finalMessageText": "thankyou"
+}
+Insert result: true
+
+2026-05-09T17:20:19+02:00
+{
+    "mediaPublicPath": "message_media\/images\/msg_20260509_172019_c2514947.jpg",
+    "mediaType": "image",
+    "mediaMime": "image\/jpeg",
+    "mediaSize": 83775,
+    "mediaOriginalName": "680886167_993973893587415_1190611873030211526_n.jpg",
+    "finalMessageText": "[CHAT_MEDIA]message_media\/images\/msg_20260509_172019_c2514947.jpg|image[\/CHAT_MEDIA]"
+}
+Insert result: true
+
