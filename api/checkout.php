@@ -189,9 +189,18 @@ try {
     $cart = $cartRes->fetch_assoc();
     
     if (!$cart) {
-        throw new Exception('Cart not found');
+        // Create cart if it doesn't exist
+        $insertStmt = $conn->prepare('INSERT INTO carts (user_id) VALUES (?)');
+        $insertStmt->bind_param('i', $userId);
+        if ($insertStmt->execute()) {
+            $cartId = $conn->insert_id;
+            $insertStmt->close();
+        } else {
+            throw new Exception('Failed to create cart');
+        }
+    } else {
+        $cartId = $cart['cart_id'];
     }
-    $cartId = $cart['cart_id'];
 
     // Fetch selected cart items (if any) and product rows (if any)
     $cartItems = [];

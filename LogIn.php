@@ -173,7 +173,7 @@ session_start();
                 <p class="lead">Quick and secure. We'll send a verification email.</p>
                 <form method="post" action="send_otp.php">
                     <div class="form-row"><label for="name">Full name</label><input id="name" name="name" type="text" placeholder="John Doe" required></div>
-                    <div class="form-row"><label for="reg_email">Email</label><input id="reg_email" name="email" type="email" placeholder="you@example.com" required></div>
+                    <div class="form-row"><label for="reg_email">Email</label><input id="reg_email" name="email" type="email" placeholder="you@example.com" pattern="^[^\s@]+@[^\s@]+\.com$" title="Please enter a .com email address" required><div id="regEmailAlert" style="display:none;font-size:13px;color:#b91c1c;margin-top:4px;">.com email address is required.</div></div>
                     <div class="form-row"><label for="reg_pass">Password</label><input id="reg_pass" name="password" type="password" minlength="8" placeholder="Minimum 8 characters" required></div>
                     <div id="pwdRules" style="font-size:13px;color:#6b7280;margin-top:4px;">
                         <div><span id="ruleLength" class="rule-icon">✗</span> At least 8 characters</div>
@@ -259,6 +259,31 @@ session_start();
             }
             if (confirm) {
                 confirm.addEventListener('input', updateRegRules);
+            }
+            const regEmail = document.getElementById('reg_email');
+            const regEmailAlert = document.getElementById('regEmailAlert');
+            if (regEmail) {
+                const validateRegisterEmail = () => {
+                    const value = regEmail.value.trim();
+                    const isComEmail = /^[^\s@]+@[^\s@]+\.com$/i.test(value);
+                    const message = value && !isComEmail ? 'Please enter a .com email address.' : '';
+                    regEmail.setCustomValidity(message);
+                    if (regEmailAlert) {
+                        regEmailAlert.style.display = message ? 'block' : 'none';
+                    }
+                };
+                regEmail.addEventListener('input', validateRegisterEmail);
+                regEmail.addEventListener('blur', () => {
+                    validateRegisterEmail();
+                    if (regEmail.value.trim() && regEmail.validationMessage) {
+                        showAuthSweetAlert({
+                            type: 'warning',
+                            title: 'Email must be .com',
+                            text: 'Please use a .com email address to create your account.',
+                            confirmText: 'OK'
+                        });
+                    }
+                });
             }
         });
         // continued below to include param handling and alerts

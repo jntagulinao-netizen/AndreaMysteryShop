@@ -24,11 +24,20 @@ $cartStmt->execute();
 $res = $cartStmt->get_result();
 $cart = $res->fetch_assoc();
 if (!$cart) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Cart not found']);
-    exit;
+    // Create cart if it doesn't exist
+    $insertStmt = $conn->prepare('INSERT INTO carts (user_id) VALUES (?)');
+    $insertStmt->bind_param('i', $userId);
+    if ($insertStmt->execute()) {
+        $cartId = $conn->insert_id;
+        $insertStmt->close();
+    } else {
+        http_response_code(400);
+        echo json_encode(['error' => 'Failed to create cart']);
+        exit;
+    }
+} else {
+    $cartId = $cart['cart_id'];
 }
-$cartId = $cart['cart_id'];
 
 if ($quantity === 0) {
     $delStmt = $conn->prepare('DELETE FROM cart_items WHERE cart_id = ? AND cart_item_id = ?');

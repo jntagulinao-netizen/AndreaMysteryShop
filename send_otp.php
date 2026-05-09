@@ -36,6 +36,11 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     header('Location: LogIn.php?tab=register');
     exit();
 }
+if (!preg_match('/^[^\s@]+@[^\s@]+\.com$/i', $email)) {
+  $_SESSION['register_err'] = 'Please use a .com email address.';
+  header('Location: LogIn.php?tab=register');
+  exit();
+}
 if ($password !== $confirmPassword) {
     $_SESSION['register_err'] = 'Passwords do not match!';
     header('Location: LogIn.php?tab=register');

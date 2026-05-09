@@ -21,10 +21,11 @@ $role = $_SESSION['user_role'] ?? 'user';
 $isAdmin = strtolower((string)$role) === 'admin';
 
 try {
-    $accessSql = 'SELECT c.conversation_id, c.user_id, c.order_id, c.subject, o.binned, u.full_name AS user_name
+    $accessSql = 'SELECT c.conversation_id, c.user_id, c.admin_id, c.order_id, c.subject, o.binned, u.full_name AS user_name, a.full_name AS admin_name
                   FROM conversations c
                   LEFT JOIN orders o ON o.order_id = c.order_id
                   LEFT JOIN users u ON u.user_id = c.user_id
+                  LEFT JOIN users a ON a.user_id = c.admin_id
                   WHERE c.conversation_id = ? LIMIT 1';
     $accessStmt = $conn->prepare($accessSql);
     if (!$accessStmt) {
@@ -55,7 +56,7 @@ try {
         }
     }
 
-    $msgStmt = $conn->prepare('SELECT message_id, sender_id, sender_role, message_text, media_path, media_type, media_mime, media_size, media_original_name, message_type, is_read, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, message_id ASC');
+    $msgStmt = $conn->prepare('SELECT m.message_id, m.sender_id, m.sender_role, m.message_text, m.media_path, m.media_type, m.media_mime, m.media_size, m.media_original_name, m.message_type, m.is_read, m.created_at, u.full_name AS sender_full_name, a.full_name AS admin_full_name FROM messages m LEFT JOIN users u ON u.user_id = m.sender_id LEFT JOIN conversations c ON c.conversation_id = m.conversation_id LEFT JOIN users a ON a.user_id = c.admin_id WHERE m.conversation_id = ? ORDER BY m.created_at ASC, m.message_id ASC');
     if (!$msgStmt) {
         throw new Exception('Failed to prepare message query');
     }
@@ -69,6 +70,7 @@ try {
             'message_id' => (int)$row['message_id'],
             'sender_id' => (int)$row['sender_id'],
             'sender_role' => $row['sender_role'],
+            'sender_full_name' => $row['sender_full_name'] ?? ($row['sender_role'] === 'admin' ? ($row['admin_full_name'] ?? null) : null),
             'message_text' => $row['message_text'],
             'media_path' => $row['media_path'],
             'media_type' => $row['media_type'],
@@ -102,9 +104,11 @@ try {
         'conversation' => [
             'conversation_id' => (int)$conversation['conversation_id'],
             'user_id' => (int)$conversation['user_id'],
+            'admin_id' => isset($conversation['admin_id']) ? (int)$conversation['admin_id'] : null,
             'order_id' => is_null($conversation['order_id']) ? null : (int)$conversation['order_id'],
             'subject' => $conversation['subject'],
-            'user_name' => $conversation['user_name'] ?? null
+            'user_name' => $conversation['user_name'] ?? null,
+            'admin_name' => $conversation['admin_name'] ?? null
         ],
         'messages' => $messages
     ]);

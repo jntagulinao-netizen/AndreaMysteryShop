@@ -212,6 +212,8 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
         .bubble { max-width: 72%; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.4; border: 1px solid transparent; }
         .bubble.me { background: #2f67d8; color: #fff; border-color: #2a5dc5; }
         .bubble.other { background: #fff; color: #1f2a3d; border-color: #dce6f4; }
+        .bubble.user { background: #fff; color: #1f2a3d; border-color: #2f67d8; box-shadow: inset 0 0 0 1px rgba(47, 103, 216, 0.08); }
+        .bubble.admin { background: #fff; color: #1f2a3d; border-color: #e22a39; box-shadow: inset 0 0 0 1px rgba(226, 42, 57, 0.08); }
         .bubble.system { background: #fff8ea; color: #6f4f12; border-color: #f3deaf; }
         .meta { font-size: 11px; color: #8a95ab; margin-top: 4px; }
         .msg-link { display: block; color: inherit; text-decoration: none; }
@@ -973,6 +975,8 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
                 activeConversationOrderId = conversation.order_id || null;
                 const title = conversation.subject || (conversation.order_id ? `Order #${conversation.order_id}` : 'Support Chat');
                 const adminUserName = String(conversation.user_name || '').trim();
+                const adminDisplayName = String(conversation.admin_name || '').trim();
+                window.currentConversationAdminName = adminDisplayName;
                 document.getElementById('chatTitle').textContent = title;
                 document.getElementById('chatSub').textContent = currentRole === 'admin'
                     ? `Chat with ${adminUserName || ('User #' + conversation.user_id)}`
@@ -996,8 +1000,18 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             list.innerHTML = messages.map(m => {
                 const isMine = (m.sender_role === currentRole) && (m.sender_id === currentUserId);
                 const rowClass = isMine ? 'msg-row me' : 'msg-row';
-                const bubbleClass = m.sender_role === 'system' ? 'bubble system' : (isMine ? 'bubble me' : 'bubble other');
-                const label = m.sender_role === 'system' ? 'System' : (m.sender_role === 'admin' ? 'Admin' : 'User');
+                const bubbleClass = m.sender_role === 'system'
+                    ? 'bubble system'
+                    : (m.sender_role === 'admin'
+                        ? 'bubble admin'
+                        : 'bubble user');
+                const senderName = String(m.sender_full_name || '').trim();
+                const fallbackAdminName = String(window.currentConversationAdminName || '').trim();
+                const label = m.sender_role === 'system'
+                    ? 'System'
+                    : (m.sender_role === 'admin'
+                        ? `admin.${senderName || fallbackAdminName || 'Admin'}`
+                        : 'User');
                 const parsed = parseMessageContent(m.message_text || '');
                 const targetUrl = getOrderTargetUrl();
                 const isOrderNotice = (m.message_type === 'order_notice' || m.message_type === 'status_notice');
