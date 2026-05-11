@@ -52,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // Fetch orders with items
 $query = 'SELECT o.order_id, o.recipient_id, o.order_date, o.status, o.payment_method, o.total_amount, o.archived, o.delivery_type, COALESCE(ds.slot_date, o.order_date) AS schedule_date, DATE_FORMAT(ds.slot_time, "%H:%i") AS schedule_slot,
+                      CASE WHEN aol.order_id IS NOT NULL THEN 1 ELSE 0 END AS is_auction_order,
                  oi.order_item_id, oi.product_id, oi.quantity, oi.price, 
                                  p.product_name, p.product_description,
                                  (SELECT pi.image_url
@@ -62,6 +63,7 @@ $query = 'SELECT o.order_id, o.recipient_id, o.order_date, o.status, o.payment_m
                                     LIMIT 1) AS product_image
           FROM orders o
           LEFT JOIN delivery_slots ds ON o.delivery_slot_id = ds.slot_id
+          LEFT JOIN auction_order_links aol ON o.order_id = aol.order_id
           LEFT JOIN order_items oi ON o.order_id = oi.order_id
           LEFT JOIN products p ON oi.product_id = p.product_id
           WHERE o.user_id = ? AND o.binned = 0
@@ -88,6 +90,7 @@ while ($row = $result->fetch_assoc()) {
             'delivery_type' => $row['delivery_type'] ?? 'pickup',
             'schedule_date' => $row['schedule_date'] ?? null,
             'schedule_slot' => $row['schedule_slot'] ?? null,
+            'is_auction_order' => intval($row['is_auction_order'] ?? 0),
             'seller_address' => '123 Mystery Shop Street, Manila, Philippines', // Mock seller address
             'items' => []
         ];
@@ -873,7 +876,7 @@ $statusDisplay = [
             </div>
             <?php if (!empty($orders) && $hasOrderItems): ?>
                 <?php foreach ($orders as $order): ?>
-                    <div class="order-group" data-order-id="<?php echo intval($order['order_id']); ?>" data-status="<?php echo htmlspecialchars($order['status']); ?>" data-archived="<?php echo intval($order['archived']); ?>">
+                    <div class="order-group" data-order-id="<?php echo intval($order['order_id']); ?>" data-status="<?php echo htmlspecialchars($order['status']); ?>" data-archived="<?php echo intval($order['archived']); ?>" data-is-auction="<?php echo intval($order['is_auction_order'] ?? 0); ?>">
                         <!-- Store Header -->
                         <div class="store-header">
                             <div class="store-info">
@@ -881,7 +884,7 @@ $statusDisplay = [
                                 <div class="store-name">Andrea Mystery Shop</div>
                                 <div class="store-arrow">›</div>
                             </div>
-                            <div class="order-status"><?php echo $statusDisplay[$order['status']] ?? ucfirst($order['status']); ?></div>
+                            <div class="order-status"><?php echo (($order['status'] === 'received' && intval($order['is_auction_order'] ?? 0) === 1) ? 'Order Received' : ($statusDisplay[$order['status']] ?? ucfirst($order['status']))); ?></div>
                         </div>
                         
                         <!-- Order Items -->
@@ -901,7 +904,7 @@ $statusDisplay = [
                                 $recipientAddress = htmlspecialchars(implode(', ', $parts));
                             }
                         ?>
-                            <div class="order-item" onclick="openOrderDetail(this)" data-order-id="<?php echo $order['order_id']; ?>" data-item-id="<?php echo $item['order_item_id']; ?>" data-product-id="<?php echo $item['product_id']; ?>" data-order-status="<?php echo htmlspecialchars($order['status']); ?>" data-store-name="Andrea Mystery Shop" data-recipient-id="<?php echo htmlspecialchars($order['recipient_id']); ?>" data-recipient-name="<?php echo $recipientName; ?>" data-recipient-phone="<?php echo $recipientPhone; ?>" data-recipient-address="<?php echo $recipientAddress; ?>" data-delivery-type="<?php echo htmlspecialchars($order['delivery_type'] ?? ''); ?>" data-schedule-date="<?php echo htmlspecialchars($order['schedule_date'] ?? ''); ?>" data-schedule-slot="<?php echo htmlspecialchars($order['schedule_slot'] ?? ''); ?>">
+                            <div class="order-item" onclick="openOrderDetail(this)" data-order-id="<?php echo $order['order_id']; ?>" data-item-id="<?php echo $item['order_item_id']; ?>" data-product-id="<?php echo $item['product_id']; ?>" data-order-status="<?php echo htmlspecialchars($order['status']); ?>" data-is-auction="<?php echo intval($order['is_auction_order'] ?? 0); ?>" data-store-name="Andrea Mystery Shop" data-recipient-id="<?php echo htmlspecialchars($order['recipient_id']); ?>" data-recipient-name="<?php echo $recipientName; ?>" data-recipient-phone="<?php echo $recipientPhone; ?>" data-recipient-address="<?php echo $recipientAddress; ?>" data-delivery-type="<?php echo htmlspecialchars($order['delivery_type'] ?? ''); ?>" data-schedule-date="<?php echo htmlspecialchars($order['schedule_date'] ?? ''); ?>" data-schedule-slot="<?php echo htmlspecialchars($order['schedule_slot'] ?? ''); ?>">
                                 <div class="item-image">
                                     <img src="<?php echo $itemImage; ?>" alt="Product">
                                 </div>
@@ -1499,6 +1502,7 @@ $statusDisplay = [
             for (const group of document.querySelectorAll('.order-group')) {
                 let status = group.dataset.status;
                 const archived = parseInt(group.dataset.archived || 0);
+                const isAuctionOrder = parseInt(group.dataset.isAuction || 0) === 1;
                 const orderId = group.querySelector('.order-item')?.dataset.orderId || '';
                 const productId = group.querySelector('.order-item')?.dataset.productId || '';
                 const products = Array.from(group.querySelectorAll('.item-name')).map(el => el.textContent.toLowerCase()).join(' ');
@@ -1520,10 +1524,12 @@ $statusDisplay = [
                             shouldShow = true;
                         } else if (currentStatus === 'delivered') {
                             // "Completed" shows delivered orders plus pickups that are already picked up.
-                            shouldShow = status === 'delivered' || status === 'pickedup';
+                            // Auction orders should stay in completed after received (not in To review).
+                            shouldShow = status === 'delivered' || status === 'pickedup' || (status === 'received' && isAuctionOrder);
                         } else if (currentStatus === 'delivered-unreviewed') {
                             // "To review" shows orders that are already confirmed as received.
-                            shouldShow = status === 'received';
+                            // Exclude auction orders from To review.
+                            shouldShow = status === 'received' && !isAuctionOrder;
                         } else if (currentStatus === 'reviewed') {
                             // "Reviewed" shows reviewed orders only
                             shouldShow = status === 'reviewed';
@@ -1729,6 +1735,7 @@ $statusDisplay = [
             const orderId = element.dataset.orderId;
             const itemId = element.dataset.itemId;
             const status = element.dataset.orderStatus;
+            const isAuctionOrder = parseInt(element.dataset.isAuction || '0', 10) === 1;
             const storeName = element.dataset.storeName;
             const recipientId = element.dataset.recipientId;
             const recipientName = element.dataset.recipientName;
@@ -1894,6 +1901,9 @@ $statusDisplay = [
             actionButtons.innerHTML = '';
             const activeProductName = (itemName || '').trim();
             config.actions.forEach(action => {
+                if (isAuctionOrder && action === 'Rate it') {
+                    return;
+                }
                 const button = document.createElement('button');
                 button.textContent = action;
                 button.className = action === 'Buy again' || action === 'Rate it' ? 'action-primary' : '';
@@ -2410,11 +2420,15 @@ $statusDisplay = [
                                     currentOrderGroup.dataset.status = 'received';
                                     const statusNode = currentOrderGroup.querySelector('.order-status');
                                     if (statusNode) {
-                                        statusNode.textContent = 'Order Received';
+                                        const isAuctionOrder = parseInt(currentOrderGroup.dataset.isAuction || '0', 10) === 1;
+                                        statusNode.textContent = isAuctionOrder ? 'Order Received' : 'To Review';
                                     }
                                 }
                                 closeOrderDetail();
-                                await localAlert('success', 'Received Confirmed', 'Order confirmed as received. You may now rate it.');
+                                const isAuctionOrder = currentOrderGroup ? (parseInt(currentOrderGroup.dataset.isAuction || '0', 10) === 1) : false;
+                                await localAlert('success', 'Received Confirmed', isAuctionOrder
+                                    ? 'Order confirmed as received.'
+                                    : 'Order confirmed as received. You may now rate it.');
                                 setTimeout(() => location.reload(), 200);
                             } else {
                                 await localAlert('error', 'Confirmation Failed', data.message || 'Failed to confirm receipt');

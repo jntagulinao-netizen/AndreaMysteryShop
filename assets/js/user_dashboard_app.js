@@ -1832,7 +1832,8 @@
                 name: product.name,
                 price: parseFloat(product.price),
                 image: Array.isArray(product.image) ? product.image : [product.image],
-                quantity: 1
+                quantity: 1,
+                stock: stock
             }];
             // Pre-select only this product for checkout
             selectedItems.clear();
@@ -2138,8 +2139,22 @@
             
             // Auto-select all cart items if none are selected
             if (selectedItems.size === 0 && cart.length > 0) {
-                console.log('No items selected, auto-selecting all cart items');
-                cart.forEach(item => selectedItems.add(item.id));
+                const selectableCartItems = cart.filter(item => Number(item.stock || 0) > 0);
+                if (selectableCartItems.length === 0) {
+                    showToast('No in-stock items are available for checkout.', 'error');
+                    return;
+                }
+                console.log('No items selected, auto-selecting in-stock cart items');
+                selectableCartItems.forEach(item => selectedItems.add(item.id));
+            }
+
+            // If some items are selected but none are purchasable (in-stock), block opening checkout
+            const itemsSourceCheck = buyNowItems.length > 0 ? buyNowItems : cart;
+            const purchasableSelected = itemsSourceCheck.filter(item => selectedItems.has(item.id) && Number(item.stock || 0) > 0);
+            if (selectedItems.size > 0 && purchasableSelected.length === 0) {
+                showToast('Selected items are out of stock. Please select in-stock items to checkout.', 'error');
+                console.warn('Attempted to open checkout with only out-of-stock selections:', Array.from(selectedItems));
+                return;
             }
             
             document.getElementById('checkoutModal').classList.add('show');
@@ -2180,8 +2195,8 @@
             // If in buy now mode, use ONLY buy now items. Otherwise use cart items
             const itemsSource = buyNowItems.length > 0 ? buyNowItems : cart;
             
-            // Show ONLY SELECTED items in checkout summary
-            const itemsToShow = itemsSource.filter(item => selectedItems.has(item.id));
+            // Show ONLY SELECTED items in checkout summary and exclude out-of-stock items
+            const itemsToShow = itemsSource.filter(item => selectedItems.has(item.id) && Number(item.stock || 0) > 0);
             
             // Calculate totals
             const updateTotals = () => {
@@ -2193,6 +2208,15 @@
                 document.getElementById('checkoutShipping').textContent = shipping === 0 ? 'FREE' : `₱${formatPeso(shipping)}`;
                 document.getElementById('checkoutTotal').textContent = `₱${formatPeso(total)}`;
             };
+
+            const getCheckoutItemStock = (item) => {
+                if (item && item.stock !== undefined && item.stock !== null) {
+                    return Number(item.stock) || 0;
+                }
+
+                const matchedProduct = products.find(product => product.id === item.id || product.id === item.product_id);
+                return Number(matchedProduct?.stock || 0);
+            };
             
             // Render items with quantity controls
             container.innerHTML = itemsToShow.map(item => `
@@ -2202,10 +2226,11 @@
                         <div class="order-item-name">${item.name}</div>
                         <div class="order-item-price">₱${formatPeso(item.price)}</div>
                         <div class="checkout-qty-row">
-                            <button type="button" class="qty-adj-btn minus" onclick="adjustCheckoutQty(${item.id}, -1)">−</button>
+                            <button type="button" class="qty-adj-btn minus" onclick="adjustCheckoutQty(${item.id}, -1)" ${item.quantity <= 1 ? 'disabled title="Minimum quantity is 1"' : ''}>−</button>
                             <span class="checkout-qty" id="qty-${item.id}">${item.quantity}</span>
-                            <button type="button" class="qty-adj-btn plus" onclick="adjustCheckoutQty(${item.id}, 1)">+</button>
+                            <button type="button" class="qty-adj-btn plus" onclick="adjustCheckoutQty(${item.id}, 1)" ${item.quantity >= getCheckoutItemStock(item) ? 'disabled title="Maximum available quantity reached"' : ''}>+</button>
                         </div>
+                        <div class="cart-item-stock-state"><span class="product-stock-info-value ${getCheckoutItemStock(item) > 0 ? 'in' : 'out'}">Stock: ${getCheckoutItemStock(item)}</span></div>
                         <div class="order-item-line-total">₱${formatPeso(item.price * item.quantity)}</div>
                     </div>
                 </div>
@@ -2227,11 +2252,19 @@
                 console.error('Item not found:', itemId);
                 return;
             }
+
+            const stock = item.stock !== undefined && item.stock !== null
+                ? Number(item.stock) || 0
+                : Number(products.find(product => product.id === item.id || product.id === item.product_id)?.stock || 0);
             
             // Adjust quantity
             const newQty = item.quantity + change;
             if (newQty < 1) {
                 alert('Quantity must be at least 1');
+                return;
+            }
+            if (change > 0 && newQty > stock) {
+                alert(stock > 0 ? `Only ${stock} item(s) available in stock.` : 'This item is out of stock.');
                 return;
             }
             if (newQty > 100) {
@@ -2263,6 +2296,18 @@
                     itemElement.textContent = `₱${formatPeso(price * qty)}`;
                 }
             });
+
+            const plusBtn = document.querySelector(`.order-item .qty-adj-btn.plus[onclick="adjustCheckoutQty(${itemId}, 1)"]`);
+            if (plusBtn) {
+                plusBtn.disabled = newQty >= stock || stock <= 0;
+                plusBtn.title = newQty >= stock ? 'Maximum available quantity reached' : '';
+            }
+
+            const minusBtn = document.querySelector(`.order-item .qty-adj-btn.minus[onclick="adjustCheckoutQty(${itemId}, -1)"]`);
+            if (minusBtn) {
+                minusBtn.disabled = newQty <= 1;
+                minusBtn.title = newQty <= 1 ? 'Minimum quantity is 1' : '';
+            }
             
             document.getElementById('checkoutSubtotal').textContent = `₱${formatPeso(subtotal)}`;
             document.getElementById('checkoutShipping').textContent = shipping === 0 ? 'FREE' : `₱${formatPeso(shipping)}`;
@@ -2291,10 +2336,11 @@
             
             // Verify selected items exist in the appropriate source
             const itemsSource = buyNowItems.length > 0 ? buyNowItems : cart;
-            const itemsInCheckout = itemsSource.filter(item => selectedItems.has(item.id));
+            const purchasableItems = itemsSource.filter(item => Number(item.stock || 0) > 0);
+            const itemsInCheckout = purchasableItems.filter(item => selectedItems.has(item.id));
             if (itemsInCheckout.length === 0) {
-                showToast('Selected items are not found!', 'error');
-                console.error('Selected items not found:', selectedItems, itemsSource);
+                showToast('Selected items are out of stock or not available.', 'error');
+                console.error('Selected items not available for checkout:', selectedItems, itemsSource);
                 return;
             }
 
@@ -2389,8 +2435,13 @@
                 // Build items array with updated quantities from checkout (from appropriate source)
                 const itemsSource = inBuyNowMode ? buyNowItems : cart;
                 const selectedItemsWithQty = [];
+                const purchasableItemIds = new Set(itemsInCheckout.map(item => item.id));
 
                 for (const selectedId of selectedItems) {
+                    if (!purchasableItemIds.has(selectedId)) {
+                        continue;
+                    }
+
                     const item = itemsSource.find(i => i.id === selectedId || i.cart_item_id === selectedId);
                     if (!item) continue;
 
@@ -2442,9 +2493,10 @@
                 document.getElementById('successOrderId').textContent = data.order_id;
                 document.getElementById('successModal').classList.add('show');
                 
-                // IMPORTANT: for cart flow, remove only selected items from cart; for buy-now flow, do not touch cart.
+                // IMPORTANT: for cart flow, remove only the items that were actually included in the order (purchasable)
                 if (!inBuyNowMode) {
-                    cart = cart.filter(item => !selectedItems.has(item.id));
+                    const removedCartIds = new Set(itemsInCheckout.map(i => i.cart_item_id || i.id));
+                    cart = cart.filter(item => !removedCartIds.has(item.id) && !removedCartIds.has(item.cart_item_id));
                     updateCartBadge();
                     renderCart();
                 }
@@ -2550,7 +2602,7 @@
                 }
             } catch (err) {
                 console.error('loadAvailableSlots error:', err);
-                slotSelect.innerHTML = '<option value="">Error loading slots</option>';
+                slotSelect.innerHTML = '<option value="">Please Choose a Date</option>';
                 slotNote.textContent = 'Error loading time slots. Please try again.';
                 slotSelect.disabled = true;
             }

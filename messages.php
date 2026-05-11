@@ -1059,9 +1059,10 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
                 const parsed = parseMessageContent(m.message_text || '');
                 const targetUrl = getOrderTargetUrl();
                 const isOrderNotice = (m.message_type === 'order_notice' || m.message_type === 'status_notice');
+                const noticeImageUrl = parsed.imageUrl || m.media_path || '';
                 const mediaHtml = parsed.chatMediaUrl
                     ? renderMediaPreview(parsed.chatMediaUrl, parsed.chatMediaType, 'Attachment')
-                    : (parsed.imageUrl ? renderMediaPreview(parsed.imageUrl, 'image', 'Product') : '');
+                    : (noticeImageUrl ? renderMediaPreview(noticeImageUrl, 'image', 'Product') : '');
                 const contentHtml = `${mediaHtml}<div>${formatMessageText(parsed.cleanText)}</div>`;
                 const noticeHtml = isOrderNotice ? renderOrderNoticeCard(m, parsed, targetUrl) : contentHtml;
                 // Add delete button if message is mine

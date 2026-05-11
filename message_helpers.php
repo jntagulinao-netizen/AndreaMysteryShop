@@ -23,12 +23,33 @@ function messageEnsureConversation(mysqli $conn, int $userId, ?int $orderId = nu
     $adminId = $adminId ?? messageGetDefaultAdminId($conn);
 
     if ($orderId !== null && $orderId > 0) {
+        $auctionSubject = null;
+        $auctionLookup = $conn->prepare('SELECT aoi.item_name FROM auction_order_links aol LEFT JOIN auction_order_items aoi ON aoi.order_id = aol.order_id WHERE aol.order_id = ? ORDER BY aoi.order_item_id ASC LIMIT 1');
+        if ($auctionLookup) {
+            $auctionLookup->bind_param('i', $orderId);
+            $auctionLookup->execute();
+            $auctionLookupRes = $auctionLookup->get_result();
+            if ($auctionLookupRes && ($auctionRow = $auctionLookupRes->fetch_assoc())) {
+                $auctionSubject = trim((string)($auctionRow['item_name'] ?? ''));
+            }
+            $auctionLookup->close();
+        }
+
         $find = $conn->prepare('SELECT conversation_id FROM conversations WHERE user_id = ? AND order_id = ? LIMIT 1');
         if ($find) {
             $find->bind_param('ii', $userId, $orderId);
             $find->execute();
             $res = $find->get_result();
             if ($res && ($row = $res->fetch_assoc())) {
+                if ($auctionSubject !== null && $auctionSubject !== '') {
+                    $updateSubject = $conn->prepare('UPDATE conversations SET subject = ? WHERE conversation_id = ? AND (subject IS NULL OR subject = CONCAT("Order #", ?))');
+                    if ($updateSubject) {
+                        $existingConversationId = (int)$row['conversation_id'];
+                        $updateSubject->bind_param('sii', $auctionSubject, $existingConversationId, $orderId);
+                        $updateSubject->execute();
+                        $updateSubject->close();
+                    }
+                }
                 $find->close();
                 return (int)$row['conversation_id'];
             }
@@ -39,7 +60,7 @@ function messageEnsureConversation(mysqli $conn, int $userId, ?int $orderId = nu
         if (!$insert) {
             return 0;
         }
-        $subject = 'Order #' . $orderId;
+        $subject = $auctionSubject !== null && $auctionSubject !== '' ? $auctionSubject : ('Order #' . $orderId);
         $insert->bind_param('iiis', $userId, $adminId, $orderId, $subject);
         if (!$insert->execute()) {
             $insert->close();

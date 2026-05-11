@@ -788,7 +788,7 @@ foreach ($slotsByDate as $date => $daySlots) {
                   </div>
                 </div>
                 <div class="slot-actions">
-                  <button class="btn-small" type="button" onclick="editSlot(getSelectedSlotId('<?php echo $date; ?>', 'all'))">Edit</button>
+                  <button class="btn-small" type="button" onclick="editSlot('<?php echo $date; ?>', 'all')">Edit</button>
                   <button class="btn-small" type="button" onclick="deleteSlot(getSelectedSlotId('<?php echo $date; ?>', 'all'))">Delete</button>
                 </div>
               </div>
@@ -842,7 +842,7 @@ foreach ($slotsByDate as $date => $daySlots) {
                   </div>
                 </div>
                 <div class="slot-actions">
-                  <button class="btn-small" type="button" onclick="editSlot(getSelectedSlotId('<?php echo $date; ?>', 'active'))">Edit</button>
+                  <button class="btn-small" type="button" onclick="editSlot('<?php echo $date; ?>', 'active')">Edit</button>
                   <button class="btn-small" type="button" onclick="deleteSlot(getSelectedSlotId('<?php echo $date; ?>', 'active'))">Delete</button>
                 </div>
               </div>
@@ -896,7 +896,7 @@ foreach ($slotsByDate as $date => $daySlots) {
                   </div>
                 </div>
                 <div class="slot-actions">
-                  <button class="btn-small" type="button" onclick="editSlot(getSelectedSlotId('<?php echo $date; ?>', 'full'))">Edit</button>
+                  <button class="btn-small" type="button" onclick="editSlot('<?php echo $date; ?>', 'full')">Edit</button>
                   <button class="btn-small" type="button" onclick="deleteSlot(getSelectedSlotId('<?php echo $date; ?>', 'full'))">Delete</button>
                 </div>
               </div>
@@ -950,7 +950,7 @@ foreach ($slotsByDate as $date => $daySlots) {
                   </div>
                 </div>
                 <div class="slot-actions">
-                  <button class="btn-small" type="button" onclick="editSlot(getSelectedSlotId('<?php echo $date; ?>', 'inactive'))">Edit</button>
+                  <button class="btn-small" type="button" onclick="editSlot('<?php echo $date; ?>', 'inactive')">Edit</button>
                   <button class="btn-small" type="button" onclick="deleteSlot(getSelectedSlotId('<?php echo $date; ?>', 'inactive'))">Delete</button>
                 </div>
               </div>
@@ -1004,7 +1004,9 @@ foreach ($slotsByDate as $date => $daySlots) {
       return select ? select.value : null;
     }
 
-    function editSlot(slotId) {
+    function editSlot(date, section) {
+      const select = document.querySelector(`.slot-select[data-date="${date}"][data-section="${section}"]`);
+      const slotId = select ? select.value : null;
       if (!slotId) {
         if (window.localSwalAlert) {
           window.localSwalAlert('warning', 'Select a Slot', 'Please select a slot first.');
@@ -1013,9 +1015,11 @@ foreach ($slotsByDate as $date => $daySlots) {
         }
         return;
       }
-      const option = document.querySelector(`option[value="${slotId}"]`);
+
+      const option = select.selectedOptions && select.selectedOptions[0] ? select.selectedOptions[0] : null;
       if (!option) return;
-      const slotItem = option.closest('.slot-item');
+
+      const slotItem = select.closest('.slot-item');
       if (!slotItem) return;
       const time = option.getAttribute('data-time');
       const editForm = slotItem.querySelector('.edit-form-inline');

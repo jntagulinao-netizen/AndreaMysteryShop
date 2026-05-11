@@ -20,14 +20,14 @@ if ($role !== 'user') {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>User Dashboard - LUXE</title>
-  <link rel="stylesheet" href="main.css?v=20260508-2">
-        <link rel="stylesheet" href="assets/css/reusable_catalog_modal_reviews.css?v=20260508-2">
-    <link rel="stylesheet" href="assets/css/user_dashboard_search.css?v=20260508-2">
-    <link rel="stylesheet" href="assets/css/user_dashboard_cart.css?v=20260508-2">
-    <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260508-2">
-    <link rel="stylesheet" href="assets/css/local_swal.css?v=20260508-2">
-  <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260508-2">
-    <link rel="stylesheet" href="assets/css/category_products_custom_display.css?v=20260508-2">
+  <link rel="stylesheet" href="main.css?v=20260511-1">
+        <link rel="stylesheet" href="assets/css/reusable_catalog_modal_reviews.css?v=20260511-1">
+    <link rel="stylesheet" href="assets/css/user_dashboard_search.css?v=20260511-1">
+    <link rel="stylesheet" href="assets/css/user_dashboard_cart.css?v=20260511-1">
+    <link rel="stylesheet" href="assets/css/user_dashboard_checkout.css?v=20260511-1">
+    <link rel="stylesheet" href="assets/css/local_swal.css?v=20260511-1">
+  <link rel="stylesheet" href="assets/css/user_dashboard_shared.css?v=20260511-1">
+    <link rel="stylesheet" href="assets/css/category_products_custom_display.css?v=20260511-1">
 </head>
 <body>
     <?php include __DIR__ . '/partials/user_dashboard/topbar_search.php'; ?>
@@ -63,15 +63,15 @@ if ($role !== 'user') {
 
 
 
-    <script src="assets/js/user_dashboard_reusable_ui.js?v=20260508-2"></script>
-    <script src="assets/js/local_swal.js?v=20260508-2"></script>
-    <script src="assets/js/user_dashboard_cart.js?v=20260508-2"></script>
-    <script src="assets/js/user_dashboard_helpers.js?v=20260508-2"></script>
-    <script src="assets/js/user_dashboard_recipients.js?v=20260508-2"></script>
-    <script src="assets/js/user_dashboard_search.js?v=20260508-2"></script>
-    <script src="assets/js/user_dashboard_app.js?v=20260508-2"></script>
-    <script src="assets/js/user_dashboard_app_init.js?v=20260508-2"></script>
-    <script src="assets/js/category_products_custom_display.js?v=20260508-2"></script>
+    <script src="assets/js/user_dashboard_reusable_ui.js?v=20260511-1"></script>
+    <script src="assets/js/local_swal.js?v=20260511-1"></script>
+    <script src="assets/js/user_dashboard_cart.js?v=20260511-5"></script>
+    <script src="assets/js/user_dashboard_helpers.js?v=20260511-1"></script>
+    <script src="assets/js/user_dashboard_recipients.js?v=20260511-1"></script>
+    <script src="assets/js/user_dashboard_search.js?v=20260511-1"></script>
+    <script src="assets/js/user_dashboard_app.js?v=20260511-6"></script>
+    <script src="assets/js/user_dashboard_app_init.js?v=20260511-1"></script>
+    <script src="assets/js/category_products_custom_display.js?v=20260511-1"></script>
 
 
 </body>

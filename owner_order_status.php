@@ -279,7 +279,7 @@ function format_peso_display($amount) {
              <option value="pickup">Pickup</option>
             <option value="shipped">Shipped</option>
             <option value="delivered">Delivered</option>
-             <option value="pickedup">Picked Up</option>
+            <option value="pickedup">Hand over</option>
              <option value="received">Received</option>
             <option value="reviewed">Reviewed</option>
             <option value="cancelled">Cancelled</option>
@@ -423,7 +423,7 @@ function format_peso_display($amount) {
       const text = String(messageText || '').toLowerCase();
       if (text.includes('cancelled')) return 'Cancelled By';
       if (text.includes('received')) return 'Received By';
-      if (text.includes('picked up')) return 'Picked Up By';
+      if (text.includes('picked up')) return 'Hand over by';
       if (text.includes('ready for pickup') || text.includes('pickup')) return 'Ready for Pickup By';
       if (text.includes('shipped')) return 'Shipped By';
       if (text.includes('delivered')) return 'Delivered By';
@@ -459,6 +459,10 @@ function format_peso_display($amount) {
           if (label === 'Received By' && !['received', 'reviewed'].includes(order.status)) {
             return false;
           }
+          // Exclude "Reviewed By" actions from display
+          if (label === 'Reviewed By') {
+            return false;
+          }
           return true;
         });
         const actionMap = {};
@@ -477,8 +481,8 @@ function format_peso_display($amount) {
             created_at: order.order_date
           };
         }
-        // If the order is delivered, ensure Delivered By is present when the order has reached that stage
-        if (['delivered', 'received', 'reviewed'].includes(order.status) && !actionMap['Delivered By']) {
+        // If the order is delivered (and not pickup), ensure Delivered By is present when the order has reached that stage
+        if (order.delivery_type !== 'pickup' && ['delivered', 'received', 'reviewed'].includes(order.status) && !actionMap['Delivered By']) {
           const deliveredEntry = filteredHistory.find(entry => classifyOrderAction(entry.message_text, order.status) === 'Delivered By');
           actionMap['Delivered By'] = deliveredEntry || {
             message_text: 'Order delivered',
@@ -488,24 +492,34 @@ function format_peso_display($amount) {
           };
         }
         const statusOrder = ['pending', 'processing', 'shipped', 'delivered', 'received', 'pickup', 'pickedup', 'cancelled', 'reviewed'];
+        // For pickup orders, use a different status order (exclude Delivered)
+        const statusOrderPickup = ['pending', 'processing', 'pickup', 'pickedup', 'received', 'cancelled', 'reviewed'];
+        
         const labelToStatus = {
           'Processing By': 'processing',
           'Shipped By': 'shipped',
           'Delivered By': 'delivered',
           'Received By': 'received',
           'Ready for Pickup By': 'pickup',
-          'Picked Up By': 'pickedup',
+          'Hand over by': 'pickedup',
           'Cancelled By': 'cancelled',
           'Archived By': 'archived',
           'Moved To Bin By': 'binned'
         };
+        
+        const currentStatusOrder = order.delivery_type === 'pickup' ? statusOrderPickup : statusOrder;
+        // Remove Delivered By from actionMap for pickup orders
+        if (order.delivery_type === 'pickup' && actionMap['Delivered By']) {
+          delete actionMap['Delivered By'];
+        }
+        
         const actions = Object.values(actionMap).sort((a, b) => {
           const labelA = classifyOrderAction(a.message_text, order.status);
           const labelB = classifyOrderAction(b.message_text, order.status);
           const statusA = labelToStatus[labelA] || 'unknown';
           const statusB = labelToStatus[labelB] || 'unknown';
-          const indexA = statusOrder.indexOf(statusA);
-          const indexB = statusOrder.indexOf(statusB);
+          const indexA = currentStatusOrder.indexOf(statusA);
+          const indexB = currentStatusOrder.indexOf(statusB);
           if (indexA !== indexB) {
             return indexA - indexB;
           }

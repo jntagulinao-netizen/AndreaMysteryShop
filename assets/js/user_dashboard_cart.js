@@ -19,15 +19,35 @@ function getFilteredCartItems() {
         : cart;
 }
 
+function isOutOfStockCartItem(item) {
+    return Number(item?.stock || 0) <= 0;
+}
+
+function getSelectableCartItems(sourceCart = cart) {
+    return sourceCart.filter(item => !isOutOfStockCartItem(item));
+}
+
+function syncSelectedItemsWithCart() {
+    // Keep selected items only if they still exist in the cart (do not unselect out-of-stock items).
+    const cartIds = new Set(cart.map(item => item.id));
+    selectedItems.forEach((itemId) => {
+        if (!cartIds.has(itemId)) {
+            selectedItems.delete(itemId);
+        }
+    });
+}
+
 function renderSidebarCart(cartItems) {
+    syncSelectedItemsWithCart();
     cartItems.innerHTML = cart.length ? cart.map(item => `
-        <div class="cart-item-card cart-item-card-compact">
+        <div class="cart-item-card cart-item-card-compact ${isOutOfStockCartItem(item) ? 'out-of-stock' : ''}">
             <div class="cart-item-row">
-                <input type="checkbox" class="cart-item-checkbox cart-item-select" ${selectedItems.has(item.id) ? 'checked' : ''} onchange="toggleItemSelection(${item.id})">
+                <input type="checkbox" class="cart-item-checkbox cart-item-select" ${selectedItems.has(item.id) ? 'checked' : ''} ${isOutOfStockCartItem(item) ? 'disabled aria-disabled="true"' : `onchange="toggleItemSelection(${item.id})"`}>
                 <img src="${resolveItemImage(item)}" alt="${item.name}" class="cart-item-clickable" onclick="openProductModal(${item.product_id})">
                 <div class="cart-item-content cart-item-clickable" onclick="openProductModal(${item.product_id})">
                     <p class="cart-item-title">${item.name}</p>
                     <p class="cart-item-variant">Qty: ${item.quantity}</p>
+                    ${isOutOfStockCartItem(item) ? '<p class="cart-item-stock-state"><span class="product-stock-info-value out">Out of Stock</span></p>' : ''}
                     <p class="cart-item-price">₱${formatPeso(item.price)}</p>
                 </div>
             </div>
@@ -49,6 +69,7 @@ function renderSidebarCart(cartItems) {
 }
 
 function renderCartPage() {
+    syncSelectedItemsWithCart();
     const emptyContainer = document.getElementById('emptyCartContainer');
     const cartGrid = document.getElementById('cartPageGrid');
     const cartPageTitle = document.getElementById('cartPageTitle');
@@ -81,7 +102,9 @@ function renderCartPage() {
     const displayCount = cartSearchQuery ? filteredCart.length : cart.length;
     cartPageTitle.textContent = 'Shopping Cart (' + displayCount + ' items' + (selectedCount > 0 ? ', ' + selectedCount + ' selected' : '') + ')';
 
-    const selectAllBtn = selectedItems.size === cart.length && cart.length > 0
+    const selectableCartItems = getSelectableCartItems(cart);
+    const allSelectableItemsSelected = selectableCartItems.length > 0 && selectableCartItems.every(item => selectedItems.has(item.id));
+    const selectAllBtn = allSelectableItemsSelected
         ? '<button onclick="deselectAll()" class="cart-select-all-btn cart-select-all-btn-secondary">Deselect All</button>'
         : '<button onclick="selectAll()" class="cart-select-all-btn">Select All</button>';
 
@@ -105,12 +128,13 @@ function renderCartPage() {
                 </div>
             </div>
             ${items.map(item => `
-                <div class="cart-item-card ${selectedItems.has(item.id) ? 'selected' : ''}">
-                    <input type="checkbox" class="cart-item-checkbox cart-item-select" ${selectedItems.has(item.id) ? 'checked' : ''} onchange="toggleItemSelection(${item.id})">
+                <div class="cart-item-card ${selectedItems.has(item.id) ? 'selected' : ''} ${isOutOfStockCartItem(item) ? 'out-of-stock' : ''}">
+                    <input type="checkbox" class="cart-item-checkbox cart-item-select" ${selectedItems.has(item.id) ? 'checked' : ''} ${isOutOfStockCartItem(item) ? 'disabled aria-disabled="true"' : `onchange="toggleItemSelection(${item.id})"`}>
                     <img src="${resolveItemImage(item)}" alt="${item.name}" class="cart-item-clickable" onclick="openProductModal(${item.product_id})">
                     <div class="cart-item-content cart-item-clickable" onclick="openProductModal(${item.product_id})">
                         <p class="cart-item-title">${item.name}</p>
                         <p class="cart-item-variant">Variant: ${item.variant || 'Default'}</p>
+                        ${isOutOfStockCartItem(item) ? '<p class="cart-item-stock-state"><span class="product-stock-info-value out">Out of Stock</span></p>' : ''}
                         <p class="cart-item-price">₱${formatPeso(item.price)}</p>
                         <div class="action-row">
                             <div class="quantity-area">
@@ -130,7 +154,7 @@ function renderCartPage() {
 
     cartPageItems.innerHTML = '<div class="cart-select-bar"><strong>Select items to checkout:</strong>' + selectAllBtn + '</div>' + cartItemsHTML;
 
-    const selectedItemsList = cart.filter(item => selectedItems.has(item.id));
+    const selectedItemsList = getSelectableCartItems().filter(item => selectedItems.has(item.id));
     const subtotal = selectedItemsList.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const shipping = 0;
     const total = subtotal + shipping;
@@ -160,6 +184,11 @@ function renderCart() {
 }
 
 function toggleItemSelection(itemId) {
+    const target = cart.find(item => item.id === itemId || item.cart_item_id === itemId);
+    if (!target || isOutOfStockCartItem(target)) {
+        return;
+    }
+
     if (selectedItems.has(itemId)) {
         selectedItems.delete(itemId);
     } else {
@@ -170,7 +199,8 @@ function toggleItemSelection(itemId) {
 }
 
 function selectAll() {
-    cart.forEach(item => selectedItems.add(item.id));
+    // Select all currently visible/filtered cart items (includes out-of-stock for deletion purposes)
+    getFilteredCartItems().forEach(item => selectedItems.add(item.id));
     renderCart();
     updateCheckoutButtonState();
 }
@@ -260,7 +290,7 @@ async function updateQuantity(id, change) {
     }
 }
 
-async function removeFromCart(id, confirmRemoval = true) {
+async function removeFromCart(id, confirmRemoval = true, showAlert = true) {
     const item = cart.find(i => i.id === id || i.cart_item_id === id);
     const itemName = item ? item.name || 'this item' : 'this item';
     const removePrompt = `Remove ${itemName} from your cart?`;
@@ -281,15 +311,22 @@ async function removeFromCart(id, confirmRemoval = true) {
         if (item && item.product_id) body.append('product_id', item.product_id);
         const res = await fetch('api/remove-from-cart.php', { method: 'POST', body });
         if (!res.ok) throw new Error('Could not remove item');
-        await loadCart();
-        if (typeof window.localSwalAlert === 'function') {
-            await window.localSwalAlert('success', 'Removed', `${itemName} has been removed from your cart.`);
+        // When showAlert is false we are likely in a batch operation; avoid reloading/alerting per-item
+        if (showAlert) {
+            await loadCart();
+            if (typeof window.localSwalAlert === 'function') {
+                await window.localSwalAlert('success', 'Removed', `${itemName} has been removed from your cart.`);
+            }
         }
     } catch (err) {
-        if (typeof window.localSwalAlert === 'function') {
-            await window.localSwalAlert('error', 'Remove Failed', err.message || 'Unable to remove item.');
+        if (showAlert) {
+            if (typeof window.localSwalAlert === 'function') {
+                await window.localSwalAlert('error', 'Remove Failed', err.message || 'Unable to remove item.');
+            } else {
+                alert(err.message);
+            }
         } else {
-            alert(err.message);
+            console.error('Batch remove error for', id, err);
         }
     }
 }
@@ -321,11 +358,30 @@ async function clearCartItems() {
     }
 
     const itemIdsToRemove = Array.from(selectedItems);
+    const removedNames = itemIdsToRemove.map(id => {
+        const it = cart.find(i => i.id === id || i.cart_item_id === id);
+        return it ? it.name || 'Item' : 'Item';
+    });
+
     for (const itemId of itemIdsToRemove) {
-        await removeFromCart(itemId, false);
+        await removeFromCart(itemId, false, false);
     }
 
     selectedItems.clear();
     await loadCart();
     updateCartBadge();
+
+    // Show a single consolidated alert for the batch removal
+    if (removedNames.length > 0) {
+        const first = removedNames[0];
+        const message = removedNames.length === 1
+            ? `${first} has been removed from your cart.`
+            : `${first} and ${removedNames.length - 1} other item${removedNames.length - 1 > 1 ? 's' : ''} have been removed from your cart.`;
+
+        if (typeof window.localSwalAlert === 'function') {
+            await window.localSwalAlert('success', 'Removed', message);
+        } else {
+            alert(message);
+        }
+    }
 }

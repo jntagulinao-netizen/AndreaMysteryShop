@@ -244,7 +244,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'pickup' => 'Your order for ' . $primaryProductName . ' is now Ready for Pickup. Please come to our store at your scheduled time.',
         'pickedup' => 'Your order for ' . $primaryProductName . ' has been picked up. Please confirm receipt.',
         'shipped' => 'Update: Your order for ' . $primaryProductName . ' has been Shipped and is now on the way.',
-        'delivered' => 'Your order for ' . $primaryProductName . ' is marked Delivered. Please confirm once received.'
+        'delivered' => 'Your order for ' . $primaryProductName . ' is marked Delivered. Please confirm once received.',
+        'received' => 'Thank you for receiving your order for ' . $primaryProductName . '. We appreciate your support and hope you enjoy your purchase from Andrea Mystery Shop!'
       ];
       $notice = $statusMessages[$nextStatus] ?? ('Your order for ' . $primaryProductName . ' status is now ' . ucfirst($nextStatus) . '.');
       sendOrderStatusNotice($conn, $adminId, $orderUserId, $orderId, $notice, $nextStatus);

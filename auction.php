@@ -1930,6 +1930,10 @@ if ($role !== 'user') {
         ? String(detail.media.images[0].path || 'logo.jpg')
         : 'logo.jpg';
 
+      // Determine available quantity for this auction item (fallback to 1)
+      const available = Number(detail?.quantity ?? detail?.stock ?? 1) || 1;
+      const initialQty = 1;
+
       host.innerHTML = `
         <div class="order-item" data-id="${String(detail.auction_id || '')}">
           <img src="${image}" alt="${itemName}" class="order-item-image">
@@ -1937,18 +1941,72 @@ if ($role !== 'user') {
             <div class="order-item-name">${itemName}</div>
             <div class="order-item-price">${peso(amount)}</div>
             <div class="checkout-qty-row">
-              <button type="button" class="qty-adj-btn minus">-</button>
-              <span class="checkout-qty">1</span>
-              <button type="button" class="qty-adj-btn plus">+</button>
+              <button type="button" class="qty-adj-btn minus" ${initialQty <= 1 ? 'disabled title="Minimum quantity is 1"' : ''}>-</button>
+              <span class="checkout-qty">${initialQty}</span>
+              <button type="button" class="qty-adj-btn plus" ${initialQty >= available ? 'disabled title="Maximum available quantity reached"' : ''}>+</button>
             </div>
-            <div class="order-item-line-total">${peso(amount)}</div>
+            <div class="order-item-line-total">${peso(amount * initialQty)}</div>
           </div>
         </div>
       `;
 
-      subtotalEl.textContent = peso(amount);
+      // Update subtotal/total display
+      subtotalEl.textContent = peso(amount * initialQty);
       if (shippingEl) shippingEl.textContent = 'FREE';
-      totalEl.textContent = peso(amount);
+      totalEl.textContent = peso(amount * initialQty);
+
+      // Bind qty adjustment handlers to enforce available quantity
+      const minusBtn = host.querySelector('.qty-adj-btn.minus');
+      const plusBtn = host.querySelector('.qty-adj-btn.plus');
+      const qtyEl = host.querySelector('.checkout-qty');
+      const lineTotalEl = host.querySelector('.order-item-line-total');
+
+      function refreshTotals(qty) {
+        const subtotal = amount * qty;
+        subtotalEl.textContent = peso(subtotal);
+        totalEl.textContent = peso(subtotal);
+        if (lineTotalEl) lineTotalEl.textContent = peso(amount * qty);
+      }
+
+      if (minusBtn) {
+        minusBtn.disabled = initialQty <= 1;
+        minusBtn.addEventListener('click', () => {
+          let q = Number(qtyEl.textContent || '1');
+          if (q <= 1) return;
+          q = q - 1;
+          qtyEl.textContent = String(q);
+          plusBtn.disabled = q >= available;
+          plusBtn.title = q >= available ? 'Maximum available quantity reached' : '';
+          minusBtn.disabled = q <= 1;
+          minusBtn.title = q <= 1 ? 'Minimum quantity is 1' : '';
+          refreshTotals(q);
+        });
+      }
+
+      if (plusBtn) {
+        plusBtn.addEventListener('click', () => {
+          let q = Number(qtyEl.textContent || '1');
+          if (q >= available) {
+            alert(available > 0 ? `Only ${available} item(s) available.` : 'This item is out of stock.');
+            plusBtn.disabled = true;
+            return;
+          }
+          q = q + 1;
+          if (q > 100) {
+            alert('Maximum quantity is 100');
+            return;
+          }
+          qtyEl.textContent = String(q);
+          plusBtn.disabled = q >= available;
+          plusBtn.title = q >= available ? 'Maximum available quantity reached' : '';
+          minusBtn.disabled = q <= 1;
+          minusBtn.title = q <= 1 ? 'Minimum quantity is 1' : '';
+          refreshTotals(q);
+        });
+        // initialize state
+        plusBtn.disabled = initialQty >= available || available <= 0;
+        plusBtn.title = plusBtn.disabled ? 'Maximum available quantity reached' : '';
+      }
     }
 
     function buildRecipientAddress(recipient) {
@@ -2045,9 +2103,14 @@ if ($role !== 'user') {
       placeOrderBtn.classList.add('loading');
       placeOrderBtn.innerHTML = '<span class="loading-spinner"></span> Processing...';
       try {
+        // Read the current quantity from the checkout form
+        const qtyEl = document.querySelector('.checkout-qty');
+        const quantity = qtyEl ? Number(qtyEl.textContent || '1') : 1;
+
         const body = new URLSearchParams();
         body.set('auction_id', String(detail.auction_id || ''));
         body.set('recipient_id', String(selectedWinnerRecipientId));
+        body.set('quantity', String(Math.max(1, quantity)));
         body.set('payment_method', 'cash');
 
         const res = await fetch('api/checkout-auction.php', {

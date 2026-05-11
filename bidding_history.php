@@ -937,7 +937,7 @@ if ($role !== 'user') {
         }
       } catch (err) {
         console.error('loadAvailableSlots error:', err);
-        slotSelect.innerHTML = '<option value="">Error loading slots</option>';
+        slotSelect.innerHTML = '<option value="">Please Choose a Date</option>';
         if (slotNote) {
           slotNote.textContent = 'Error loading time slots. Please try again.';
         }

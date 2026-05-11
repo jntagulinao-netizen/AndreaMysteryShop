@@ -29,7 +29,20 @@ $userId = (int)$_SESSION['user_id'];
 $auctionId = (int)($_POST['auction_id'] ?? 0);
 $bidId = (int)($_POST['bid_id'] ?? 0);
 $recipientId = (int)($_POST['recipient_id'] ?? 0);
+$quantity = (int)($_POST['quantity'] ?? 1);
 $paymentMethod = trim((string)($_POST['payment_method'] ?? ''));
+
+// Validate quantity
+if ($quantity < 1) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Quantity must be at least 1']);
+    exit;
+}
+if ($quantity > 100) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Maximum quantity is 100']);
+    exit;
+}
 
 // Get scheduling parameters
 $deliveryType = trim($_POST['delivery_type'] ?? 'delivery');
@@ -182,6 +195,12 @@ try {
 
     if ((int)($auction['winner_user_id'] ?? 0) !== $userId) {
         throw new Exception('Only the winning bidder can checkout this auction');
+    }
+
+    // Validate quantity against available auction quantity (auctions typically have qty=1)
+    $availableQty = 1;
+    if ($quantity > $availableQty) {
+        throw new Exception("Only $availableQty item(s) available for this auction");
     }
 
     if ($bidId > 0) {
@@ -402,6 +421,18 @@ try {
 
     $conversationId = messageEnsureConversation($conn, $userId, (int)$orderId, messageGetDefaultAdminId($conn));
     if ($conversationId > 0) {
+        $noticeImagePath = null;
+        $thumbStmt = $conn->prepare('SELECT image_url FROM product_images WHERE product_id = ? ORDER BY is_pinned DESC, image_id ASC LIMIT 1');
+        if ($thumbStmt) {
+            $thumbStmt->bind_param('i', $auctionProductId);
+            $thumbStmt->execute();
+            $thumbRes = $thumbStmt->get_result();
+            if ($thumbRes && ($thumbRow = $thumbRes->fetch_assoc())) {
+                $noticeImagePath = trim((string)($thumbRow['image_url'] ?? ''));
+            }
+            $thumbStmt->close();
+        }
+
         $addressParts = [];
         if (!empty($recipient['street_name'])) $addressParts[] = trim((string)$recipient['street_name']);
         if (!empty($recipient['unit_floor'])) $addressParts[] = trim((string)$recipient['unit_floor']);
@@ -425,7 +456,7 @@ try {
             . "Order Total: PHP " . number_format((float)$orderPrice, 2) . "\n\n"
             . "We'll send updates here as your order status changes.";
 
-        messageInsert($conn, $conversationId, 0, 'system', $noticeText, 'order_notice', null);
+        messageInsertFull($conn, $conversationId, 0, 'system', $noticeText, 'order_notice', null, $noticeImagePath, 'image', null, null, $itemName);
     }
 
     $conn->commit();
