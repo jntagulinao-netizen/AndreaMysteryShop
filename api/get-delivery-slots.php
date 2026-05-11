@@ -39,22 +39,25 @@ $timeSlots = [
 
 // Load slots from delivery_slots table for the requested date
 $availableSlots = [];
-$stmt = $conn->prepare("SELECT slot_id, slot_time, max_orders, current_orders FROM delivery_slots WHERE slot_date = ? AND is_active = 1 ORDER BY slot_time ASC");
+$stmt = $conn->prepare("SELECT slot_id, slot_time, current_orders FROM delivery_slots WHERE slot_date = ? AND is_active = 1 ORDER BY slot_time ASC");
 $stmt->bind_param('s', $date);
 $stmt->execute();
 $result = $stmt->get_result();
 
 while ($row = $result->fetch_assoc()) {
     $slotTime = date('H:i', strtotime($row['slot_time']));
-    $maxOrders = (int)$row['max_orders'];
     $currentOrders = (int)$row['current_orders'];
-    $remaining = max(0, $maxOrders - $currentOrders);
+    $remaining = $currentOrders < 1 ? 1 : 0;
+
+    if ($remaining <= 0) {
+        continue;
+    }
 
     $availableSlots[] = [
         'id' => (int)$row['slot_id'],
         'time' => $slotTime,
         'available' => $remaining,
-        'capacity' => $maxOrders
+        'capacity' => 1
     ];
 }
 

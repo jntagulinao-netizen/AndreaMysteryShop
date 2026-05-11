@@ -3,12 +3,12 @@ header('Content-Type: application/json; charset=utf-8');
 require __DIR__ . '/../dbConnection.php';
 
 $stmt = $conn->prepare("SELECT slot_date,
-       SUM(GREATEST(max_orders - current_orders, 0)) AS open_slots,
+             SUM(CASE WHEN current_orders < 1 THEN 1 ELSE 0 END) AS open_slots,
        COUNT(*) AS total_slots
   FROM delivery_slots
  WHERE is_active = 1
    AND slot_date >= CURDATE()
-   AND current_orders < max_orders
+     AND current_orders < 1
  GROUP BY slot_date
  ORDER BY slot_date ASC
  LIMIT 60");

@@ -142,6 +142,29 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             font-weight: 700;
             cursor: pointer;
             white-space: nowrap;
+            position: relative;
+        }
+        .conversation-toggle-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            background: #e22a39;
+            color: #fff;
+            border: 2px solid #fff;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+            box-shadow: 0 2px 8px rgba(226, 42, 57, 0.35);
+        }
+        .conversation-toggle.has-unread .conversation-toggle-badge {
+            display: inline-flex;
         }
         .conversation-title-wrap { min-width: 0; flex: 1; }
         .drawer-overlay {
@@ -599,7 +622,10 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             <div class="panel">
                 <div class="chat-head">
                     <div class="chat-head-row">
-                        <button type="button" class="conversation-toggle" onclick="toggleConversationDrawer(event)">☰ Chats</button>
+                        <button type="button" class="conversation-toggle" onclick="toggleConversationDrawer(event)">
+                            ☰ Chats
+                            <span id="conversationToggleBadge" class="conversation-toggle-badge" aria-hidden="true"></span>
+                        </button>
                         <div class="conversation-title-wrap">
                             <div id="chatTitle" class="chat-title">Select a conversation</div>
                             <div id="chatSub" class="chat-sub">Order updates and chat will appear here.</div>
@@ -760,6 +786,23 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             });
         }
 
+        function setConversationToggleBadge(count) {
+            const button = document.querySelector('.conversation-toggle');
+            if (!button) return;
+
+            const badge = document.getElementById('conversationToggleBadge');
+            if (!badge) return;
+
+            const unread = Number(count || 0);
+            if (unread > 0) {
+                badge.textContent = unread > 99 ? '99+' : String(unread);
+                button.classList.add('has-unread');
+            } else {
+                badge.textContent = '';
+                button.classList.remove('has-unread');
+            }
+        }
+
         function refreshMessageFullscreenState() {
             const isMobile = window.matchMedia('(max-width: 768px)').matches;
             const hasOpenConversation = !!activeConversationId;
@@ -852,6 +895,7 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
                     return sum + Number(conversation.unread_count || 0);
                 }, 0);
                 setAdminMessagesBadge(unreadCount);
+                setConversationToggleBadge(unreadCount);
                 renderConversations();
 
                 if (!targetConversationResolved) {

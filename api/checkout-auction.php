@@ -79,7 +79,7 @@ if (in_array($deliveryType, ['delivery', 'pickup'])) {
     }
 
     // Ensure the selected slot is still available
-    $slotStmt = $conn->prepare('SELECT slot_id, max_orders, current_orders FROM delivery_slots WHERE slot_date = ? AND slot_time = ? AND is_active = 1 FOR UPDATE');
+    $slotStmt = $conn->prepare('SELECT slot_id, current_orders FROM delivery_slots WHERE slot_date = ? AND slot_time = ? AND is_active = 1 FOR UPDATE');
     if (!$slotStmt) {
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Slot validation failed']);
@@ -95,7 +95,7 @@ if (in_array($deliveryType, ['delivery', 'pickup'])) {
         echo json_encode(['success' => false, 'error' => 'Selected ' . $slotType . ' slot is not available']);
         exit;
     }
-    if ((int)$slot['current_orders'] >= (int)$slot['max_orders']) {
+    if ((int)$slot['current_orders'] >= 1) {
         $slotType = ($deliveryType === 'delivery') ? 'delivery' : 'pickup';
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Selected ' . $slotType . ' slot is fully booked. Please choose another time.']);
@@ -331,7 +331,7 @@ try {
     }
 
     if (!empty($selectedSlotId)) {
-        $slotUpdateStmt = $conn->prepare('UPDATE delivery_slots SET current_orders = current_orders + 1 WHERE slot_id = ?');
+        $slotUpdateStmt = $conn->prepare('UPDATE delivery_slots SET current_orders = current_orders + 1 WHERE slot_id = ? AND current_orders < 1 AND is_active = 1');
         if (!$slotUpdateStmt) {
             throw new Exception('Failed to prepare slot update');
         }
@@ -340,7 +340,7 @@ try {
             throw new Exception('Failed to update slot order count');
         }
         if ($slotUpdateStmt->affected_rows === 0) {
-            throw new Exception('Failed to increment slot count; slot not found or inactive');
+            throw new Exception('Selected delivery time is fully booked. Please choose another time.');
         }
         $slotUpdateStmt->close();
     }

@@ -15,18 +15,57 @@ require_once 'dbConnection.php';
 $message = '';
 $messageType = '';
 
+function normalizeSlotTimeValue(string $value): ?string {
+  $value = trim($value);
+  if ($value === '') {
+    return null;
+  }
+
+  $formats = ['H:i', 'g:i A', 'g:iA', 'h:i A', 'h:iA', 'H:i:s'];
+  foreach ($formats as $format) {
+    $dt = DateTime::createFromFormat($format, $value);
+    if ($dt instanceof DateTime) {
+      return $dt->format('H:i:00');
+    }
+  }
+
+  $timestamp = strtotime($value);
+  if ($timestamp !== false) {
+    return date('H:i:00', $timestamp);
+  }
+
+  return null;
+}
+
+function parseBulkSlotTimes(string $rawTimes): array {
+  $parts = preg_split('/[\r\n,;]+/', $rawTimes) ?: [];
+  $times = [];
+
+  foreach ($parts as $part) {
+    $normalized = normalizeSlotTimeValue((string)$part);
+    if ($normalized && !in_array($normalized, $times, true)) {
+      $times[] = $normalized;
+    }
+  }
+
+  return $times;
+}
+
+function formatSlotSummary(array $slot, string $statusLabel): string {
+  $timeLabel = date('g:i A', strtotime((string)($slot['slot_time'] ?? '')));
+  $currentOrders = (int)($slot['current_orders'] ?? 0);
+
+  return $timeLabel . ' - Booked: ' . $currentOrders . '/1, Status: ' . $statusLabel;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'update') {
         $slot_id = intval($_POST['slot_id'] ?? 0);
         $slot_date = trim($_POST['edit_slot_date'] ?? '');
         $slot_time = trim($_POST['edit_slot_time'] ?? '');
-        $max_orders = intval($_POST['edit_max_orders'] ?? 5);
 
         if ($slot_id <= 0 || empty($slot_date) || empty($slot_time)) {
             $message = 'Invalid data for update.';
-            $messageType = 'error';
-        } elseif ($max_orders < 1 || $max_orders > 50) {
-            $message = 'Maximum orders must be between 1 and 50.';
             $messageType = 'error';
         } else {
             // Check if another slot exists with same date/time
@@ -39,8 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 // Update
-                $stmt = $conn->prepare('UPDATE delivery_slots SET slot_date = ?, slot_time = ?, max_orders = ? WHERE slot_id = ?');
-                $stmt->bind_param('ssii', $slot_date, $slot_time, $max_orders, $slot_id);
+        $stmt = $conn->prepare('UPDATE delivery_slots SET slot_date = ?, slot_time = ?, max_orders = 1 WHERE slot_id = ?');
+        $stmt->bind_param('ssi', $slot_date, $slot_time, $slot_id);
                 if ($stmt->execute()) {
                     $message = 'Delivery slot updated successfully!';
                     $messageType = 'success';
@@ -70,39 +109,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
         }
     } else {
-        // Add logic (existing)
+      // Add one date with multiple available times in a single submission.
         $slot_date = trim($_POST['slot_date'] ?? '');
-        $slot_time = trim($_POST['slot_time'] ?? '');
-        $max_orders = intval($_POST['max_orders'] ?? 5);
+      $raw_times = trim($_POST['slot_times'] ?? ($_POST['slot_time'] ?? ''));
+      $slotTimes = parseBulkSlotTimes($raw_times);
 
-        if (empty($slot_date) || empty($slot_time)) {
-            $message = 'Please provide both date and time.';
-            $messageType = 'error';
-        } elseif ($max_orders < 1 || $max_orders > 50) {
-            $message = 'Maximum orders must be between 1 and 50.';
+      if (empty($slot_date) || empty($slotTimes)) {
+        $message = 'Please provide a date and at least one valid time.';
             $messageType = 'error';
         } else {
-            // Check if slot already exists
-            $stmt = $conn->prepare('SELECT slot_id FROM delivery_slots WHERE slot_date = ? AND slot_time = ?');
-            $stmt->bind_param('ss', $slot_date, $slot_time);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            if ($result->num_rows > 0) {
-                $message = 'A delivery slot with this date and time already exists.';
-                $messageType = 'error';
-            } else {
-                // Insert new slot
-                $stmt = $conn->prepare('INSERT INTO delivery_slots (slot_date, slot_time, max_orders) VALUES (?, ?, ?)');
-                $stmt->bind_param('ssi', $slot_date, $slot_time, $max_orders);
-                if ($stmt->execute()) {
-                    $message = 'Delivery slot added successfully!';
-                    $messageType = 'success';
-                } else {
-                    $message = 'Failed to add delivery slot. Please try again.';
-                    $messageType = 'error';
-                }
+        $addedCount = 0;
+        $duplicateCount = 0;
+        $invalidCount = 0;
+
+        $checkStmt = $conn->prepare('SELECT slot_id FROM delivery_slots WHERE slot_date = ? AND slot_time = ? LIMIT 1');
+        $insertStmt = $conn->prepare('INSERT INTO delivery_slots (slot_date, slot_time, max_orders) VALUES (?, ?, 1)');
+
+        if (!$checkStmt || !$insertStmt) {
+          $message = 'Failed to prepare delivery slot queries.';
+          $messageType = 'error';
+        } else {
+          $conn->begin_transaction();
+          try {
+            foreach ($slotTimes as $slotTime) {
+              if (!preg_match('/^\d{2}:\d{2}:00$/', $slotTime)) {
+                $invalidCount++;
+                continue;
+              }
+
+              $checkStmt->bind_param('ss', $slot_date, $slotTime);
+              $checkStmt->execute();
+              $checkResult = $checkStmt->get_result();
+              if ($checkResult && $checkResult->num_rows > 0) {
+                $duplicateCount++;
+                continue;
+              }
+
+              $insertStmt->bind_param('ss', $slot_date, $slotTime);
+              if (!$insertStmt->execute()) {
+                throw new Exception('Failed to add delivery slot at ' . $slotTime);
+              }
+              $addedCount++;
             }
-            $stmt->close();
+
+            $conn->commit();
+
+            if ($addedCount > 0) {
+              $message = $addedCount === 1
+                ? 'Delivery slot added successfully!'
+                : 'Delivery slots added successfully!';
+              if ($duplicateCount > 0 || $invalidCount > 0) {
+                $message .= ' Skipped ' . $duplicateCount . ' duplicate' . ($duplicateCount === 1 ? '' : 's') . ' and ' . $invalidCount . ' invalid time' . ($invalidCount === 1 ? '' : 's') . '.';
+              }
+              $messageType = 'success';
+            } else {
+              $message = 'No new delivery slots were added. The times may already exist or be invalid.';
+              $messageType = 'error';
+            }
+          } catch (Exception $e) {
+            $conn->rollback();
+            $message = $e->getMessage();
+            $messageType = 'error';
+                }
+          $checkStmt->close();
+          $insertStmt->close();
+            }
         }
     }
 
@@ -290,7 +361,7 @@ foreach ($slotsByDate as $date => $daySlots) {
     $inactiveDay = [];
     foreach ($daySlots as $slot) {
         $isPastDate = $slot['slot_date'] < $todayDate;
-        if ($slot['current_orders'] >= $slot['max_orders']) {
+        if ((int)$slot['current_orders'] >= 1) {
             $fullDay[] = $slot;
         } elseif ($isPastDate || intval($slot['is_active']) === 0) {
             $inactiveDay[] = $slot;
@@ -365,6 +436,47 @@ foreach ($slotsByDate as $date => $daySlots) {
       font-size: 14px;
     }
     .form-input:focus { outline: none; border-color: #e22a39; }
+    .slot-builder {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fafafa;
+      padding: 14px;
+    }
+    .slot-builder-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .slot-builder-title {
+      font-weight: 700;
+      color: #111827;
+    }
+    .slot-builder-note {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .slot-builder-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .slot-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+    .slot-row-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .slot-time-input {
+      max-width: 260px;
+    }
 
     .btn {
       padding: 10px 16px;
@@ -516,7 +628,7 @@ foreach ($slotsByDate as $date => $daySlots) {
     }
     .inline-row {
       display: grid;
-      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
       gap: 12px;
       align-items: end;
     }
@@ -589,12 +701,25 @@ foreach ($slotsByDate as $date => $daySlots) {
           <input type="date" id="slot_date" name="slot_date" class="form-input" required min="<?php echo date('Y-m-d'); ?>">
         </div>
         <div class="form-group">
-          <label class="form-label" for="slot_time">Delivery Time</label>
-          <input type="time" id="slot_time" name="slot_time" class="form-input" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="max_orders">Maximum Orders</label>
-          <input type="number" id="max_orders" name="max_orders" class="form-input" min="1" max="50" value="5" required>
+          <label class="form-label">Delivery Times</label>
+          <div class="slot-builder" id="slotBuilder">
+            <div class="slot-builder-header">
+              <div>
+                <div class="slot-builder-title">Choose available times</div>
+                <div class="slot-builder-note">Add as many times as needed for the selected date. Each time becomes one order slot.</div>
+              </div>
+              <button type="button" class="btn btn-small" onclick="addTimeRow()">Add Time</button>
+            </div>
+            <div class="slot-builder-list" id="slotTimeList">
+              <div class="slot-row">
+                <input type="time" class="form-input slot-time-input" required>
+                <div class="slot-row-actions">
+                  <button type="button" class="btn-small" onclick="removeTimeRow(this)">Remove</button>
+                </div>
+              </div>
+            </div>
+            <textarea id="slot_times" name="slot_times" class="hidden" required></textarea>
+          </div>
         </div>
         <button type="button" class="btn btn-primary" onclick="confirmAddSlot(this)">Add Slot</button>
       </form>
@@ -654,8 +779,9 @@ foreach ($slotsByDate as $date => $daySlots) {
                     <div class="slot-select-summary"></div>
                     <select class="slot-select" data-date="<?php echo $date; ?>" data-section="all" onchange="updateSlotSummary(this)">
                       <?php foreach ($daySlots as $slot): ?>
-                        <option value="<?php echo $slot['slot_id']; ?>" data-time="<?php echo $slot['slot_time']; ?>" data-max="<?php echo $slot['max_orders']; ?>" data-active="<?php echo $slot['is_active']; ?>" data-summary="<?php echo date('g:i A', strtotime($slot['slot_time'])); ?> - Max: <?php echo $slot['max_orders']; ?>, Current: <?php echo $slot['current_orders']; ?>, Status: <?php echo $slot['is_active'] ? 'Active' : 'Inactive'; ?>">
-                          <?php echo date('g:i A', strtotime($slot['slot_time'])); ?> - Max: <?php echo $slot['max_orders']; ?>, Current: <?php echo $slot['current_orders']; ?>, Status: <?php echo $slot['is_active'] ? 'Active' : 'Inactive'; ?>
+                        <?php $slotSummary = formatSlotSummary($slot, ((int)$slot['current_orders'] >= 1) ? 'Full' : ((int)$slot['is_active'] === 1 ? 'Active' : 'Inactive')); ?>
+                        <option value="<?php echo $slot['slot_id']; ?>" data-time="<?php echo $slot['slot_time']; ?>" data-active="<?php echo $slot['is_active']; ?>" data-summary="<?php echo htmlspecialchars($slotSummary, ENT_QUOTES); ?>">
+                          <?php echo htmlspecialchars($slotSummary); ?>
                         </option>
                       <?php endforeach; ?>
                     </select>
@@ -680,10 +806,6 @@ foreach ($slotsByDate as $date => $daySlots) {
                     <div class="form-group inline-group">
                       <label class="form-label">Delivery Time</label>
                       <input type="time" name="edit_slot_time" class="form-input inline-input" required>
-                    </div>
-                    <div class="form-group inline-group">
-                      <label class="form-label">Maximum Orders</label>
-                      <input type="number" name="edit_max_orders" class="form-input inline-input" min="1" max="50" required>
                     </div>
                     <div class="inline-actions">
                       <button type="button" class="btn btn-primary btn-small" onclick="confirmSaveSlot(this)">Save</button>
@@ -711,8 +833,9 @@ foreach ($slotsByDate as $date => $daySlots) {
                     <div class="slot-select-summary"></div>
                     <select class="slot-select" data-date="<?php echo $date; ?>" data-section="active" onchange="updateSlotSummary(this)">
                       <?php foreach ($daySlots as $slot): ?>
-                        <option value="<?php echo $slot['slot_id']; ?>" data-time="<?php echo $slot['slot_time']; ?>" data-max="<?php echo $slot['max_orders']; ?>" data-active="<?php echo $slot['is_active']; ?>" data-summary="<?php echo date('g:i A', strtotime($slot['slot_time'])); ?> - Max: <?php echo $slot['max_orders']; ?>, Current: <?php echo $slot['current_orders']; ?>, Status: Active">
-                          <?php echo date('g:i A', strtotime($slot['slot_time'])); ?> - Max: <?php echo $slot['max_orders']; ?>, Current: <?php echo $slot['current_orders']; ?>, Status: Active
+                        <?php $slotSummary = formatSlotSummary($slot, 'Active'); ?>
+                        <option value="<?php echo $slot['slot_id']; ?>" data-time="<?php echo $slot['slot_time']; ?>" data-active="<?php echo $slot['is_active']; ?>" data-summary="<?php echo htmlspecialchars($slotSummary, ENT_QUOTES); ?>">
+                          <?php echo htmlspecialchars($slotSummary); ?>
                         </option>
                       <?php endforeach; ?>
                     </select>
@@ -737,10 +860,6 @@ foreach ($slotsByDate as $date => $daySlots) {
                     <div class="form-group inline-group">
                       <label class="form-label">Delivery Time</label>
                       <input type="time" name="edit_slot_time" class="form-input inline-input" required>
-                    </div>
-                    <div class="form-group inline-group">
-                      <label class="form-label">Maximum Orders</label>
-                      <input type="number" name="edit_max_orders" class="form-input inline-input" min="1" max="50" required>
                     </div>
                     <div class="inline-actions">
                       <button type="button" class="btn btn-primary btn-small" onclick="confirmSaveSlot(this)">Save</button>
@@ -768,8 +887,9 @@ foreach ($slotsByDate as $date => $daySlots) {
                     <div class="slot-select-summary"></div>
                     <select class="slot-select" data-date="<?php echo $date; ?>" data-section="full" onchange="updateSlotSummary(this)">
                       <?php foreach ($daySlots as $slot): ?>
-                        <option value="<?php echo $slot['slot_id']; ?>" data-time="<?php echo $slot['slot_time']; ?>" data-max="<?php echo $slot['max_orders']; ?>" data-active="<?php echo $slot['is_active']; ?>" data-summary="<?php echo date('g:i A', strtotime($slot['slot_time'])); ?> - Max: <?php echo $slot['max_orders']; ?>, Current: <?php echo $slot['current_orders']; ?>, Status: Full">
-                          <?php echo date('g:i A', strtotime($slot['slot_time'])); ?> - Max: <?php echo $slot['max_orders']; ?>, Current: <?php echo $slot['current_orders']; ?>, Status: Full
+                        <?php $slotSummary = formatSlotSummary($slot, 'Full'); ?>
+                        <option value="<?php echo $slot['slot_id']; ?>" data-time="<?php echo $slot['slot_time']; ?>" data-active="<?php echo $slot['is_active']; ?>" data-summary="<?php echo htmlspecialchars($slotSummary, ENT_QUOTES); ?>">
+                          <?php echo htmlspecialchars($slotSummary); ?>
                         </option>
                       <?php endforeach; ?>
                     </select>
@@ -794,10 +914,6 @@ foreach ($slotsByDate as $date => $daySlots) {
                     <div class="form-group inline-group">
                       <label class="form-label">Delivery Time</label>
                       <input type="time" name="edit_slot_time" class="form-input inline-input" required>
-                    </div>
-                    <div class="form-group inline-group">
-                      <label class="form-label">Maximum Orders</label>
-                      <input type="number" name="edit_max_orders" class="form-input inline-input" min="1" max="50" required>
                     </div>
                     <div class="inline-actions">
                       <button type="button" class="btn btn-primary btn-small" onclick="confirmSaveSlot(this)">Save</button>
@@ -825,8 +941,9 @@ foreach ($slotsByDate as $date => $daySlots) {
                     <div class="slot-select-summary"></div>
                     <select class="slot-select" data-date="<?php echo $date; ?>" data-section="inactive" onchange="updateSlotSummary(this)">
                       <?php foreach ($daySlots as $slot): ?>
-                        <option value="<?php echo $slot['slot_id']; ?>" data-time="<?php echo $slot['slot_time']; ?>" data-max="<?php echo $slot['max_orders']; ?>" data-active="<?php echo $slot['is_active']; ?>" data-summary="<?php echo date('g:i A', strtotime($slot['slot_time'])); ?> - Max: <?php echo $slot['max_orders']; ?>, Current: <?php echo $slot['current_orders']; ?>, Status: Inactive">
-                          <?php echo date('g:i A', strtotime($slot['slot_time'])); ?> - Max: <?php echo $slot['max_orders']; ?>, Current: <?php echo $slot['current_orders']; ?>, Status: Inactive
+                        <?php $slotSummary = formatSlotSummary($slot, 'Inactive'); ?>
+                        <option value="<?php echo $slot['slot_id']; ?>" data-time="<?php echo $slot['slot_time']; ?>" data-active="<?php echo $slot['is_active']; ?>" data-summary="<?php echo htmlspecialchars($slotSummary, ENT_QUOTES); ?>">
+                          <?php echo htmlspecialchars($slotSummary); ?>
                         </option>
                       <?php endforeach; ?>
                     </select>
@@ -851,10 +968,6 @@ foreach ($slotsByDate as $date => $daySlots) {
                     <div class="form-group inline-group">
                       <label class="form-label">Delivery Time</label>
                       <input type="time" name="edit_slot_time" class="form-input inline-input" required>
-                    </div>
-                    <div class="form-group inline-group">
-                      <label class="form-label">Maximum Orders</label>
-                      <input type="number" name="edit_max_orders" class="form-input inline-input" min="1" max="50" required>
                     </div>
                     <div class="inline-actions">
                       <button type="button" class="btn btn-primary btn-small" onclick="confirmSaveSlot(this)">Save</button>
@@ -905,7 +1018,6 @@ foreach ($slotsByDate as $date => $daySlots) {
       const slotItem = option.closest('.slot-item');
       if (!slotItem) return;
       const time = option.getAttribute('data-time');
-      const max = option.getAttribute('data-max');
       const editForm = slotItem.querySelector('.edit-form-inline');
       if (!editForm) return;
 
@@ -922,7 +1034,6 @@ foreach ($slotsByDate as $date => $daySlots) {
       editForm.querySelector('.edit_slot_id').value = slotId;
       editForm.querySelector('[name="edit_slot_date"]').value = slotItem.getAttribute('data-date');
       editForm.querySelector('[name="edit_slot_time"]').value = time;
-      editForm.querySelector('[name="edit_max_orders"]').value = max;
       editForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
@@ -973,6 +1084,16 @@ foreach ($slotsByDate as $date => $daySlots) {
 
     function confirmAddSlot(button) {
       const form = button.closest('form');
+      syncSlotTimes(form);
+      const hiddenTimes = form.querySelector('#slot_times');
+      if (!hiddenTimes || !hiddenTimes.value.trim()) {
+        if (window.localSwalAlert) {
+          window.localSwalAlert('warning', 'Add Times', 'Please add at least one delivery time.');
+        } else {
+          alert('Please add at least one delivery time.');
+        }
+        return;
+      }
       const confirmMessage = 'Are you sure you want to add this new delivery slot?';
       if (window.localSwalConfirm) {
         window.localSwalConfirm('Confirm Add', confirmMessage, 'Add').then((confirmed) => {
@@ -1011,6 +1132,11 @@ foreach ($slotsByDate as $date => $daySlots) {
       });
 
       document.querySelectorAll('.slot-select').forEach(select => updateSlotSummary(select));
+      const slotTimeList = document.getElementById('slotTimeList');
+      if (slotTimeList) {
+        slotTimeList.addEventListener('input', () => syncSlotTimes(document.querySelector('.content-section form')));
+      }
+      syncSlotTimes(document.querySelector('.content-section form'));
 
       if (pageMessage && pageMessage.text) {
         if (window.localSwalAlert) {
@@ -1034,6 +1160,58 @@ foreach ($slotsByDate as $date => $daySlots) {
       const option = select.selectedOptions[0];
       if (!summary || !option) return;
       summary.textContent = option.dataset.summary || '';
+    }
+
+    function addTimeRow() {
+      const list = document.getElementById('slotTimeList');
+      if (!list) return;
+
+      const row = document.createElement('div');
+      row.className = 'slot-row';
+      row.innerHTML = `
+        <input type="time" class="form-input slot-time-input" required>
+        <div class="slot-row-actions">
+          <button type="button" class="btn-small" onclick="removeTimeRow(this)">Remove</button>
+        </div>
+      `;
+      list.appendChild(row);
+      syncSlotTimes(row.closest('form'));
+    }
+
+    function removeTimeRow(button) {
+      const row = button.closest('.slot-row');
+      const list = document.getElementById('slotTimeList');
+      if (!row || !list) return;
+
+      if (list.querySelectorAll('.slot-row').length <= 1) {
+        const input = row.querySelector('input[type="time"]');
+        if (input) {
+          input.value = '';
+        }
+        syncSlotTimes(document.querySelector('.content-section form'));
+        return;
+      }
+
+      row.remove();
+      syncSlotTimes(document.querySelector('.content-section form'));
+    }
+
+    function syncSlotTimes(form) {
+      if (!form) return;
+      const hiddenTimes = form.querySelector('#slot_times');
+      const timeInputs = form.querySelectorAll('#slotTimeList input[type="time"]');
+      const times = [];
+
+      timeInputs.forEach((input) => {
+        const value = (input.value || '').trim();
+        if (value && !times.includes(value)) {
+          times.push(value);
+        }
+      });
+
+      if (hiddenTimes) {
+        hiddenTimes.value = times.join('\n');
+      }
     }
   </script>
 </body>
