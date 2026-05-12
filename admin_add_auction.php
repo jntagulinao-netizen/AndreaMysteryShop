@@ -497,6 +497,23 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
         return false;
       }
 
+      const now = Date.now();
+      if (startAt) {
+        const start = new Date(startAt).getTime();
+        if (!Number.isFinite(start) || start < now) {
+          await showAlert('warning', 'Invalid Schedule', 'Start time cannot be in the past.');
+          byId('startAt').focus();
+          return false;
+        }
+      }
+      if (endAt) {
+        const end = new Date(endAt).getTime();
+        if (!Number.isFinite(end) || end < now) {
+          await showAlert('warning', 'Invalid Schedule', 'End time cannot be in the past.');
+          byId('endAt').focus();
+          return false;
+        }
+      }
       if (startAt && endAt) {
         const start = new Date(startAt).getTime();
         const end = new Date(endAt).getTime();
@@ -575,6 +592,21 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
       if (Number.isNaN(d.getTime())) return '';
       const pad = (n) => String(n).padStart(2, '0');
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function getLocalDateTimeMin() {
+      const now = new Date();
+      now.setSeconds(0, 0);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    }
+
+    function updateScheduleMinValues() {
+      const minValue = getLocalDateTimeMin();
+      const startAt = byId('startAt');
+      const endAt = byId('endAt');
+      if (startAt) startAt.min = minValue;
+      if (endAt) endAt.min = minValue;
     }
 
     async function loadCategories() {
@@ -987,6 +1019,8 @@ $draftId = isset($_GET['draft_id']) ? (int)$_GET['draft_id'] : 0;
     (async function init() {
       bindLocalMediaPreviews();
       await loadCategories();
+      updateScheduleMinValues();
+      setInterval(updateScheduleMinValues, 30000);
       await loadDraft();
       // wire auction new-category input
       const aIn = byId('aNewCategoryName'); if (aIn) aIn.addEventListener('input', handleAuctionCategoryInput);
