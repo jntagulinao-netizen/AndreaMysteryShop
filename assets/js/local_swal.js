@@ -9,6 +9,10 @@
     overlay = document.createElement('div');
     overlay.id = 'localSwal';
     overlay.className = 'swal-overlay';
+    overlay.style.setProperty('z-index', '9999999999', 'important');
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.pointerEvents = 'auto';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-live', 'polite');
@@ -40,6 +44,10 @@
     }
 
     const root = ensure();
+    root.style.setProperty('z-index', '9999999999', 'important');
+    root.style.position = 'fixed';
+    root.style.inset = '0';
+    root.style.pointerEvents = 'auto';
     const iconEl = document.getElementById('localSwalIcon');
     const titleEl = document.getElementById('localSwalTitle');
     const textEl = document.getElementById('localSwalText');
@@ -74,6 +82,10 @@
     }
 
     const root = ensure();
+    root.style.setProperty('z-index', '9999999999', 'important');
+    root.style.position = 'fixed';
+    root.style.inset = '0';
+    root.style.pointerEvents = 'auto';
     const iconEl = document.getElementById('localSwalIcon');
     const titleEl = document.getElementById('localSwalTitle');
     const textEl = document.getElementById('localSwalText');

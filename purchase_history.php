@@ -772,7 +772,7 @@ $statusDisplay = [
           display: none;
           align-items: center;
           justify-content: center;
-          z-index: 2000;
+          z-index: 2147483650;
           padding: 20px;
         }
         .swal-overlay.show { display: flex; }
@@ -1907,7 +1907,7 @@ $statusDisplay = [
                 const button = document.createElement('button');
                 button.textContent = action;
                 button.className = action === 'Buy again' || action === 'Rate it' ? 'action-primary' : '';
-                button.onclick = () => handleAction(action, configStatus, orderId, activeProductName);
+                button.onclick = () => handleAction(action, configStatus, orderId, activeProductName, isAuctionOrder);
                 actionButtons.appendChild(button);
             });
 
@@ -1936,9 +1936,12 @@ $statusDisplay = [
 
         async function cancelOrderDirect(orderId, event) {
             event.stopPropagation();
+            const orderGroup = event.currentTarget.closest('.order-group');
+            const isAuctionOrder = orderGroup ? parseInt(orderGroup.dataset.isAuction || '0', 10) === 1 : false;
             const confirmed = await localConfirm('Cancel Order', 'Are you sure you want to cancel this order?', 'Yes, Cancel', 'Keep Order');
             if(confirmed) {
-                fetch('api/cancel-order.php', {
+                const endpoint = isAuctionOrder ? 'api/cancel-auction-order.php' : 'api/cancel-order.php';
+                fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -2305,13 +2308,14 @@ $statusDisplay = [
             uploadSummary.textContent = `${selectedReviewMediaFilesPH.length} file(s) selected • ${totalMb}MB total`;
         }
         
-        async function handleAction(action, configStatus, orderId, productName = '') {
+        async function handleAction(action, configStatus, orderId, productName = '', isAuctionOrder = false) {
             switch(action) {
                 case 'Cancel Order':
                     if(configStatus === 'pending') {
                         const confirmed = await localConfirm('Cancel Order', 'Are you sure you want to cancel this order?', 'Yes, Cancel', 'Keep Order');
                         if(confirmed) {
-                            fetch('api/cancel-order.php', {
+                            const endpoint = isAuctionOrder ? 'api/cancel-auction-order.php' : 'api/cancel-order.php';
+                            fetch(endpoint, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',

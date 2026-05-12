@@ -204,34 +204,23 @@ try {
     }
 
     if ($bidId > 0) {
-        $winningBidStmt = $conn->prepare('SELECT bid_id, user_id FROM auction_bids WHERE auction_id = ? ORDER BY bid_amount DESC, bid_id DESC LIMIT 1');
-        if (!$winningBidStmt) {
-            throw new Exception('Failed to validate winning bid');
+        $bidStmt = $conn->prepare('SELECT bid_id, user_id, auction_id FROM auction_bids WHERE bid_id = ? AND auction_id = ? LIMIT 1');
+        if (!$bidStmt) {
+            throw new Exception('Failed to validate selected bid');
         }
-        $winningBidStmt->bind_param('i', $auctionId);
-        $winningBidStmt->execute();
-        $winningBidRes = $winningBidStmt->get_result();
-        $winningBidRow = $winningBidRes ? $winningBidRes->fetch_assoc() : null;
-        $winningBidStmt->close();
+        $bidStmt->bind_param('ii', $bidId, $auctionId);
+        $bidStmt->execute();
+        $bidRes = $bidStmt->get_result();
+        $bidRow = $bidRes ? $bidRes->fetch_assoc() : null;
+        $bidStmt->close();
 
-        if (!$winningBidRow || (int)($winningBidRow['bid_id'] ?? 0) !== $bidId || (int)($winningBidRow['user_id'] ?? 0) !== $userId) {
-            throw new Exception('Checkout is only available from your highest bid entry');
+        if (!$bidRow || (int)($bidRow['user_id'] ?? 0) !== $userId) {
+            throw new Exception('Invalid bid selected for checkout');
         }
     }
 
-    $existingStmt = $conn->prepare('SELECT order_id FROM auction_order_links WHERE auction_id = ? LIMIT 1 FOR UPDATE');
-    if (!$existingStmt) {
-        throw new Exception('Failed to validate checkout state');
-    }
-    $existingStmt->bind_param('i', $auctionId);
-    $existingStmt->execute();
-    $existingRes = $existingStmt->get_result();
-    $existingRow = $existingRes ? $existingRes->fetch_assoc() : null;
-    $existingStmt->close();
-
-    if ($existingRow) {
-        throw new Exception('This auction has already been checked out');
-    }
+    $existingOrderId = 0;
+    $existingOrderLinked = false;
 
     $soldPrice = $auction['sold_price'] !== null ? (float)$auction['sold_price'] : null;
     $currentBid = $auction['current_bid'] !== null ? (float)$auction['current_bid'] : null;
@@ -335,6 +324,11 @@ try {
         $seedStockStmt->close();
     }
 
+    $orderId = 0;
+    $needReserveStock = true;
+    $needInsertOrderItem = true;
+    $needInsertAuctionOrderItems = $hasAuctionOrderItemsTable;
+
     $status = 'pending';
     $orderStmt = $conn->prepare('INSERT INTO orders (user_id, recipient_id, payment_method, status, total_amount, order_date, delivery_type, delivery_slot_id) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)');
     if (!$orderStmt) {
@@ -347,6 +341,21 @@ try {
 
     if ($orderId <= 0) {
         throw new Exception('Failed to create order');
+    }
+
+    if ($hasAuctionOrderItemsTable) {
+        $auctionOrderItemsCountStmt = $conn->prepare('SELECT COUNT(*) AS item_count FROM auction_order_items WHERE auction_id = ?');
+        if ($auctionOrderItemsCountStmt) {
+            $auctionOrderItemsCountStmt->bind_param('i', $auctionId);
+            $auctionOrderItemsCountStmt->execute();
+            $auctionOrderItemsCountRes = $auctionOrderItemsCountStmt->get_result();
+            $auctionOrderItemsCountRow = $auctionOrderItemsCountRes ? $auctionOrderItemsCountRes->fetch_assoc() : null;
+            $existingAuctionOrderItems = (int)($auctionOrderItemsCountRow['item_count'] ?? 0);
+            $auctionOrderItemsCountStmt->close();
+            if ($existingAuctionOrderItems > 0) {
+                $needInsertAuctionOrderItems = false;
+            }
+        }
     }
 
     if (!empty($selectedSlotId)) {
@@ -364,20 +373,22 @@ try {
         $slotUpdateStmt->close();
     }
 
-    $itemStmt = $conn->prepare('INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, 1, ?)');
-    if (!$itemStmt) {
-        throw new Exception('Failed to create order item');
-    }
-    $itemStmt->bind_param('iid', $orderId, $auctionProductId, $orderPrice);
-    $itemStmt->execute();
-    $orderItemId = (int)$conn->insert_id;
-    $itemStmt->close();
+    if ($needInsertOrderItem) {
+        $itemStmt = $conn->prepare('INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, 1, ?)');
+        if (!$itemStmt) {
+            throw new Exception('Failed to create order item');
+        }
+        $itemStmt->bind_param('iid', $orderId, $auctionProductId, $orderPrice);
+        $itemStmt->execute();
+        $orderItemId = (int)$itemStmt->insert_id;
+        $itemStmt->close();
 
-    if ($orderItemId <= 0) {
-        throw new Exception('Failed to create order item');
+        if ($orderItemId <= 0) {
+            throw new Exception('Failed to create order item');
+        }
     }
 
-    if ($hasAuctionOrderItemsTable) {
+    if ($hasAuctionOrderItemsTable && $needInsertAuctionOrderItems) {
         $insertAuctionOrderItemStmt = $conn->prepare(
             'INSERT INTO auction_order_items (auction_id, order_id, order_item_id, item_name, item_description, category_id, final_price, quantity, source_product_id) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)'
         );
@@ -399,25 +410,57 @@ try {
         $insertAuctionOrderItemStmt->close();
     }
 
-    $decrementStmt = $conn->prepare('UPDATE products SET product_stock = product_stock - 1, order_count = order_count + 1 WHERE product_id = ? AND product_stock >= 1');
-    if (!$decrementStmt) {
-        throw new Exception('Failed to update stock');
-    }
-    $decrementStmt->bind_param('i', $auctionProductId);
-    $decrementStmt->execute();
-    if ($decrementStmt->affected_rows === 0) {
+    if ($needReserveStock) {
+        $decrementStmt = $conn->prepare('UPDATE products SET product_stock = product_stock - 1, order_count = order_count + 1 WHERE product_id = ? AND product_stock >= 1');
+        if (!$decrementStmt) {
+            throw new Exception('Failed to update stock');
+        }
+        $decrementStmt->bind_param('i', $auctionProductId);
+        $decrementStmt->execute();
+        if ($decrementStmt->affected_rows === 0) {
+            $decrementStmt->close();
+            throw new Exception('Failed to reserve auction stock');
+        }
         $decrementStmt->close();
-        throw new Exception('Failed to reserve auction stock');
     }
-    $decrementStmt->close();
 
-    $linkStmt = $conn->prepare('INSERT INTO auction_order_links (auction_id, order_id, user_id) VALUES (?, ?, ?)');
-    if (!$linkStmt) {
-        throw new Exception('Failed to finalize auction checkout');
+    // Check for existing auction_order_links record and update it, or create new one
+    $existingLinkStmt = $conn->prepare('SELECT auction_order_id FROM auction_order_links WHERE auction_id = ? AND user_id = ? LIMIT 1');
+    if ($existingLinkStmt) {
+        $existingLinkStmt->bind_param('ii', $auctionId, $userId);
+        $existingLinkStmt->execute();
+        $existingLinkRes = $existingLinkStmt->get_result();
+        $existingLink = $existingLinkRes ? $existingLinkRes->fetch_assoc() : null;
+        $existingLinkStmt->close();
+
+        if ($existingLink) {
+            // Update existing record
+            $updateLinkStmt = $conn->prepare('UPDATE auction_order_links SET order_id = ? WHERE auction_order_id = ?');
+            if ($updateLinkStmt) {
+                $updateLinkStmt->bind_param('ii', $orderId, $existingLink['auction_order_id']);
+                $updateLinkStmt->execute();
+                $updateLinkStmt->close();
+            }
+        } else {
+            // Create new record
+            $linkStmt = $conn->prepare('INSERT INTO auction_order_links (auction_id, order_id, user_id) VALUES (?, ?, ?)');
+            if (!$linkStmt) {
+                throw new Exception('Failed to finalize auction checkout');
+            }
+            $linkStmt->bind_param('iii', $auctionId, $orderId, $userId);
+            $linkStmt->execute();
+            $linkStmt->close();
+        }
+    } else {
+        // Fallback to create new record
+        $linkStmt = $conn->prepare('INSERT INTO auction_order_links (auction_id, order_id, user_id) VALUES (?, ?, ?)');
+        if (!$linkStmt) {
+            throw new Exception('Failed to finalize auction checkout');
+        }
+        $linkStmt->bind_param('iii', $auctionId, $orderId, $userId);
+        $linkStmt->execute();
+        $linkStmt->close();
     }
-    $linkStmt->bind_param('iii', $auctionId, $orderId, $userId);
-    $linkStmt->execute();
-    $linkStmt->close();
 
     $conversationId = messageEnsureConversation($conn, $userId, (int)$orderId, messageGetDefaultAdminId($conn));
     if ($conversationId > 0) {

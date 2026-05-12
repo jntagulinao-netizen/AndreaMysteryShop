@@ -5,15 +5,36 @@ require __DIR__ . '/../dbConnection.php';
 require_once __DIR__ . '/auction_helpers.php';
 
 $auctionId = isset($_GET['auction_id']) ? (int)$_GET['auction_id'] : 0;
+$orderId = isset($_GET['order_id']) ? (int)$_GET['order_id'] : 0;
+if ($auctionId <= 0 && $orderId <= 0) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid auction or order ID']);
+    exit;
+}
+
+$currentUserId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+
+if ($auctionId <= 0 && $orderId > 0) {
+    $resolveStmt = $conn->prepare('SELECT auction_id FROM auction_order_links WHERE order_id = ? AND user_id = ? LIMIT 1');
+    if ($resolveStmt) {
+        $resolveStmt->bind_param('ii', $orderId, $currentUserId);
+        $resolveStmt->execute();
+        $resolveRes = $resolveStmt->get_result();
+        $resolveRow = $resolveRes ? $resolveRes->fetch_assoc() : null;
+        if ($resolveRow && isset($resolveRow['auction_id'])) {
+            $auctionId = (int)$resolveRow['auction_id'];
+        }
+        $resolveStmt->close();
+    }
+}
+
 if ($auctionId <= 0) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'Invalid auction ID']);
+    echo json_encode(['success' => false, 'error' => 'Auction not found']);
     exit;
 }
 
 auction_sync_statuses($conn, $auctionId);
-
-$currentUserId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
 
 $hasOrderLinkTable = false;
 $orderLinkTableCheck = $conn->query("SHOW TABLES LIKE 'auction_order_links'");
@@ -22,8 +43,8 @@ if ($orderLinkTableCheck && $orderLinkTableCheck->num_rows > 0) {
 }
 
 $detailSql = $hasOrderLinkTable
-    ? 'SELECT l.auction_id, l.item_name, COALESCE(NULLIF(l.item_description, \'\'), p.product_description, \'\') AS item_description, l.condition_grade, l.starting_bid, l.current_bid, l.reserve_price, l.bid_increment, l.start_at, l.end_at, l.auction_status, l.winner_user_id, l.sold_price, l.closed_at, c.category_name, u.full_name AS winner_name, aol.order_id AS linked_order_id FROM auction_listings l LEFT JOIN categories c ON c.category_id = l.category_id LEFT JOIN users u ON u.user_id = l.winner_user_id LEFT JOIN products p ON p.product_id = l.auction_product_id LEFT JOIN auction_order_links aol ON aol.auction_id = l.auction_id WHERE l.auction_id = ? LIMIT 1'
-    : 'SELECT l.auction_id, l.item_name, COALESCE(NULLIF(l.item_description, \'\'), p.product_description, \'\') AS item_description, l.condition_grade, l.starting_bid, l.current_bid, l.reserve_price, l.bid_increment, l.start_at, l.end_at, l.auction_status, l.winner_user_id, l.sold_price, l.closed_at, c.category_name, u.full_name AS winner_name, NULL AS linked_order_id FROM auction_listings l LEFT JOIN categories c ON c.category_id = l.category_id LEFT JOIN users u ON u.user_id = l.winner_user_id LEFT JOIN products p ON p.product_id = l.auction_product_id WHERE l.auction_id = ? LIMIT 1';
+    ? 'SELECT l.auction_id, l.item_name, COALESCE(NULLIF(l.item_description, \'\'), p.product_description, \'\') AS item_description, l.condition_grade, l.starting_bid, l.current_bid, l.reserve_price, l.bid_increment, l.start_at, l.end_at, l.auction_status, l.winner_user_id, l.sold_price, l.closed_at, c.category_name, u.full_name AS winner_name, aol.order_id AS linked_order_id, aol.status AS link_status, aol.secondary_offer_expires_at, aol.original_winner_user_id, o.status AS order_status FROM auction_listings l LEFT JOIN categories c ON c.category_id = l.category_id LEFT JOIN users u ON u.user_id = l.winner_user_id LEFT JOIN products p ON p.product_id = l.auction_product_id LEFT JOIN auction_order_links aol ON aol.auction_order_id = (SELECT MAX(auction_order_id) FROM auction_order_links WHERE auction_id = l.auction_id AND user_id = ?) LEFT JOIN orders o ON o.order_id = aol.order_id WHERE l.auction_id = ? LIMIT 1'
+    : 'SELECT l.auction_id, l.item_name, COALESCE(NULLIF(l.item_description, \'\'), p.product_description, \'\') AS item_description, l.condition_grade, l.starting_bid, l.current_bid, l.reserve_price, l.bid_increment, l.start_at, l.end_at, l.auction_status, l.winner_user_id, l.sold_price, l.closed_at, c.category_name, u.full_name AS winner_name, NULL AS linked_order_id, NULL AS link_status, NULL AS secondary_offer_expires_at, NULL AS original_winner_user_id, NULL AS order_status FROM auction_listings l LEFT JOIN categories c ON c.category_id = l.category_id LEFT JOIN users u ON u.user_id = l.winner_user_id LEFT JOIN products p ON p.product_id = l.auction_product_id WHERE l.auction_id = ? LIMIT 1';
 
 $stmt = $conn->prepare($detailSql);
 if (!$stmt) {
@@ -31,7 +52,11 @@ if (!$stmt) {
     echo json_encode(['success' => false, 'error' => 'Failed to load auction']);
     exit;
 }
-$stmt->bind_param('i', $auctionId);
+if ($hasOrderLinkTable) {
+    $stmt->bind_param('ii', $currentUserId, $auctionId);
+} else {
+    $stmt->bind_param('i', $auctionId);
+}
 $stmt->execute();
 $res = $stmt->get_result();
 $row = $res ? $res->fetch_assoc() : null;
@@ -112,8 +137,12 @@ echo json_encode([
         'bid_count' => $bidCount,
         'winner_user_id' => $row['winner_user_id'] !== null ? (int)$row['winner_user_id'] : null,
         'is_winner' => $row['winner_user_id'] !== null && (int)$row['winner_user_id'] === $currentUserId,
-        'checked_out' => $row['linked_order_id'] !== null,
-        'order_id' => $row['linked_order_id'] !== null ? (int)$row['linked_order_id'] : null,
+        'link_status' => (string)($row['link_status'] ?? ''),
+        'secondary_offer_expires_at' => (string)($row['secondary_offer_expires_at'] ?? ''),
+        'order_status' => (string)($row['order_status'] ?? ''),
+        'original_winner_user_id' => $row['original_winner_user_id'] !== null ? (int)$row['original_winner_user_id'] : null,
+        'checked_out' => (string)($row['link_status'] ?? '') === 'linked' && !((string)($row['order_status'] ?? '') === 'pending' && $row['original_winner_user_id'] !== null),
+        'order_id' => (string)($row['link_status'] ?? '') === 'linked' && $row['linked_order_id'] !== null ? (int)$row['linked_order_id'] : null,
         'winner_name' => $row['winner_name'] !== null ? auction_mask_name((string)$row['winner_name']) : '',
         'sold_price' => $row['sold_price'] !== null ? (float)$row['sold_price'] : null,
         'closed_at' => (string)($row['closed_at'] ?? ''),

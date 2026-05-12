@@ -109,7 +109,7 @@ function messageInsertFull(mysqli $conn, int $conversationId, int $senderId, str
     }
 
     $senderRole = in_array($senderRole, ['user', 'admin', 'system'], true) ? $senderRole : 'system';
-    $messageType = in_array($messageType, ['chat', 'order_notice', 'status_notice'], true) ? $messageType : 'chat';
+    $messageType = in_array($messageType, ['chat', 'order_notice', 'status_notice', 'secondary_auction_offer', 'secondary_offer_accepted', 'secondary_offer_declined', 'auction_relisting'], true) ? $messageType : 'chat';
     $isRead = 0;
 
     $stmt = $conn->prepare('INSERT INTO messages (conversation_id, sender_id, sender_role, message_text, media_path, media_type, media_mime, media_size, media_original_name, message_type, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())');
@@ -135,4 +135,24 @@ function messageInsertFull(mysqli $conn, int $conversationId, int $senderId, str
     }
 
     return true;
+}
+
+function sendPrivateMessage(int $topicId, int $recipientId, string $messageType, string $messageText, mysqli $conn, ?int $orderId = null): array {
+    if ($recipientId <= 0 || trim($messageText) === '') {
+        return ['success' => false, 'message' => 'Invalid notification payload'];
+    }
+
+    $conversationId = messageEnsureConversation($conn, $recipientId, $orderId, messageGetDefaultAdminId($conn));
+    if ($conversationId <= 0) {
+        return ['success' => false, 'message' => 'Failed to create notification conversation'];
+    }
+
+    $safeType = in_array($messageType, ['chat', 'order_notice', 'status_notice', 'secondary_auction_offer', 'secondary_offer_accepted', 'secondary_offer_declined', 'auction_relisting'], true) ? $messageType : 'order_notice';
+    $ok = messageInsertFull($conn, $conversationId, 0, 'system', $messageText, $safeType, null);
+
+    return [
+        'success' => $ok,
+        'conversation_id' => $conversationId,
+        'topic_id' => $topicId
+    ];
 }

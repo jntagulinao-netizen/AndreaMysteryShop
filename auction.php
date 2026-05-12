@@ -22,7 +22,7 @@ if ($role !== 'user') {
   <link rel="stylesheet" href="assets/css/local_swal.css">
   <link rel="stylesheet" href="assets/css/winner_notify.css?v=20260501-4">
   <script src="assets/js/local_swal.js"></script>
-  <script src="assets/js/winner_notify.js?v=20260501-9"></script>
+  <script src="assets/js/winner_notify.js?v=20260512-1"></script>
   <style>
     :root {
       --bg: #05060a;

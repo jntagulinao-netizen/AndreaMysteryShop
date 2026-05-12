@@ -148,6 +148,7 @@ if ($role !== 'user') {
     .pill.ended { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.14); color: #e2e8f0; }
     .pill.highest { background: rgba(16,185,129,0.2); border-color: rgba(16,185,129,0.34); color: #a7f3d0; }
     .pill.ordered { background: rgba(59,130,246,0.18); border-color: rgba(59,130,246,0.28); color: #c6dbff; }
+    .pill.cancelled { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.28); color: #fecaca; }
     .right { display: grid; gap: 8px; justify-items: end; }
     .amount { font-size: 16px; font-weight: 800; }
     .btn {
@@ -1276,12 +1277,25 @@ if ($role !== 'user') {
         const auctionId = Number(row.auction_id || 0);
         const isHighestBidRow = Boolean(row.is_highest_bid_record);
         const isOrdered = Boolean(row.checked_out);
+        const isSecondaryOffer = String(row.link_status || '') === 'secondary_offer';
+        const orderStatus = String(row.order_status || '').toLowerCase();
+        const linkStatus = String(row.link_status || '').toLowerCase();
+        const hasOrder = row.order_id !== null;
+        let orderBadge = '';
+        if (hasOrder) {
+          if (orderStatus === 'cancelled' || linkStatus === 'cancelled') {
+            orderBadge = '<span class="pill cancelled">Cancelled</span>';
+          } else {
+            orderBadge = '<span class="pill ordered">Ordered</span>';
+          }
+        }
         middle.innerHTML = `
           <div>
             <span class="pill ${statusClass}">${String(row.auction_status || 'scheduled')}</span>
             <span class="pill">${String(row.bid_status || 'valid')}</span>
             ${isHighestBidRow ? '<span class="pill highest">Highest Bid</span>' : ''}
-            ${isHighestBidRow && isOrdered ? '<span class="pill ordered">Ordered</span>' : ''}
+            ${orderBadge}
+            ${isSecondaryOffer ? '<span class="pill">Secondary Offer</span>' : ''}
           </div>
           <h3 class="meta-title">${String(row.item_name || 'Auction Item')}</h3>
           <div class="meta-line">Category: ${String(row.category_name || 'No Category')}</div>
@@ -1310,30 +1324,28 @@ if ($role !== 'user') {
     }
 
     function getUniqueAuctionBids() {
-      // Group bids by auction and get the highest bid for each
-      const auctionMap = {};
+      if (!Array.isArray(bidRows)) return [];
       
-      if (Array.isArray(bidRows)) {
-        bidRows.forEach((row) => {
-          const auctionId = Number(row.auction_id || 0);
-          if (!auctionId) return;
-          
-          if (!auctionMap[auctionId]) {
-            auctionMap[auctionId] = row;
-          } else {
-            // Keep the highest bid
-            const current = auctionMap[auctionId];
-            const currentAmount = Number(current.bid_amount || 0);
-            const rowAmount = Number(row.bid_amount || 0);
-            if (rowAmount > currentAmount) {
-              auctionMap[auctionId] = row;
-            }
+      // Group by auction_id and take the most recent bid per auction
+      const auctionMap = new Map();
+      
+      bidRows.forEach(bid => {
+        const auctionId = Number(bid.auction_id);
+        if (!auctionMap.has(auctionId)) {
+          auctionMap.set(auctionId, bid);
+        } else {
+          // Keep the more recent bid
+          const existing = auctionMap.get(auctionId);
+          const existingTime = new Date(String(existing.created_at || '')).getTime();
+          const currentTime = new Date(String(bid.created_at || '')).getTime();
+          if (currentTime > existingTime) {
+            auctionMap.set(auctionId, bid);
           }
-        });
-      }
+        }
+      });
       
-      // Convert to array and sort by most recent
-      return Object.values(auctionMap).sort((a, b) => {
+      // Return unique auctions sorted by most recent bid
+      return Array.from(auctionMap.values()).sort((a, b) => {
         const timeA = new Date(String(a.created_at || '')).getTime();
         const timeB = new Date(String(b.created_at || '')).getTime();
         return timeB - timeA;

@@ -1057,8 +1057,8 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
                         ? `admin.${senderName || fallbackAdminName || 'Admin'}`
                         : 'User');
                 const parsed = parseMessageContent(m.message_text || '');
-                const targetUrl = getOrderTargetUrl();
-                const isOrderNotice = (m.message_type === 'order_notice' || m.message_type === 'status_notice');
+                const targetUrl = getOrderTargetUrl(m);
+                const isOrderNotice = (m.message_type === 'order_notice' || m.message_type === 'status_notice' || m.message_type === 'secondary_auction_offer' || m.message_type === 'secondary_offer_accepted' || m.message_type === 'secondary_offer_declined' || m.message_type === 'auction_relisting');
                 const noticeImageUrl = parsed.imageUrl || m.media_path || '';
                 const mediaHtml = parsed.chatMediaUrl
                     ? renderMediaPreview(parsed.chatMediaUrl, parsed.chatMediaType, 'Attachment')
@@ -1265,6 +1265,7 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
         function renderOrderNoticeCard(message, parsed, targetUrl) {
             const parts = parseNoticeParts(parsed.cleanText);
             const detailsId = `notice-details-${message.message_id}`;
+            const isSecondaryOffer = message.message_type === 'secondary_auction_offer';
             const thumb = parsed.imageUrl
                 ? `
                     <span class="media-preview-wrap media-clickable" role="button" tabindex="0" data-media-url="${escapeAttr(parsed.imageUrl)}" data-media-type="image" aria-label="View product image">
@@ -1273,6 +1274,8 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
                     </span>
                 `
                 : '';
+            const actionLabel = isSecondaryOffer ? 'Open in auction' : 'Open order page';
+            const summaryText = parts.summary || (isSecondaryOffer ? 'Tap to open the auction and respond to the offer.' : 'Tap to view this order.');
 
             return `
                 <div class="order-notice-card">
@@ -1280,17 +1283,18 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
                         ${thumb}
                         <div>
                             <div class="order-notice-title">${escapeHtml(parts.title)}</div>
-                            <div class="order-notice-summary">${escapeHtml(parts.summary || 'Tap to view this order.')}</div>
+                            <div class="order-notice-summary">${escapeHtml(summaryText)}</div>
                         </div>
                     </a>
                     <div class="order-notice-actions">
-                        <a class="order-jump-link" href="${escapeAttr(targetUrl)}">Open order page</a>
+                        <a class="order-jump-link" href="${escapeAttr(targetUrl)}">${escapeHtml(actionLabel)}</a>
                         <button type="button" class="order-detail-toggle" onclick="toggleNoticeDetails(event, '${escapeAttr(detailsId)}')">View details</button>
                     </div>
                     <div id="${escapeAttr(detailsId)}" class="order-details-panel">${escapeHtml(parts.details || parsed.cleanText)}</div>
                 </div>
             `;
         }
+
 
         function toggleNoticeDetails(event, detailsId) {
             event.preventDefault();
@@ -1333,9 +1337,12 @@ $requestedProduct = trim((string)($_GET['product'] ?? ''));
             overlay.classList.remove('active');
         }
 
-        function getOrderTargetUrl() {
+        function getOrderTargetUrl(message) {
             const base = currentRole === 'admin' ? 'admin_orders.php' : 'purchase_history.php';
             if (!activeConversationOrderId) return base;
+            if (message && message.message_type === 'secondary_auction_offer') {
+                return `auction.php?order_id=${encodeURIComponent(activeConversationOrderId)}`;
+            }
             return `${base}?order_id=${encodeURIComponent(activeConversationOrderId)}`;
         }
 

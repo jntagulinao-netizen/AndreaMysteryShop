@@ -4,6 +4,7 @@
  */
 
 let winnerData = null;
+let secondaryOfferData = null;
 let currentWinnerIndex = 0;
 let winnerAutoRotateInterval = null;
 let winnerProgressInterval = null;
@@ -56,38 +57,53 @@ async function checkWinnerNotification() {
 
     // Find won but not checked out auctions
     const wonAuctions = [];
+    const secondaryOffers = [];
     data.bids.forEach((row) => {
       if (!row) return;
-      if (row.auction_status !== 'sold') return;
-      if (!row.is_winner || row.checked_out) return;
-      if (!row.is_highest_bid_record) return;
-      if (row.bid_status && String(row.bid_status).toLowerCase() !== 'valid') return;
+      if (row.auction_status === 'sold' && row.is_winner && !row.checked_out && row.is_highest_bid_record && (!row.bid_status || String(row.bid_status).toLowerCase() === 'valid')) {
+        wonAuctions.push({
+          auction_id: row.auction_id,
+          item_name: row.item_name,
+          cover_image: row.cover_image,
+          sold_price: row.sold_price
+        });
+      }
 
-      wonAuctions.push({
-        auction_id: row.auction_id,
-        item_name: row.item_name,
-        cover_image: row.cover_image,
-        sold_price: row.sold_price
-      });
+      if (String(row.link_status || '') === 'secondary_offer' && !row.checked_out) {
+        secondaryOffers.push({
+          auction_id: row.auction_id,
+          item_name: row.item_name,
+          cover_image: row.cover_image,
+          sold_price: row.sold_price,
+          auction_order_id: row.auction_order_id
+        });
+      }
     });
 
     console.log('[WinnerNotify] Won auctions found:', wonAuctions.length);
 
-    if (wonAuctions.length === 0) {
-      console.log('[WinnerNotify] No won auctions to show');
+    if (wonAuctions.length > 0) {
+      winnerData = wonAuctions;
+      currentWinnerIndex = 0;
+      console.log('[WinnerNotify] Showing winner notification in 1.5s...');
+      setTimeout(() => {
+        showWinnerNotification();
+      }, 1500);
       return;
     }
 
-    // Store data and show animation
-    winnerData = wonAuctions;
-    currentWinnerIndex = 0;
+    if (secondaryOffers.length > 0) {
+      secondaryOfferData = secondaryOffers;
+      winnerData = secondaryOffers;
+      currentWinnerIndex = 0;
+      console.log('[WinnerNotify] Showing secondary offer notification in 1.5s...');
+      setTimeout(() => {
+        showSecondaryOfferNotification();
+      }, 1500);
+      return;
+    }
 
-    console.log('[WinnerNotify] Showing notification in 1.5s...');
-
-    // Delay slightly to let page load first
-    setTimeout(() => {
-      showWinnerNotification();
-    }, 1500);
+    console.log('[WinnerNotify] No winner or secondary offers to show');
 
   } catch (err) {
     console.error('[WinnerNotify] Error:', err);
@@ -352,7 +368,7 @@ function startProgressBar() {
   winnerCheckoutTextTimeout = setTimeout(() => {
     const claimBtn = document.querySelector('.winner-btn-primary');
     if (claimBtn) {
-      claimBtn.textContent = 'Go to Checkout';
+      claimBtn.textContent = secondaryOfferData ? 'Review Offer' : 'Go to Checkout';
     }
     winnerCheckoutTextTimeout = null;
   }, 15000);
@@ -415,4 +431,132 @@ if (document.readyState === 'loading') {
   }, { once: true });
 } else {
   scheduleWinnerNotificationCheck();
+}
+
+function showSecondaryOfferNotification() {
+  console.log('[WinnerNotify] showSecondaryOfferNotification called');
+  if (!secondaryOfferData || secondaryOfferData.length === 0) return;
+
+  if (winnerNotificationOpen) return;
+
+  document.querySelectorAll('#winnerNotifyOverlay').forEach((node) => node.remove());
+
+  const overlay = document.createElement('div');
+  overlay.className = 'winner-notify-overlay show';
+  overlay.id = 'winnerNotifyOverlay';
+  winnerNotificationOpen = true;
+
+  const container = document.createElement('div');
+  container.className = 'winner-notify-container';
+
+  const title = document.createElement('div');
+  title.className = 'winner-notify-title';
+  title.innerHTML = '⚡ Your Bid Is Next';
+  container.appendChild(title);
+
+  const subtitle = document.createElement('div');
+  subtitle.className = 'winner-notify-subtitle';
+  subtitle.textContent = 'The original winner cancelled. You now have the chance to claim this item before it moves to the next bidder.';
+  container.appendChild(subtitle);
+
+  const carousel = document.createElement('div');
+  carousel.className = 'winner-notify-carousel';
+  carousel.id = 'winnerCarousel';
+
+  const productWrapper = document.createElement('div');
+  productWrapper.className = 'winner-product-wrapper';
+
+  const productImage = document.createElement('img');
+  productImage.className = 'winner-product-image';
+  productImage.id = 'winnerProductImage';
+  productImage.src = getWinnerImage(secondaryOfferData[0].cover_image);
+  productImage.alt = secondaryOfferData[0].item_name;
+  productWrapper.appendChild(productImage);
+  carousel.appendChild(productWrapper);
+  container.appendChild(carousel);
+
+  const info = document.createElement('div');
+  info.className = 'winner-notify-info';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'winner-product-name';
+  nameEl.id = 'winnerProductName';
+  nameEl.textContent = secondaryOfferData[0].item_name || 'Secondary Offer';
+
+  const priceEl = document.createElement('div');
+  priceEl.className = 'winner-product-price';
+  priceEl.id = 'winnerProductPrice';
+  priceEl.textContent = formatPeso(secondaryOfferData[0].sold_price);
+
+  const counterEl = document.createElement('div');
+  counterEl.className = 'winner-product-counter';
+  counterEl.id = 'winnerProductCounter';
+  counterEl.textContent = `Offer 1 of ${secondaryOfferData.length}`;
+
+  info.appendChild(nameEl);
+  info.appendChild(priceEl);
+  info.appendChild(counterEl);
+  container.appendChild(info);
+
+  const progress = document.createElement('div');
+  progress.className = 'winner-notify-progress';
+  progress.innerHTML = '<div class="winner-progress-bar" id="winnerProgress" style="width:0%"></div>';
+  container.appendChild(progress);
+
+  const actions = document.createElement('div');
+  actions.className = 'winner-notify-actions';
+
+  const acceptBtn = document.createElement('button');
+  acceptBtn.type = 'button';
+  acceptBtn.className = 'winner-btn winner-btn-primary';
+  acceptBtn.textContent = 'Accept Offer';
+  acceptBtn.addEventListener('click', () => handleSecondaryOfferChoice('accept'));
+  actions.appendChild(acceptBtn);
+
+  const declineBtn = document.createElement('button');
+  declineBtn.type = 'button';
+  declineBtn.className = 'winner-btn winner-btn-secondary';
+  declineBtn.textContent = 'Decline Offer';
+  declineBtn.addEventListener('click', () => handleSecondaryOfferChoice('decline'));
+  actions.appendChild(declineBtn);
+
+  container.appendChild(actions);
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+
+  startProgressBar();
+}
+
+async function handleSecondaryOfferChoice(action) {
+  if (!secondaryOfferData || secondaryOfferData.length === 0) return;
+  const offerId = Number(secondaryOfferData[0].auction_order_id || 0);
+  if (!offerId) {
+    console.error('[WinnerNotify] Missing secondary offer auction order ID');
+    return;
+  }
+
+  try {
+    const res = await fetch('api/handle-secondary-offer.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ offer_id: offerId, action })
+    });
+    const data = await readJsonResponse(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to process offer');
+    }
+
+    if (action === 'accept') {
+      window.location.href = 'bidding_history.php';
+      return;
+    }
+
+    closeWinnerNotification(false);
+    setTimeout(() => {
+      window.location.reload();
+    }, 300);
+  } catch (err) {
+    // Use the browser alert as a fallback for errors in the secondary winner flow.
+    window.alert('Offer failed: ' + String(err.message || 'Unable to process offer'));
+  }
 }

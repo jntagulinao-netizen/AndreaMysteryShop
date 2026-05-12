@@ -58,23 +58,25 @@ $auctionOrderChart = [
     ['label' => 'Non-ordered', 'value' => 0]
 ];
 $orderChartSql = 'SELECT
-  SUM(IF(aol.order_id IS NOT NULL, 1, 0)) AS ordered_count,
-  SUM(IF(aol.order_id IS NULL, 1, 0)) AS non_ordered_count
+  COUNT(DISTINCT CASE WHEN aol.order_id IS NOT NULL THEN l.auction_id END) AS ordered_count,
+  COUNT(DISTINCT l.auction_id) AS total_auctions
   FROM auction_listings l
   LEFT JOIN auction_order_links aol ON aol.auction_id = l.auction_id' . $whereClause;
 $orderChartResult = $conn->query($orderChartSql);
 if ($orderChartResult && $orderChartResult->num_rows > 0) {
     $orderCounts = $orderChartResult->fetch_assoc();
+    $orderedCount = intval($orderCounts['ordered_count'] ?? 0);
+    $totalAuctions = intval($orderCounts['total_auctions'] ?? 0);
     $auctionOrderChart = [
-        ['label' => 'Ordered', 'value' => intval($orderCounts['ordered_count'] ?? 0)],
-        ['label' => 'Non-ordered', 'value' => intval($orderCounts['non_ordered_count'] ?? 0)]
+        ['label' => 'Ordered', 'value' => $orderedCount],
+        ['label' => 'Non-ordered', 'value' => max(0, $totalAuctions - $orderedCount)]
     ];
 }
 
 $auctionList = [];
-$auctionListSql = 'SELECT l.auction_id, l.item_name, l.auction_status, l.start_at, l.end_at, l.current_bid, l.starting_bid, IF(aol.order_id IS NOT NULL, 1, 0) AS has_order
-  FROM auction_listings l
-  LEFT JOIN auction_order_links aol ON aol.auction_id = l.auction_id' . $whereClause . '
+$auctionListSql = 'SELECT l.auction_id, l.item_name, l.auction_status, l.start_at, l.end_at, l.current_bid, l.starting_bid,
+  IF(EXISTS(SELECT 1 FROM auction_order_links aol WHERE aol.auction_id = l.auction_id AND aol.order_id IS NOT NULL), 1, 0) AS has_order
+  FROM auction_listings l' . $whereClause . '
   ORDER BY l.start_at DESC';
 $auctionListResult = $conn->query($auctionListSql);
 if ($auctionListResult) {

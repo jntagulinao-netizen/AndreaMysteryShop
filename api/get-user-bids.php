@@ -32,8 +32,8 @@ if ($tableCheck && $tableCheck->num_rows > 0) {
 }
 
 $sql = $hasOrderLinkTable
-    ? 'SELECT b.bid_id, b.auction_id, b.bid_amount, b.bid_status, b.created_at, l.item_name, l.auction_status, l.start_at, l.end_at, l.current_bid, l.sold_price, l.winner_user_id, c.category_name, aol.order_id FROM auction_bids b INNER JOIN auction_listings l ON l.auction_id = b.auction_id LEFT JOIN categories c ON c.category_id = l.category_id LEFT JOIN auction_order_links aol ON aol.auction_id = l.auction_id WHERE b.user_id = ? ORDER BY b.bid_id DESC LIMIT ?'
-    : 'SELECT b.bid_id, b.auction_id, b.bid_amount, b.bid_status, b.created_at, l.item_name, l.auction_status, l.start_at, l.end_at, l.current_bid, l.sold_price, l.winner_user_id, c.category_name, NULL AS order_id FROM auction_bids b INNER JOIN auction_listings l ON l.auction_id = b.auction_id LEFT JOIN categories c ON c.category_id = l.category_id WHERE b.user_id = ? ORDER BY b.bid_id DESC LIMIT ?';
+    ? 'SELECT b.bid_id, b.auction_id, b.bid_amount, b.bid_status, b.created_at, l.item_name, l.auction_status, l.start_at, l.end_at, l.current_bid, l.sold_price, l.winner_user_id, c.category_name, aol.order_id, aol.auction_order_id, aol.status AS link_status, aol.secondary_offer_expires_at, aol.original_winner_user_id, o.status AS order_status FROM auction_bids b INNER JOIN auction_listings l ON l.auction_id = b.auction_id LEFT JOIN categories c ON c.category_id = l.category_id LEFT JOIN auction_order_links aol ON aol.auction_order_id = (SELECT MAX(auction_order_id) FROM auction_order_links WHERE auction_id = l.auction_id AND user_id = b.user_id) LEFT JOIN orders o ON o.order_id = aol.order_id WHERE b.user_id = ? ORDER BY b.bid_id DESC LIMIT ?'
+    : 'SELECT b.bid_id, b.auction_id, b.bid_amount, b.bid_status, b.created_at, l.item_name, l.auction_status, l.start_at, l.end_at, l.current_bid, l.sold_price, l.winner_user_id, c.category_name, NULL AS order_id, NULL AS auction_order_id, NULL AS link_status, NULL AS secondary_offer_expires_at, NULL AS original_winner_user_id, NULL AS order_status FROM auction_bids b INNER JOIN auction_listings l ON l.auction_id = b.auction_id LEFT JOIN categories c ON c.category_id = l.category_id WHERE b.user_id = ? ORDER BY b.bid_id DESC LIMIT ?';
 
 $stmt = $conn->prepare($sql);
 if (!$stmt) {
@@ -80,6 +80,9 @@ while ($row = $res->fetch_assoc()) {
     $isCurrentHighest = $auctionStatus === 'active' && $topBidderByAuction[$auctionId] === $userId;
     $isHighestBidRecord = $topBidIdByAuction[$auctionId] === (int)($row['bid_id'] ?? 0);
 
+    $originalWinnerUserId = $row['original_winner_user_id'] !== null ? (int)$row['original_winner_user_id'] : null;
+    $isSecondaryAccepted = (string)($row['link_status'] ?? '') === 'linked' && (string)($row['order_status'] ?? '') === 'pending' && $originalWinnerUserId !== null;
+
     $rows[] = [
         'bid_id' => (int)($row['bid_id'] ?? 0),
         'auction_id' => $auctionId,
@@ -97,8 +100,13 @@ while ($row = $res->fetch_assoc()) {
         'is_winner' => $row['winner_user_id'] !== null && (int)$row['winner_user_id'] === $userId,
         'is_current_highest' => $isCurrentHighest,
         'is_highest_bid_record' => $isHighestBidRecord,
-        'checked_out' => $row['order_id'] !== null,
+        'link_status' => (string)($row['link_status'] ?? ''),
+        'secondary_offer_expires_at' => (string)($row['secondary_offer_expires_at'] ?? ''),
+        'order_status' => (string)($row['order_status'] ?? ''),
+        'original_winner_user_id' => $originalWinnerUserId,
+        'checked_out' => $row['order_id'] !== null || (string)($row['link_status'] ?? '') === 'cancelled',
         'order_id' => $row['order_id'] !== null ? (int)$row['order_id'] : null,
+        'auction_order_id' => $row['auction_order_id'] !== null ? (int)$row['auction_order_id'] : null,
         'cover_image' => $coverImage
     ];
 }
