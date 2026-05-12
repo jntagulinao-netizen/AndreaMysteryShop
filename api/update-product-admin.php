@@ -77,6 +77,7 @@ $price = round((float)$priceRaw, 2);
 $stock = intval($stockRaw);
 $variants = [];
 $newVariants = [];
+$deletedVariantIds = [];
 $newMainImage = null;
 $additionalMainImages = [];
 $variantAdditionalImageFiles = [];
@@ -201,6 +202,24 @@ if ($newVariantsRaw !== '') {
             'stock' => intval($variantStock)
         ];
     }
+}
+
+$deletedVariantIdsRaw = trim((string)($_POST['deleted_variant_ids'] ?? ''));
+if ($deletedVariantIdsRaw !== '') {
+    $decodedDeletedVariantIds = json_decode($deletedVariantIdsRaw, true);
+    if (!is_array($decodedDeletedVariantIds)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid deleted variants payload']);
+        exit;
+    }
+
+    foreach ($decodedDeletedVariantIds as $deletedVariantId) {
+        $variantId = intval($deletedVariantId);
+        if ($variantId > 0) {
+            $deletedVariantIds[] = $variantId;
+        }
+    }
+    $deletedVariantIds = array_values(array_unique($deletedVariantIds));
 }
 
 $variantImageUpdatesRaw = trim((string)($_POST['variant_image_updates'] ?? ''));
@@ -711,6 +730,76 @@ try {
                     'pinned_new_image_index' => -1
                 ];
             }
+        }
+    }
+
+    if (count($deletedVariantIds) > 0) {
+        foreach ($deletedVariantIds as $deletedVariantId) {
+            if ($deletedVariantId <= 0) {
+                continue;
+            }
+
+            $deletedVariantStmt = $conn->prepare('SELECT product_id, parent_product_id FROM products WHERE product_id = ? LIMIT 1');
+            if (!$deletedVariantStmt) {
+                throw new Exception('Failed to prepare deleted variant lookup');
+            }
+            $deletedVariantStmt->bind_param('i', $deletedVariantId);
+            if (!$deletedVariantStmt->execute()) {
+                throw new Exception('Failed to read deleted variant');
+            }
+            $deletedVariantRes = $deletedVariantStmt->get_result();
+            $deletedVariantRow = $deletedVariantRes ? $deletedVariantRes->fetch_assoc() : null;
+            $deletedVariantStmt->close();
+
+            if (!$deletedVariantRow) {
+                continue;
+            }
+
+            $deletedVariantImagesStmt = $conn->prepare('SELECT image_id, image_url FROM product_images WHERE product_id = ?');
+            if (!$deletedVariantImagesStmt) {
+                throw new Exception('Failed to prepare deleted variant image lookup');
+            }
+            $deletedVariantImagesStmt->bind_param('i', $deletedVariantId);
+            if (!$deletedVariantImagesStmt->execute()) {
+                throw new Exception('Failed to read deleted variant images');
+            }
+            $deletedVariantImagesRes = $deletedVariantImagesStmt->get_result();
+            $deletedVariantImages = [];
+            while ($imageRow = $deletedVariantImagesRes->fetch_assoc()) {
+                $deletedVariantImages[] = [
+                    'image_id' => (int)$imageRow['image_id'],
+                    'image_url' => (string)$imageRow['image_url']
+                ];
+            }
+            $deletedVariantImagesStmt->close();
+
+            foreach ($deletedVariantImages as $imageRow) {
+                $deleteDeletedVariantImageStmt = $conn->prepare('DELETE FROM product_images WHERE image_id = ? AND product_id = ?');
+                if (!$deleteDeletedVariantImageStmt) {
+                    throw new Exception('Failed to prepare deleted variant image delete query');
+                }
+                $imageId = (int)$imageRow['image_id'];
+                $deleteDeletedVariantImageStmt->bind_param('ii', $imageId, $deletedVariantId);
+                if (!$deleteDeletedVariantImageStmt->execute()) {
+                    throw new Exception('Failed to delete variant image');
+                }
+                $deleteDeletedVariantImageStmt->close();
+
+                $candidatePath = absolutePathFromRelative((string)$imageRow['image_url']);
+                if (is_file($candidatePath)) {
+                    $deletedFilesAfterCommit[] = $candidatePath;
+                }
+            }
+
+            $deleteDeletedVariantStmt = $conn->prepare('DELETE FROM products WHERE product_id = ? LIMIT 1');
+            if (!$deleteDeletedVariantStmt) {
+                throw new Exception('Failed to prepare variant delete query');
+            }
+            $deleteDeletedVariantStmt->bind_param('i', $deletedVariantId);
+            if (!$deleteDeletedVariantStmt->execute()) {
+                throw new Exception('Failed to delete variant');
+            }
+            $deleteDeletedVariantStmt->close();
         }
     }
 

@@ -1437,6 +1437,7 @@ if ($currentView === 'archived') {
     let newVariantTempCounter = 1;
     let pendingMainVariantSelection = '';
     let onlySwitchedMainVariant = false;
+    let deletedExistingVariantIds = [];
     let currentPage = 1;
     let itemsPerPage = 12;
     let totalPages = 1;
@@ -2478,7 +2479,7 @@ if ($currentView === 'archived') {
             <div class="variant-images-grid"></div>
             <div class="variant-row-actions">
               <button type="button" class="variant-main-btn ${isMainSelection ? 'active' : ''}" data-main-selection="${escapeHtml(selectionKey)}">${mainActionLabel}</button>
-              ${variant.isNew ? '<button type="button" class="variant-remove-row-btn">Remove Variant</button>' : ''}
+              <button type="button" class="variant-remove-row-btn">${variant.isNew ? 'Remove Variant' : 'Remove Saved Variant'}</button>
             </div>
           </div>
         </div>
@@ -2504,9 +2505,24 @@ if ($currentView === 'archived') {
       renderVariantsEditSectionFromState();
     }
 
+    function syncVariantEditorsFromDom(rowsContainer) {
+      const rows = rowsContainer ? rowsContainer.querySelectorAll('.variant-edit-row') : document.querySelectorAll('.variant-edit-row');
+      rows.forEach((row) => {
+        const tempId = Number(row.querySelector('.variant-temp-id')?.value || 0);
+        const variant = findEditingVariantByTempId(tempId);
+        if (!variant) return;
+
+        variant.name = (row.querySelector('.variant-name')?.value || '').trim();
+        variant.price = row.querySelector('.variant-price')?.value || '0';
+        variant.stock = row.querySelector('.variant-stock')?.value || '0';
+      });
+    }
+
     function renderVariantsEditSectionFromState() {
       const rows = document.getElementById('variantsEditRows');
       if (!rows) return;
+
+      syncVariantEditorsFromDom(rows);
 
       rows.innerHTML = currentEditingVariants.map((variant) => buildVariantRowMarkup(variant)).join('');
 
@@ -2525,6 +2541,10 @@ if ($currentView === 'archived') {
             const index = currentEditingVariants.findIndex((variant) => Number(variant.tempId) === tempId);
             if (index === -1) return;
             const removedVariant = currentEditingVariants.splice(index, 1)[0];
+            const removedVariantId = Number(removedVariant.id || 0);
+            if (removedVariantId > 0) {
+              deletedExistingVariantIds.push(removedVariantId);
+            }
             const removedSelectionKey = Number(removedVariant.id || 0) > 0
               ? `id:${Number(removedVariant.id)}`
               : `temp:${Number(removedVariant.tempId || 0)}`;
@@ -2568,6 +2588,7 @@ if ($currentView === 'archived') {
       section.style.display = 'block';
       pendingMainVariantSelection = '';
       onlySwitchedMainVariant = false;
+      deletedExistingVariantIds = [];
       currentEditingVariants = childVariants.map((v) => ({
         id: Number(v.id),
         tempId: Number(v.id),
@@ -2579,6 +2600,9 @@ if ($currentView === 'archived') {
         newImages: [],
         pinnedKey: normalizeVariantImages(v.image).length > 0 ? 'e:0' : ''
       }));
+      newVariantTempCounter = currentEditingVariants.reduce((max, variant) => {
+        return Math.max(max, Number(variant.tempId || 0));
+      }, 0) + 1;
 
       if (addBtn) {
         addBtn.onclick = addNewVariantRow;
@@ -3202,6 +3226,12 @@ if ($currentView === 'archived') {
         }
 
         const body = new FormData();
+        if (deletedExistingVariantIds.length > 0) {
+          const uniqueDeletedVariantIds = Array.from(new Set(deletedExistingVariantIds.map((id) => Number(id)).filter((id) => id > 0)));
+          if (uniqueDeletedVariantIds.length > 0) {
+            body.append('deleted_variant_ids', JSON.stringify(uniqueDeletedVariantIds));
+          }
+        }
         body.append('product_id', String(productId));
         body.append('product_name', productName);
         body.append('price', String(Number(price).toFixed(2)));
@@ -3476,6 +3506,7 @@ if ($currentView === 'archived') {
       currentEditingVariants = [];
       pendingMainVariantSelection = '';
       onlySwitchedMainVariant = false;
+      deletedExistingVariantIds = [];
     }
 
     async function loadProducts() {
